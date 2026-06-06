@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "node-gyp": "^12.4.0",
+    "tree-sitter-cli": "^0.26.9"
+  }
+}

@@ -1,0 +1,21 @@
+=================================
+Simple
+=================================
+[ testing = 5 ]
+---
+(mel
+ (list
+  (expr_list
+   (expr
+	  (simple_expr
+	  (assignment_expr
+     (identifier)
+	   (literal
+	    (number_literal)
+	   )
+		)
+		)
+	 )
+  )
+ )
+)

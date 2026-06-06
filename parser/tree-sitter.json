@@ -1,0 +1,42 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "mel",
+      "camelcase": "Mel",
+      "title": "Mel",
+      "scope": "source.mel",
+      "file-types": [
+        "mel"
+      ],
+      "injection-regex": "^mel$",
+      "class-name": "TreeSitterMel"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "GPLv3",
+    "description": "Metadata Expression Language",
+    "authors": [
+      {
+        "name": "Will Hawkins",
+        "email": "hawkinsw@obs.cr",
+        "url": ""
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/tree-sitter/tree-sitter-mel",
+      "funding": ""
+    }
+  },
+  "bindings": {
+    "c": false,
+    "go": false,
+    "java": false,
+    "node": false,
+    "python": false,
+    "rust": true,
+    "swift": false,
+    "zig": false
+  }
+}

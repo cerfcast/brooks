@@ -1,0 +1,42 @@
+on: [push, pull_request]
+
+name: Continuous Integration
+
+jobs:
+  grammar-tests:
+    name: Grammar Tests
+    runs-on: ubuntu-build
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v4
+      - uses: tree-sitter/setup-action@v2
+      # Because our tree-sitter code is in a subdirectory,
+      # and working-directory does not apply to uses, we
+      # are forced to specify calls to the CI ourselves.
+      # See https://github.com/orgs/community/discussions/25742
+      - run: tree-sitter generate
+        working-directory: ./parser
+      - run: tree-sitter test
+        working-directory: ./parser
+  library-tests:
+    name: Library Tests
+    runs-on: ubuntu-build
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v4
+      - uses: tree-sitter/setup-action@v2
+      # Because our tree-sitter code is in a subdirectory,
+      # and working-directory does not apply to uses, we
+      # are forced to specify calls to the CI ourselves.
+      # See https://github.com/orgs/community/discussions/25742
+      - run: tree-sitter generate
+        working-directory: ./parser
+      - run: cargo build
+      - run: cargo test
+  library-format-tests:
+    name: Library Format Tests
+    runs-on: ubuntu-build
+    steps:
+      - uses: actions/checkout@v2
+      - run: cargo fmt
+

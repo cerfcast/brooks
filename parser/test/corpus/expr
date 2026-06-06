@@ -1,0 +1,230 @@
+=================================
+Associativity Check
+=================================
+5 + 2
+---
+(mel
+ (expr
+  (simple_expr
+   (binary_expr
+	  (expr
+	   (simple_expr
+	    (literal_expr
+	     (literal
+		    (number_literal)
+		   )
+		  )
+		 )
+	  )
+	  (binary_infix_operator
+	   (math_operator
+		  (math_plus)
+		 )
+	  )
+    (expr
+	   (simple_expr
+	    (literal_expr
+	     (literal
+		    (number_literal)
+		   )
+		  )
+		 )
+	  )
+	 )
+	)
+ )
+)
+
+=================================
+Associativity Check
+=================================
+5 + 2 - 3
+---
+(mel
+ (expr
+  (simple_expr
+   (binary_expr
+	  (expr
+	   (simple_expr
+      (binary_expr
+	     (expr
+		    (simple_expr
+	       (literal_expr
+	        (literal
+		       (number_literal)
+		      )
+		     )
+	      )
+		   )
+	     (binary_infix_operator
+	      (math_operator
+		     (math_plus)
+		    )
+	     )
+       (expr
+		    (simple_expr
+	       (literal_expr
+	        (literal
+		       (number_literal)
+		      )
+		     )
+			  )
+	     )
+	    )
+		 )
+    )
+    (binary_infix_operator
+     (math_operator
+		  (math_minus)
+		 )
+	  )
+    (expr
+	   (simple_expr
+	    (literal_expr
+	     (literal
+	     (number_literal)
+	     )
+      )
+		 )
+	  )
+	 )
+  )
+ )
+)
+
+=================================
+Associativity Check
+=================================
+5 + 2 - 3 + 6
+---
+(mel
+ (expr
+  (simple_expr
+   (binary_expr
+	  (expr
+     (simple_expr
+      (binary_expr
+	     (expr
+	      (simple_expr
+         (binary_expr
+			    (expr
+	         (simple_expr
+	          (literal_expr
+	           (literal
+		          (number_literal)
+		         )
+		        )
+				   )
+	        )
+	        (binary_infix_operator
+	         (math_operator
+		        (math_plus)
+		       )
+	        )
+			    (expr
+	         (simple_expr
+	          (literal_expr
+	           (literal
+		          (number_literal)
+		         )
+		        )
+				   )
+	        )
+         )
+			  )
+		   )
+	     (binary_infix_operator
+	      (math_operator
+		     (math_minus)
+		    )
+	     )
+		   (expr
+	      (simple_expr
+         (literal_expr
+          (literal
+	         (number_literal)
+	        )
+		     )
+			  )
+		   )
+		  )
+		 )
+	  )
+    (binary_infix_operator
+     (math_operator
+		  (math_plus)
+		 )
+	  )
+    (expr
+     (simple_expr
+	    (literal_expr
+	     (literal
+	     (number_literal)
+	     )
+      )
+		 )
+	  )
+	 )
+  )
+ )
+)
+=================================
+Associativity Check
+=================================
+5 + ( 2 - 3 )
+---
+(mel
+ (expr
+  (simple_expr
+   (binary_expr
+	  (expr
+		(simple_expr
+      (literal_expr
+       (literal
+        (number_literal)
+		   )
+		  )
+	   )
+	  )
+    (binary_infix_operator
+     (math_operator
+      (math_plus)
+     )
+    )
+    (expr
+     (grouped_expr
+	    (expr
+		   (simple_expr
+			  (binary_expr
+				 (expr
+				  (simple_expr
+					 (literal_expr
+					  (literal
+						 (number_literal)
+						)
+					 )
+					)
+				 )
+         (binary_infix_operator
+          (math_operator
+		       (math_minus)
+		      )
+	       )
+         (expr
+				  (simple_expr
+					 (literal_expr
+					  (literal
+						 (number_literal)
+						)
+					 )
+					)
+				 )
+			  )
+			 )
+		  )
+		 )
+	  )
+	 )
+  )
+ )
+)
