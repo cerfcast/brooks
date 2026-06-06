@@ -15,7 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[allow(dead_code)]
-mod ast;
-#[allow(dead_code)]
-mod compiler;
+pub trait MELAST {}
+pub struct FunctionCall {}
+
+pub struct Mel {}
+
+impl MELAST for Mel {}
+impl MELAST for FunctionCall {}
