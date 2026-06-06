@@ -5,7 +5,7 @@ name: Continuous Integration
 jobs:
   grammar-tests:
     name: Grammar Tests
-    runs-on: ubuntu-build
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v4
@@ -20,7 +20,7 @@ jobs:
         working-directory: ./parser
   library-tests:
     name: Library Tests
-    runs-on: ubuntu-build
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v4
@@ -35,7 +35,7 @@ jobs:
       - run: cargo test
   library-format-tests:
     name: Library Format Tests
-    runs-on: ubuntu-build
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - run: cargo fmt
