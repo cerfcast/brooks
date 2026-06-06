@@ -1,5 +1,20 @@
 [
   {
+    "type": "argument_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "arguments",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "arguments",
     "named": true,
     "fields": {},
@@ -8,11 +23,11 @@
       "required": true,
       "types": [
         {
-          "type": "expr",
+          "type": "arguments",
           "named": true
         },
         {
-          "type": "expr_list",
+          "type": "expr",
           "named": true
         }
       ]
@@ -84,6 +99,11 @@
     }
   },
   {
+    "type": "boolean_literal",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "comparison_operator",
     "named": true,
     "fields": {},
@@ -92,23 +112,23 @@
       "required": true,
       "types": [
         {
-          "type": "binary_eq",
+          "type": "eq",
           "named": true
         },
         {
-          "type": "binary_gt",
+          "type": "gt",
           "named": true
         },
         {
-          "type": "binary_gte",
+          "type": "gte",
           "named": true
         },
         {
-          "type": "binary_lt",
+          "type": "lt",
           "named": true
         },
         {
-          "type": "binary_lte",
+          "type": "lte",
           "named": true
         }
       ]
@@ -161,7 +181,7 @@
       "required": true,
       "types": [
         {
-          "type": "arguments",
+          "type": "argument_list",
           "named": true
         },
         {
@@ -210,6 +230,10 @@
       "required": true,
       "types": [
         {
+          "type": "boolean_literal",
+          "named": true
+        },
+        {
           "type": "number_literal",
           "named": true
         },
@@ -255,11 +279,6 @@
     }
   },
   {
-    "type": "math_minus",
-    "named": true,
-    "fields": {}
-  },
-  {
     "type": "math_operator",
     "named": true,
     "fields": {},
@@ -268,28 +287,23 @@
       "required": true,
       "types": [
         {
-          "type": "math_div",
+          "type": "div",
           "named": true
         },
         {
-          "type": "math_minus",
+          "type": "minus",
           "named": true
         },
         {
-          "type": "math_mul",
+          "type": "mul",
           "named": true
         },
         {
-          "type": "math_plus",
+          "type": "plus",
           "named": true
         }
       ]
     }
-  },
-  {
-    "type": "math_plus",
-    "named": true,
-    "fields": {}
   },
   {
     "type": "mel",
@@ -310,16 +324,6 @@
         }
       ]
     }
-  },
-  {
-    "type": "minus",
-    "named": true,
-    "fields": {}
-  },
-  {
-    "type": "plus",
-    "named": true,
-    "fields": {}
   },
   {
     "type": "prefix_expr",
@@ -388,6 +392,10 @@
           "named": true
         },
         {
+          "type": "identifier",
+          "named": true
+        },
+        {
           "type": "literal_expr",
           "named": true
         },
@@ -407,15 +415,7 @@
     "named": false
   },
   {
-    "type": "+",
-    "named": false
-  },
-  {
     "type": ",",
-    "named": false
-  },
-  {
-    "type": "-",
     "named": false
   },
   {
@@ -439,23 +439,23 @@
     "named": true
   },
   {
-    "type": "binary_eq",
+    "type": "div",
     "named": true
   },
   {
-    "type": "binary_gt",
+    "type": "eq",
     "named": true
   },
   {
-    "type": "binary_gte",
+    "type": "false",
+    "named": false
+  },
+  {
+    "type": "gt",
     "named": true
   },
   {
-    "type": "binary_lt",
-    "named": true
-  },
-  {
-    "type": "binary_lte",
+    "type": "gte",
     "named": true
   },
   {
@@ -463,11 +463,19 @@
     "named": true
   },
   {
-    "type": "math_div",
+    "type": "lt",
     "named": true
   },
   {
-    "type": "math_mul",
+    "type": "lte",
+    "named": true
+  },
+  {
+    "type": "minus",
+    "named": true
+  },
+  {
+    "type": "mul",
     "named": true
   },
   {
@@ -479,12 +487,20 @@
     "named": true
   },
   {
+    "type": "plus",
+    "named": true
+  },
+  {
     "type": "string_concat",
     "named": true
   },
   {
     "type": "string_literal",
     "named": true
+  },
+  {
+    "type": "true",
+    "named": false
   },
   {
     "type": "uneg",

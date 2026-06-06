@@ -1,0 +1,109 @@
+=================================
+Function Call 
+=================================
+simple()
+---
+(mel
+ (expr
+  (simple_expr
+   (function_call_expr
+	  (identifier)
+		(argument_list)
+	 )
+	)
+ )
+)
+
+=================================
+Function Call (Name Starts With Underscore)
+=================================
+_start_with_underscore()
+---
+(mel
+ (expr
+  (simple_expr
+   (function_call_expr
+	  (identifier)
+		(argument_list)
+	 )
+	)
+ )
+)
+
+=================================
+Function Call (With Arguments)
+=================================
+simple(a, b, c)
+---
+(mel
+ (expr
+  (simple_expr
+   (function_call_expr
+	  (identifier)
+		(argument_list
+		 (arguments
+		  (arguments
+			 (arguments
+			  (expr
+				 (simple_expr
+				  (identifier)
+				 )
+				)
+			 )
+			 (expr
+			  (simple_expr
+				 (identifier)
+				)
+			 )
+			)
+			(expr
+			 (simple_expr
+			  (identifier)
+			 )
+			)
+		 )
+    )
+	 )
+	)
+ )
+)
+
+=================================
+Function Call (Name Starts With Number)
+=================================
+1start_with_underscore()
+---
+(mel
+ (expr
+  (simple_expr
+   (binary_expr
+    (expr
+     (simple_expr
+      (literal_expr
+       (literal
+        (number_literal)
+			 )
+			)
+		 )
+		)
+    (ERROR
+     (UNEXPECTED 's')
+		)
+    (binary_infix_operator
+     (logic_operator
+      (or)
+		 )
+		)
+    (expr
+     (simple_expr
+      (function_call_expr
+       (identifier)
+       (argument_list)
+			)
+		 )
+		)
+	 )
+	)
+ )
+)
+

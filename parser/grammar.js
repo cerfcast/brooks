@@ -27,15 +27,17 @@ export default grammar({
     list: $ => seq("[", optional($.expr_list), "]"),
 
     expr_list: $ => choice($.expr, seq($.expr_list, ",", $.expr)),
-    arguments: $ => choice($.expr, seq($.expr_list, ",", $.expr)),
+
+    argument_list: $ => seq("(", optional($.arguments), ")"),
+    arguments: $ => choice($.expr, seq($.arguments, ",", $.expr)),
 
     // Grouping expressions with parenthesis allows for precedence.
     expr: $ => choice($.grouped_expr, $.simple_expr),
     grouped_expr: $ => seq("(", $.expr, ")"),
-    simple_expr: $ => choice($.assignment_expr, $.function_call_expr, $.binary_expr, $.prefix_expr, $.literal_expr),
+    simple_expr: $ => choice($.assignment_expr, $.function_call_expr, $.binary_expr, $.prefix_expr, $.literal_expr, $.identifier),
 
     assignment_expr: $ => seq($.identifier, "=", $.literal),
-    function_call_expr: $ => seq($.identifier, "(", optional($.arguments), ")"),
+    function_call_expr: $ => seq($.identifier, $.argument_list),
 
     // Assume that all binary expressions are left associative.
     binary_expr: $ => prec.left(1, seq($.expr, $.binary_infix_operator, $.expr)),
@@ -43,17 +45,18 @@ export default grammar({
     prefix_expr: $ => prec.right(2, seq($.prefix_operator, $.expr)),
     literal_expr: $ => $.literal,
 
-    literal: $ => choice($.string_literal, $.number_literal),
-    identifier: _ => /[_a-zA-Z][_a-zA-Z\.\-\#]+/,
+    literal: $ => choice($.string_literal, $.number_literal, $.boolean_literal),
+    identifier: _ => /[_a-zA-Z][_a-zA-Z]*/,
 
     number_literal: _ => /[0-9]+/,
     string_literal: _ => /"[a-z A-Z]*"/,
+    boolean_literal: _ => choice("true", "false"),
 
     // Binary infix operators.
     binary_infix_operator: $ => choice($.logic_operator, $.comparison_operator, $.math_operator, $.string_concat),
     logic_operator: $ => choice($.and, $.or),
-    comparison_operator: $ => choice($.binary_eq, $.binary_lt, $.binary_lte, $.binary_gt, $.binary_gte),
-    math_operator: $ => choice($.math_plus, $.math_minus, $.math_mul, $.math_div),
+    comparison_operator: $ => choice($.eq, $.lt, $.lte, $.gt, $.gte),
+    math_operator: $ => choice($.plus, $.minus, $.mul, $.div),
 
     prefix_operator: $ => choice($.plus, $.minus, $.bang, $.uneg),
 
@@ -68,16 +71,14 @@ export default grammar({
 
     string_concat: _ => '.',
 
-    binary_eq: _ => "==",
-    binary_lt: _ => "<",
-    binary_lte: _ => "<=",
-    binary_gt: _ => ">",
-    binary_gte: _ => ">=",
+    eq: _ => "==",
+    lt: _ => "<",
+    lte: _ => "<=",
+    gt: _ => ">",
+    gte: _ => ">=",
 
-    math_plus: _ => '+',
-    math_minus: _ => '-',
-    math_mul: _ => '*',
-    math_div: _ => '/',
+    mul: _ => '*',
+    div: _ => '/',
 
 /*
 <list>                ::= "[" "]" | "[" <expr_list> "]"

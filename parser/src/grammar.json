@@ -66,6 +66,31 @@
         }
       ]
     },
+    "argument_list": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "arguments"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
+    },
     "arguments": {
       "type": "CHOICE",
       "members": [
@@ -78,7 +103,7 @@
           "members": [
             {
               "type": "SYMBOL",
-              "name": "expr_list"
+              "name": "arguments"
             },
             {
               "type": "STRING",
@@ -144,6 +169,10 @@
         {
           "type": "SYMBOL",
           "name": "literal_expr"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
         }
       ]
     },
@@ -172,24 +201,8 @@
           "name": "identifier"
         },
         {
-          "type": "STRING",
-          "value": "("
-        },
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "arguments"
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "STRING",
-          "value": ")"
+          "type": "SYMBOL",
+          "name": "argument_list"
         }
       ]
     },
@@ -245,12 +258,16 @@
         {
           "type": "SYMBOL",
           "name": "number_literal"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "boolean_literal"
         }
       ]
     },
     "identifier": {
       "type": "PATTERN",
-      "value": "[_a-zA-Z][_a-zA-Z\\.\\-\\#]+"
+      "value": "[_a-zA-Z][_a-zA-Z]*"
     },
     "number_literal": {
       "type": "PATTERN",
@@ -259,6 +276,19 @@
     "string_literal": {
       "type": "PATTERN",
       "value": "\"[a-z A-Z]*\""
+    },
+    "boolean_literal": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "true"
+        },
+        {
+          "type": "STRING",
+          "value": "false"
+        }
+      ]
     },
     "binary_infix_operator": {
       "type": "CHOICE",
@@ -299,23 +329,23 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "binary_eq"
+          "name": "eq"
         },
         {
           "type": "SYMBOL",
-          "name": "binary_lt"
+          "name": "lt"
         },
         {
           "type": "SYMBOL",
-          "name": "binary_lte"
+          "name": "lte"
         },
         {
           "type": "SYMBOL",
-          "name": "binary_gt"
+          "name": "gt"
         },
         {
           "type": "SYMBOL",
-          "name": "binary_gte"
+          "name": "gte"
         }
       ]
     },
@@ -324,19 +354,19 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "math_plus"
+          "name": "plus"
         },
         {
           "type": "SYMBOL",
-          "name": "math_minus"
+          "name": "minus"
         },
         {
           "type": "SYMBOL",
-          "name": "math_mul"
+          "name": "mul"
         },
         {
           "type": "SYMBOL",
-          "name": "math_div"
+          "name": "div"
         }
       ]
     },
@@ -389,39 +419,31 @@
       "type": "STRING",
       "value": "."
     },
-    "binary_eq": {
+    "eq": {
       "type": "STRING",
       "value": "=="
     },
-    "binary_lt": {
+    "lt": {
       "type": "STRING",
       "value": "<"
     },
-    "binary_lte": {
+    "lte": {
       "type": "STRING",
       "value": "<="
     },
-    "binary_gt": {
+    "gt": {
       "type": "STRING",
       "value": ">"
     },
-    "binary_gte": {
+    "gte": {
       "type": "STRING",
       "value": ">="
     },
-    "math_plus": {
-      "type": "STRING",
-      "value": "+"
-    },
-    "math_minus": {
-      "type": "STRING",
-      "value": "-"
-    },
-    "math_mul": {
+    "mul": {
       "type": "STRING",
       "value": "*"
     },
-    "math_div": {
+    "div": {
       "type": "STRING",
       "value": "/"
     }

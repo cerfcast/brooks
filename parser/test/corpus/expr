@@ -18,7 +18,7 @@ Associativity Check
 	  )
 	  (binary_infix_operator
 	   (math_operator
-		  (math_plus)
+		  (plus)
 		 )
 	  )
     (expr
@@ -58,7 +58,7 @@ Associativity Check
 		   )
 	     (binary_infix_operator
 	      (math_operator
-		     (math_plus)
+		     (plus)
 		    )
 	     )
        (expr
@@ -75,7 +75,7 @@ Associativity Check
     )
     (binary_infix_operator
      (math_operator
-		  (math_minus)
+		  (minus)
 		 )
 	  )
     (expr
@@ -118,7 +118,7 @@ Associativity Check
 	        )
 	        (binary_infix_operator
 	         (math_operator
-		        (math_plus)
+		        (plus)
 		       )
 	        )
 			    (expr
@@ -135,7 +135,7 @@ Associativity Check
 		   )
 	     (binary_infix_operator
 	      (math_operator
-		     (math_minus)
+		     (minus)
 		    )
 	     )
 		   (expr
@@ -152,7 +152,7 @@ Associativity Check
 	  )
     (binary_infix_operator
      (math_operator
-		  (math_plus)
+		  (plus)
 		 )
 	  )
     (expr
@@ -188,7 +188,7 @@ Associativity Check
 	  )
     (binary_infix_operator
      (math_operator
-      (math_plus)
+      (plus)
      )
     )
     (expr
@@ -207,7 +207,7 @@ Associativity Check
 				 )
          (binary_infix_operator
           (math_operator
-		       (math_minus)
+		       (minus)
 		      )
 	       )
          (expr
@@ -226,5 +226,50 @@ Associativity Check
 	  )
 	 )
   )
+ )
+)
+=================================
+Unary Expression Check
+=================================
+true and ! false
+---
+(mel
+ (expr
+  (simple_expr
+   (binary_expr
+	  (expr
+		(simple_expr
+      (literal_expr
+       (literal
+        (boolean_literal)
+		   )
+		  )
+	   )
+	  )
+    (binary_infix_operator
+     (logic_operator
+      (and)
+     )
+    )
+    (expr
+     (simple_expr
+	    (prefix_expr
+			 (prefix_operator
+			  (bang)
+			 )
+			 (expr
+			  (simple_expr
+				 (literal_expr
+				  (literal
+					 (boolean_literal)
+					)
+				 )
+				)
+			 )
+			)
+		 )
+		)
+	 )
+	)
  )
 )
