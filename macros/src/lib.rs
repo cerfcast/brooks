@@ -2,7 +2,6 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::DeriveInput;
 
-
 #[proc_macro_derive(GrammarName)]
 pub fn grammar_name_derive(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(input).unwrap();

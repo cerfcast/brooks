@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use brooks_macros::GrammarName;
 use crate::grammar::GrammarNode;
+use brooks_macros::GrammarName;
 pub trait AST {}
 
 #[derive(GrammarName)]
@@ -26,7 +26,7 @@ pub struct FunctionCall {}
 /// A MEL Expression
 pub enum Expr {
     FunctionCall(FunctionCall),
-    BinaryInfixOperation
+    BinaryInfixOperation,
 }
 
 impl AST for Mel {}
