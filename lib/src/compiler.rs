@@ -19,7 +19,10 @@ use std::collections::HashMap;
 
 use tree_sitter::{self, Node, TreeCursor};
 
-use crate::ast::{FunctionCall, Expr, AST};
+use crate::{
+    ast::{AST, Expr, FunctionCall, Mel},
+    grammar::GrammarNode,
+};
 
 #[derive(Debug, Clone)]
 pub enum SyntaxError {
@@ -94,8 +97,7 @@ impl SyntaxVisitorDriver {
         match hm.get(walker.node().grammar_name()) {
             Some(callable) => (callable)(visitor, walker.node(), context, self),
             None => {
-                if grammar_name == "mel" || grammar_name == "expr" || grammar_name == "simple_expr"
-                {
+                if grammar_name == Mel::name() {
                     walker.goto_first_child();
                     self.visit(walker, visitor, context)
                 } else {

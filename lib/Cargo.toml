@@ -9,3 +9,4 @@ tree-sitter-mel = { path = "parser" }
 [dependencies]
 tree-sitter = "0.26.9"
 tree-sitter-mel = { path = "parser" }
+brooks-macros = { path = "../macros" }

@@ -19,3 +19,5 @@
 pub mod ast;
 #[allow(dead_code)]
 pub mod compiler;
+#[allow(dead_code)]
+pub mod grammar;

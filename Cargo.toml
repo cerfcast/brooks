@@ -5,7 +5,8 @@ edition = "2024"
 
 [workspace]
 resolver="3"
-members=["lib"]
+members=["lib", "macros"]
 
 [dependencies]
 brooks-lib = { path = "lib" }
+brooks-macros = { path = "macros" }

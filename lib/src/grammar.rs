@@ -15,19 +15,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use brooks_macros::GrammarName;
-use crate::grammar::GrammarNode;
-pub trait AST {}
 
-#[derive(GrammarName)]
-pub struct Mel {}
-pub struct FunctionCall {}
-
-/// A MEL Expression
-pub enum Expr {
-    FunctionCall(FunctionCall),
-    BinaryInfixOperation
+pub trait GrammarNode {
+    fn name() -> String;
 }
 
-impl AST for Mel {}
-impl AST for Expr {}
+#[cfg(test)]
+mod tests {
+    use crate::ast::Mel;
+    use crate::grammar::GrammarNode;
+
+    #[test]
+    fn test_grammar_node() {
+        assert_eq!(Mel::name(), "mel")
+    }
+}
