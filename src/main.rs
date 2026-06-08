@@ -1,3 +1,11 @@
+#[allow(
+    redundant_imports,
+    unused_imports,
+    clippy::single_component_path_imports
+)]
+use brooks_lib;
+
 fn main() {
-    println!("Hello, world!");
+    // TODO
+    println!("TODO")
 }

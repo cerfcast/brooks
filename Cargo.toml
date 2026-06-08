@@ -8,3 +8,4 @@ resolver="3"
 members=["lib"]
 
 [dependencies]
+brooks-lib = { path = "lib" }
