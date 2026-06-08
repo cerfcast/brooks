@@ -16,6 +16,6 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #[allow(dead_code)]
-mod ast;
+pub mod ast;
 #[allow(dead_code)]
-mod compiler;
+pub mod compiler;
