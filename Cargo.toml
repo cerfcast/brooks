@@ -1,11 +1,10 @@
 [package]
-name = "brooks"
+name = "brooks-cli"
 version = "0.1.0"
 edition = "2024"
 
-[build-dependencies]
-tree-sitter-mel = { path = "parser" }
+[workspace]
+resolver="3"
+members=["lib"]
 
 [dependencies]
-tree-sitter = "0.26.9"
-tree-sitter-mel = { path = "parser" }
