@@ -122,15 +122,15 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "grouped_expr"
+          "name": "_grouped_expr"
         },
         {
           "type": "SYMBOL",
-          "name": "simple_expr"
+          "name": "_simple_expr"
         }
       ]
     },
-    "grouped_expr": {
+    "_grouped_expr": {
       "type": "SEQ",
       "members": [
         {
@@ -147,7 +147,7 @@
         }
       ]
     },
-    "simple_expr": {
+    "_simple_expr": {
       "type": "CHOICE",
       "members": [
         {
@@ -168,7 +168,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "literal_expr"
+          "name": "_literal_expr"
         },
         {
           "type": "SYMBOL",
@@ -244,7 +244,7 @@
         ]
       }
     },
-    "literal_expr": {
+    "_literal_expr": {
       "type": "SYMBOL",
       "name": "literal"
     },

@@ -143,11 +143,31 @@
       "required": true,
       "types": [
         {
-          "type": "grouped_expr",
+          "type": "assignment_expr",
           "named": true
         },
         {
-          "type": "simple_expr",
+          "type": "binary_expr",
+          "named": true
+        },
+        {
+          "type": "expr",
+          "named": true
+        },
+        {
+          "type": "function_call_expr",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "prefix_expr",
           "named": true
         }
       ]
@@ -192,21 +212,6 @@
     }
   },
   {
-    "type": "grouped_expr",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "expr",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "list",
     "named": true,
     "fields": {},
@@ -239,21 +244,6 @@
         },
         {
           "type": "string_literal",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "literal_expr",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "literal",
           "named": true
         }
       ]
@@ -366,41 +356,6 @@
         },
         {
           "type": "uneg",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "simple_expr",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "assignment_expr",
-          "named": true
-        },
-        {
-          "type": "binary_expr",
-          "named": true
-        },
-        {
-          "type": "function_call_expr",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "literal_expr",
-          "named": true
-        },
-        {
-          "type": "prefix_expr",
           "named": true
         }
       ]

@@ -7,13 +7,11 @@ Simple
  (list
   (expr_list
    (expr
-	  (simple_expr
 	  (assignment_expr
      (identifier)
 	   (literal
 	    (number_literal)
 	   )
-		)
 		)
 	 )
   )
