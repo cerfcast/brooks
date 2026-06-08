@@ -15,9 +15,9 @@ jobs:
       # are forced to specify calls to the CI ourselves.
       # See https://github.com/orgs/community/discussions/25742
       - run: tree-sitter generate
-        working-directory: ./parser
+        working-directory: ./lib/parser
       - run: tree-sitter test
-        working-directory: ./parser
+        working-directory: ./lib/parser
   library-tests:
     name: Library Tests
     runs-on: ubuntu-latest
@@ -30,9 +30,10 @@ jobs:
       # are forced to specify calls to the CI ourselves.
       # See https://github.com/orgs/community/discussions/25742
       - run: tree-sitter generate
-        working-directory: ./parser
+        working-directory: ./lib/parser
       - run: cargo build
       - run: cargo test
+      - run: cargo test -p brooks-lib
   library-format-tests:
     name: Library Format Tests
     runs-on: ubuntu-latest
