@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 use tree_sitter::{self, Node, TreeCursor};
 
-use crate::ast::{FunctionCall, MELAST};
+use crate::ast::{FunctionCall, Expr, AST};
 
 #[derive(Debug, Clone)]
 pub enum SyntaxError {
@@ -29,16 +29,43 @@ pub type SyntaxVisitorResult<T> = Result<T, SyntaxError>;
 
 type VisitorableResult = bool;
 pub trait SyntaxVisitor<T> {
-    fn visit_function_call(&self, syntax: Node, context: &mut T);
-    fn visit_other(&self, syntax: Node, context: &mut T);
+    fn visit_function_call(
+        &self,
+        syntax: Node,
+        context: &mut T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<()>;
+    fn visit_expr(
+        &self,
+        syntax: Node,
+        context: &mut T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<()>;
 }
 
 pub struct MELCompiler {}
 
 pub struct MELCompilerContext {}
 impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
-    fn visit_function_call(&self, _syntax: Node, context: &mut MELCompilerContext) {}
-    fn visit_other(&self, _syntax: Node, context: &mut MELCompilerContext) {}
+    fn visit_function_call(
+        &self,
+        _syntax: Node,
+        _context: &mut MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<()> {
+        Ok(())
+    }
+    fn visit_expr(
+        &self,
+        _syntax: Node,
+        context: &mut MELCompilerContext,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<()> {
+        // An expr is just a wrapper. Navigate deeper.
+        let mut walker = _syntax.walk();
+        walker.goto_first_child();
+        driver.visit(walker, self, context)
+    }
 }
 
 pub struct SyntaxVisitorDriver {}
@@ -54,21 +81,18 @@ impl SyntaxVisitorDriver {
         let hm: HashMap<String, _> = HashMap::from([
             (
                 "function_call_expr".to_string(),
-                U::visit_other as fn(&U, Node, &mut _),
+                U::visit_function_call as fn(&U, Node, &mut _, &Self) -> SyntaxVisitorResult<()>,
             ),
             (
-                "testing".to_string(),
-                U::visit_function_call as fn(&U, Node, &mut _),
+                "expr".to_string(),
+                U::visit_expr as fn(&U, Node, &mut _, &Self) -> SyntaxVisitorResult<()>,
             ),
         ]);
 
         println!("Walker: {:?}", walker.node());
         let grammar_name = walker.node().grammar_name();
         match hm.get(walker.node().grammar_name()) {
-            Some(callable) => {
-                (callable)(visitor, walker.node(), context);
-                Ok(())
-            }
+            Some(callable) => (callable)(visitor, walker.node(), context, self),
             None => {
                 if grammar_name == "mel" || grammar_name == "expr" || grammar_name == "simple_expr"
                 {
@@ -89,7 +113,7 @@ pub enum CompilerError {
 }
 pub type CompileResult<T> = Result<T, CompilerError>;
 
-pub fn compile(source: &str) -> CompileResult<impl MELAST> {
+pub fn compile(source: &str) -> CompileResult<impl AST> {
     let mut parser = tree_sitter::Parser::new();
     let language = tree_sitter_mel::LANGUAGE;
     parser
@@ -106,7 +130,7 @@ pub fn compile(source: &str) -> CompileResult<impl MELAST> {
 
     vd.visit(walker, &sd, &mut cd)
         .map_err(CompilerError::SyntaxError)
-        .map(|_| FunctionCall {})
+        .map(|_| Expr::FunctionCall(FunctionCall {}))
 }
 
 #[cfg(test)]

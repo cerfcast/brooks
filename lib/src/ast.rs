@@ -15,10 +15,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub trait MELAST {}
-pub struct FunctionCall {}
+use brooks_macros::GrammarName;
+use crate::grammar::GrammarNode;
+pub trait AST {}
 
 pub struct Mel {}
+pub struct FunctionCall {}
 
-impl MELAST for Mel {}
-impl MELAST for FunctionCall {}
+/// A MEL Expression
+pub enum Expr {
+    FunctionCall(FunctionCall),
+    BinaryInfixOperation
+}
+
+impl AST for Mel {}
+impl AST for Expr {}
