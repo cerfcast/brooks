@@ -16,14 +16,22 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::grammar::GrammarNode;
-use brooks_macros::GrammarName;
-pub trait AST {}
+use brooks_macros::grammar_name;
 
-#[derive(GrammarName)]
+use std::fmt::Debug;
+pub trait AST: Debug {}
+
+#[derive(Debug)]
+#[grammar_name(mel)]
 pub struct Mel {}
+
+#[derive(Debug)]
+#[grammar_name(function_call_expr)]
 pub struct FunctionCall {}
 
 /// A MEL Expression
+#[derive(Debug)]
+#[grammar_name(expr)]
 pub enum Expr {
     FunctionCall(FunctionCall),
     BinaryInfixOperation,
@@ -31,3 +39,4 @@ pub enum Expr {
 
 impl AST for Mel {}
 impl AST for Expr {}
+impl AST for FunctionCall {}

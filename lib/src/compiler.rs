@@ -16,11 +16,11 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-
+use std::fmt::Debug;
 use tree_sitter::{self, Node, TreeCursor};
 
 use crate::{
-    ast::{AST, Expr, FunctionCall, Mel},
+    ast::{self, AST, FunctionCall},
     grammar::GrammarNode,
 };
 
@@ -30,42 +30,71 @@ pub enum SyntaxError {
 }
 pub type SyntaxVisitorResult<T> = Result<T, SyntaxError>;
 
-type VisitorableResult = bool;
 pub trait SyntaxVisitor<T> {
     fn visit_function_call(
         &self,
         syntax: Node,
         context: &mut T,
         driver: &SyntaxVisitorDriver,
-    ) -> SyntaxVisitorResult<()>;
+    ) -> SyntaxVisitorResult<T>;
     fn visit_expr(
         &self,
         syntax: Node,
         context: &mut T,
         driver: &SyntaxVisitorDriver,
-    ) -> SyntaxVisitorResult<()>;
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_mel(
+        &self,
+        syntax: Node,
+        context: &mut T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+}
+
+#[derive(Default)]
+pub struct MELCompilerContext {
+    ast: Option<Box<dyn AST>>,
+}
+
+impl Debug for MELCompilerContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MELCompilerContext")
+            .field("ast", &self.ast)
+            .finish()
+    }
 }
 
 pub struct MELCompiler {}
-
-pub struct MELCompilerContext {}
 impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
     fn visit_function_call(
         &self,
         _syntax: Node,
         _context: &mut MELCompilerContext,
         _driver: &SyntaxVisitorDriver,
-    ) -> SyntaxVisitorResult<()> {
-        Ok(())
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        Ok(MELCompilerContext {
+            ast: Some(Box::new(FunctionCall {})),
+        })
     }
     fn visit_expr(
         &self,
-        _syntax: Node,
+        syntax: Node,
         context: &mut MELCompilerContext,
         driver: &SyntaxVisitorDriver,
-    ) -> SyntaxVisitorResult<()> {
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
         // An expr is just a wrapper. Navigate deeper.
-        let mut walker = _syntax.walk();
+        let mut walker = syntax.walk();
+        walker.goto_first_child();
+        driver.visit(walker, self, context)
+    }
+    fn visit_mel(
+        &self,
+        syntax: Node,
+        context: &mut MELCompilerContext,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        // A mel is just a wrapper. Navigate deeper.
+        let mut walker = syntax.walk();
         walker.goto_first_child();
         driver.visit(walker, self, context)
     }
@@ -77,33 +106,29 @@ impl SyntaxVisitorDriver {
     #[allow(dead_code)]
     pub fn visit<T, U: SyntaxVisitor<T>>(
         &self,
-        mut walker: TreeCursor,
+        walker: TreeCursor,
         visitor: &U,
         context: &mut T,
-    ) -> SyntaxVisitorResult<()> {
+    ) -> SyntaxVisitorResult<T> {
         let hm: HashMap<String, _> = HashMap::from([
             (
-                "function_call_expr".to_string(),
-                U::visit_function_call as fn(&U, Node, &mut _, &Self) -> SyntaxVisitorResult<()>,
+                ast::FunctionCall::name(),
+                U::visit_function_call as fn(&U, Node, &mut _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
-                "expr".to_string(),
-                U::visit_expr as fn(&U, Node, &mut _, &Self) -> SyntaxVisitorResult<()>,
+                ast::Expr::name(),
+                U::visit_expr as fn(&U, Node, &mut _, &Self) -> SyntaxVisitorResult<T>,
+            ),
+            (
+                ast::Mel::name(),
+                U::visit_mel as fn(&U, Node, &mut _, &Self) -> SyntaxVisitorResult<T>,
             ),
         ]);
 
         println!("Walker: {:?}", walker.node());
-        let grammar_name = walker.node().grammar_name();
         match hm.get(walker.node().grammar_name()) {
             Some(callable) => (callable)(visitor, walker.node(), context, self),
-            None => {
-                if grammar_name == Mel::name() {
-                    walker.goto_first_child();
-                    self.visit(walker, visitor, context)
-                } else {
-                    Err(SyntaxError::NoSuchVisitor)
-                }
-            }
+            None => Err(SyntaxError::NoSuchVisitor),
         }
     }
 }
@@ -115,7 +140,7 @@ pub enum CompilerError {
 }
 pub type CompileResult<T> = Result<T, CompilerError>;
 
-pub fn compile(source: &str) -> CompileResult<impl AST> {
+pub fn compile(source: &str) -> CompileResult<MELCompilerContext> {
     let mut parser = tree_sitter::Parser::new();
     let language = tree_sitter_mel::LANGUAGE;
     parser
@@ -128,11 +153,10 @@ pub fn compile(source: &str) -> CompileResult<impl AST> {
     let walker = result.walk();
     let vd = SyntaxVisitorDriver {};
     let sd = MELCompiler {};
-    let mut cd = MELCompilerContext {};
+    let mut cc = MELCompilerContext::default();
 
-    vd.visit(walker, &sd, &mut cd)
+    vd.visit(walker, &sd, &mut cc)
         .map_err(CompilerError::SyntaxError)
-        .map(|_| Expr::FunctionCall(FunctionCall {}))
 }
 
 #[cfg(test)]
