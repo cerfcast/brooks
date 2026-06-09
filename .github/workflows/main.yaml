@@ -35,6 +35,7 @@ jobs:
       - run: cargo test
       - run: cargo test -p brooks-lib
       - run: cargo test -p brooks-macros
+      - run: cargo test --manifest-path lib/parser/Cargo.toml
   library-format-tests:
     name: Library Format Tests
     runs-on: ubuntu-latest
