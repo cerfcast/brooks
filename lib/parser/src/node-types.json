@@ -297,6 +297,10 @@
           "named": true
         },
         {
+          "type": "modulo",
+          "named": true
+        },
+        {
           "type": "mul",
           "named": true
         },
@@ -356,18 +360,6 @@
       "types": [
         {
           "type": "bang",
-          "named": true
-        },
-        {
-          "type": "minus",
-          "named": true
-        },
-        {
-          "type": "plus",
-          "named": true
-        },
-        {
-          "type": "uneg",
           "named": true
         }
       ]
@@ -442,6 +434,10 @@
     "named": true
   },
   {
+    "type": "modulo",
+    "named": true
+  },
+  {
     "type": "mul",
     "named": true
   },
@@ -468,9 +464,5 @@
   {
     "type": "true",
     "named": false
-  },
-  {
-    "type": "uneg",
-    "named": true
   }
 ]

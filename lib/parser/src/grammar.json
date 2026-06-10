@@ -375,6 +375,10 @@
         {
           "type": "SYMBOL",
           "name": "div"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "modulo"
         }
       ]
     },
@@ -383,19 +387,7 @@
       "members": [
         {
           "type": "SYMBOL",
-          "name": "plus"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "minus"
-        },
-        {
-          "type": "SYMBOL",
           "name": "bang"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "uneg"
         }
       ]
     },
@@ -454,6 +446,10 @@
     "div": {
       "type": "STRING",
       "value": "/"
+    },
+    "modulo": {
+      "type": "STRING",
+      "value": "%"
     }
   },
   "extras": [

@@ -231,3 +231,44 @@ true and ! false
   )
  )
 )
+=================================
+Math Check (Modulo)
+=================================
+5 % 2 - 3
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (binary_expr
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+     (binary_infix_operator
+      (math_operator
+       (modulo)
+      )
+     )
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+    )
+   )
+   (binary_infix_operator
+    (math_operator
+     (minus)
+    )
+   )
+   (expr
+    (literal
+     (number_literal)
+    )
+   )
+  )
+ )
+)
+
