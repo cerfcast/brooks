@@ -177,22 +177,20 @@ Associativity Check (Grouping)
     )
    )
    (expr
-    (expr
-     (binary_expr
-      (expr
-       (literal
-        (number_literal)
-       )
+    (binary_expr
+     (expr
+      (literal
+       (number_literal)
       )
-      (binary_infix_operator
-       (math_operator
-        (minus)
-       )
+     )
+     (binary_infix_operator
+      (math_operator
+       (minus)
       )
-      (expr
-       (literal
-        (number_literal)
-       )
+     )
+     (expr
+      (literal
+       (number_literal)
       )
      )
     )

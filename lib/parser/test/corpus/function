@@ -34,22 +34,16 @@ simple(a, b, c)
   (function_call_expr
    (identifier)
    (argument_list
-    (arguments
-     (arguments
-      (arguments
-       (expr
-         (identifier)
-        )
-      )
-      (expr
-       (identifier)
-      )
-     )
-     (expr
-      (identifier)
-     )
+    (argument
+     (identifier)
     )
-   )
+    (argument
+     (identifier)
+    )
+    (argument
+     (identifier)
+    )
+	 )
   )
  )
 )
