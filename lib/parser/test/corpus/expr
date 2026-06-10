@@ -271,4 +271,30 @@ Math Check (Modulo)
   )
  )
 )
+=================================
+Boolean Check (Regex Equality)
+=================================
+"satisfy" ~= "/testing/" 
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (literal
+     (string_literal)
+    )
+   )
+   (binary_infix_operator
+    (comparison_operator
+     (regex_eq)
+    )
+   )
+   (expr
+    (literal
+     (regex_literal)
+    )
+   )
+  )
+ )
+)
 

@@ -270,6 +270,10 @@
         {
           "type": "SYMBOL",
           "name": "boolean_literal"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "regex_literal"
         }
       ]
     },
@@ -297,6 +301,10 @@
           "value": "false"
         }
       ]
+    },
+    "regex_literal": {
+      "type": "PATTERN",
+      "value": "\"\\/[a-z A-Z]*\\/i?\""
     },
     "binary_infix_operator": {
       "type": "CHOICE",
@@ -338,6 +346,10 @@
         {
           "type": "SYMBOL",
           "name": "eq"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "regex_eq"
         },
         {
           "type": "SYMBOL",
@@ -422,6 +434,10 @@
     "eq": {
       "type": "STRING",
       "value": "=="
+    },
+    "regex_eq": {
+      "type": "STRING",
+      "value": "~="
     },
     "lt": {
       "type": "STRING",

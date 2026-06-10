@@ -146,6 +146,10 @@
         {
           "type": "lte",
           "named": true
+        },
+        {
+          "type": "regex_eq",
+          "named": true
         }
       ]
     }
@@ -252,6 +256,10 @@
         },
         {
           "type": "number_literal",
+          "named": true
+        },
+        {
+          "type": "regex_literal",
           "named": true
         },
         {
@@ -451,6 +459,14 @@
   },
   {
     "type": "plus",
+    "named": true
+  },
+  {
+    "type": "regex_eq",
+    "named": true
+  },
+  {
+    "type": "regex_literal",
     "named": true
   },
   {

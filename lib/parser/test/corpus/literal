@@ -1,0 +1,35 @@
+=================================
+Regex Literal
+=================================
+"/testing/" 
+---
+(mel
+ (expr
+  (literal
+   (regex_literal)
+  ) 
+ )
+)
+
+=================================
+Regex Literal (case insensitive)
+=================================
+"/testing/i" 
+---
+(mel
+ (expr
+  (literal
+   (regex_literal)
+  ) 
+ )
+)
+
+=================================
+Regex Literal (Invalid Syntax)
+=================================
+"/testing/j" 
+---
+(ERROR
+ (UNEXPECTED 'j')
+)
+
