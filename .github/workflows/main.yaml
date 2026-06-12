@@ -60,11 +60,10 @@ jobs:
       - run: cargo doc -p brooks-lib --no-deps
       - name: Fix file permissions
         shell: sh
-        run: |
-            chmod -c -R +rX "target/doc" |
-            while read line; do
-                echo "::warning title=Invalid file permissions automatically fixed::$line"
-            done
+        run: chmod -R a+rX target/doc
+      - name: List file permissions
+        shell: sh
+        run: ls -latr target/doc
       - name: Generate index.html file
         run: |
             echo "<meta http-equiv=refresh content=0;url=brooks_lib/index.html>" > target/doc/index.htm
