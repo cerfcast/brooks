@@ -226,7 +226,8 @@ impl AstVisitor<AstTextSerializerContext> for AstTextSerializer {
 #[cfg(test)]
 mod tests {
     use crate::{
-        compiler::compile,
+        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        expect_expr,
         serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},
     };
 
@@ -244,7 +245,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -270,7 +273,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -296,7 +301,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -327,8 +334,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
-
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
         let context = AstTextSerializerContext {
@@ -358,7 +366,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -389,7 +399,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -420,7 +432,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -446,7 +460,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -472,7 +488,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -502,7 +520,9 @@ mod tests {
 \t\tLiteral: true";
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -528,7 +548,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -554,7 +576,9 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = compiled.ast.expect("Missing AST");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};

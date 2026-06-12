@@ -12,7 +12,8 @@ mod test;
 
 use brooks_lib::{
     ast::AstVisitorDriver,
-    compiler::compile,
+    compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+    expect_expr,
     serializer::{AstTextSerializer, AstTextSerializerContext},
 };
 use clap::{CommandFactory, Parser, Subcommand};
@@ -47,7 +48,9 @@ fn compile_and_serialize(path: clio::ClioPath) -> CliResult<()> {
 
     let compile_result = compile(&String::from_utf8_lossy(&to_parse));
     let compiled = compile_result.expect("Compilation error");
-    let ast = compiled.ast.expect("Missing AST");
+    let ast = expect_expr!(compiled)
+        .ok_or(CompilerError::SyntaxError(EmptyContext))
+        .expect("Missing AST");
 
     let driver = AstVisitorDriver {};
     let visitor = AstTextSerializer {};

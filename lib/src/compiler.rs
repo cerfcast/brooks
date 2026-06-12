@@ -139,10 +139,24 @@ pub trait SyntaxVisitor<T> {
     ) -> SyntaxVisitorResult<T>;
 }
 
+/// A context for compilation used when visiting the parse tree.
 #[derive(Default, Clone)]
-pub struct MELCompilerContext {
-    pub ast: Option<Expr>,
-    pub infix_operator: Option<BinaryInfixOperator>,
+pub enum MELCompilerContext {
+    Expr(ast::Expr),
+    Operator(ast::BinaryInfixOperator),
+    #[default]
+    Empty,
+}
+
+/// Expect that the [`MELCompilerContext`] has an Expr.
+#[macro_export]
+macro_rules! expect_expr {
+    ( $x:expr ) => {{
+        match $x {
+            MELCompilerContext::Expr(e) => Some(e),
+            _ => None,
+        }
+    }};
 }
 
 pub struct MELCompiler {
@@ -159,45 +173,28 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let mut walker = syntax.walk();
         walker.goto_first_child();
 
-        let callee = match _driver.visit(walker.node(), self, MELCompilerContext::default())? {
-            MELCompilerContext {
-                ast: Some(Expr::Identifier(id)),
-                infix_operator: _,
-            } => Result::<Box<Identifier>, SyntaxError>::Ok(id),
-            MELCompilerContext {
-                ast: Some(x),
-                infix_operator: _,
-            } => Result::<Box<Identifier>, SyntaxError>::Err(SyntaxError::UnexpectedExprType(
-                format!("{x:?}"),
-                "Identifier".to_string(),
-            )),
+        let callee = match _driver.visit(walker.node(), self, _context.clone())? {
+            MELCompilerContext::Expr(ast::Expr::Identifier(id)) => {
+                Result::<Box<Identifier>, SyntaxError>::Ok(id)
+            }
             _ => Result::<Box<Identifier>, SyntaxError>::Err(SyntaxError::EmptyContext),
         }?;
 
         walker.goto_next_sibling();
 
-        let argument_list =
-            match _driver.visit(walker.node(), self, MELCompilerContext::default())? {
-                MELCompilerContext {
-                    ast: Some(Expr::ArgumentList(args)),
-                    infix_operator: _,
-                } => Result::<Box<ArgumentList>, SyntaxError>::Ok(args),
-                MELCompilerContext {
-                    ast: Some(x),
-                    infix_operator: _,
-                } => Result::<Box<ArgumentList>, SyntaxError>::Err(
-                    SyntaxError::UnexpectedExprType(format!("{x:?}"), "ArgumentList".to_string()),
-                ),
-                _ => Result::<Box<ArgumentList>, SyntaxError>::Err(SyntaxError::EmptyContext),
-            }?;
+        let argument_list = match _driver.visit(walker.node(), self, _context.clone())? {
+            MELCompilerContext::Expr(ast::Expr::ArgumentList(args)) => {
+                Result::<Box<ArgumentList>, SyntaxError>::Ok(args)
+            }
+            _ => Result::<Box<ArgumentList>, SyntaxError>::Err(SyntaxError::EmptyContext),
+        }?;
 
-        Ok(MELCompilerContext {
-            ast: Some(Expr::FunctionCall(Box::new(ast::FunctionCall {
+        Ok(MELCompilerContext::Expr(Expr::FunctionCall(Box::new(
+            ast::FunctionCall {
                 callee: *callee,
                 arguments: *argument_list,
-            }))),
-            infix_operator: None,
-        })
+            },
+        ))))
     }
     fn visit_expr(
         &self,
@@ -236,10 +233,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let id = Identifier {
             identifier: identifier.to_string(),
         };
-        Ok(MELCompilerContext {
-            ast: Some(Expr::Identifier(Box::new(id))),
-            infix_operator: None,
-        })
+        Ok(MELCompilerContext::Expr(Expr::Identifier(Box::new(id))))
     }
 
     fn visit_argument(
@@ -253,13 +247,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         match _driver.visit(walker.node(), self, _context.clone())? {
-            MELCompilerContext {
-                ast: Some(expr),
-                infix_operator: _,
-            } => Ok(MELCompilerContext {
-                ast: Some(Expr::Argument(Box::new(ast::Argument { expr }))),
-                infix_operator: None,
-            }),
+            MELCompilerContext::Expr(expr) => Ok(MELCompilerContext::Expr(Expr::Argument(
+                Box::new(ast::Argument { expr }),
+            ))),
             _ => Err(SyntaxError::EmptyContext),
         }
     }
@@ -274,28 +264,17 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let mut args: Vec<Argument> = vec![];
         for arg in syntax.named_children(&mut walker) {
             let argument = match driver.visit(arg, self, context.clone())? {
-                MELCompilerContext {
-                    ast: Some(Expr::Argument(arg)),
-                    infix_operator: _,
-                } => Result::<Box<Argument>, SyntaxError>::Ok(arg),
-                MELCompilerContext {
-                    ast: Some(x),
-                    infix_operator: _,
-                } => Result::<Box<Argument>, SyntaxError>::Err(SyntaxError::UnexpectedExprType(
-                    format!("{x:?}"),
-                    "Argument".to_string(),
-                )),
+                MELCompilerContext::Expr(Expr::Argument(arg)) => {
+                    Result::<Box<Argument>, SyntaxError>::Ok(arg)
+                }
                 _ => Result::<Box<Argument>, SyntaxError>::Err(SyntaxError::EmptyContext),
             }?;
             args.push(*argument);
         }
 
-        Ok(MELCompilerContext {
-            ast: Some(Expr::ArgumentList(Box::new(ArgumentList {
-                arguments: args,
-            }))),
-            infix_operator: None,
-        })
+        Ok(MELCompilerContext::Expr(Expr::ArgumentList(Box::new(
+            ArgumentList { arguments: args },
+        ))))
     }
 
     fn visit_string_concat_operator(
@@ -308,10 +287,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         if walker.node().grammar_name() == "string_concat" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Concat(StringConcatOperator {})),
-            });
+            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Concat(
+                StringConcatOperator {},
+            )));
         }
         Err(SyntaxError::BadGrammarElement)
     }
@@ -326,15 +304,11 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         if walker.node().grammar_name() == "and" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Logic(And)),
-            });
+            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Logic(
+                And,
+            )));
         } else if walker.node().grammar_name() == "or" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Logic(Or)),
-            });
+            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Logic(Or)));
         }
         Err(SyntaxError::BadGrammarElement)
     }
@@ -349,30 +323,25 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         if walker.node().grammar_name() == "plus" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Math(Plus)),
-            });
+            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
+                Plus,
+            )));
         } else if walker.node().grammar_name() == "minus" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Math(Minus)),
-            });
+            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
+                Minus,
+            )));
         } else if walker.node().grammar_name() == "mul" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Math(Multiply)),
-            });
+            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
+                Multiply,
+            )));
         } else if walker.node().grammar_name() == "div" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Math(Divide)),
-            });
+            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
+                Divide,
+            )));
         } else if walker.node().grammar_name() == "modulo" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Math(Modulo)),
-            });
+            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
+                Modulo,
+            )));
         }
         Err(SyntaxError::BadGrammarElement)
     }
@@ -388,42 +357,33 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         let left = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext {
-                ast: Some(left),
-                infix_operator: None,
-            } => Result::<Expr, SyntaxError>::Ok(left),
+            MELCompilerContext::Expr(left) => Result::<Expr, SyntaxError>::Ok(left),
             _ => Result::<Expr, SyntaxError>::Err(SyntaxError::EmptyContext),
         }?;
 
         walker.goto_next_sibling();
 
         let operator = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext {
-                ast: None,
-                infix_operator: Some(oper),
-            } => Result::<BinaryInfixOperator, SyntaxError>::Ok(oper),
+            MELCompilerContext::Operator(oper) => {
+                Result::<BinaryInfixOperator, SyntaxError>::Ok(oper)
+            }
             _ => Result::<BinaryInfixOperator, SyntaxError>::Err(SyntaxError::EmptyContext),
         }?;
 
         walker.goto_next_sibling();
 
         let right = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext {
-                ast: Some(left),
-                infix_operator: None,
-            } => Result::<Expr, SyntaxError>::Ok(left),
+            MELCompilerContext::Expr(right) => Result::<Expr, SyntaxError>::Ok(right),
             _ => Result::<Expr, SyntaxError>::Err(SyntaxError::EmptyContext),
         }?;
 
-        let x = BinaryExpr(Box::new(ast::BinaryExpr {
-            left,
-            op: operator,
-            right,
-        }));
-        Ok(MELCompilerContext {
-            ast: Some(x),
-            infix_operator: None,
-        })
+        Ok(MELCompilerContext::Expr(BinaryExpr(Box::new(
+            ast::BinaryExpr {
+                left,
+                op: operator,
+                right,
+            },
+        ))))
     }
 
     fn visit_infix_operator(
@@ -458,15 +418,13 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .utf8_text(self.source.as_bytes())
             .map_err(|_| SyntaxError::InvalidRange)?;
         if literal == "true" {
-            return Ok(MELCompilerContext {
-                ast: Some(Expr::Literal(Box::new(Boolean(ast::BooleanLiteral::True)))),
-                infix_operator: None,
-            });
+            return Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(Boolean(
+                ast::BooleanLiteral::True,
+            )))));
         } else if literal == "false" {
-            return Ok(MELCompilerContext {
-                ast: Some(Expr::Literal(Box::new(Boolean(ast::BooleanLiteral::False)))),
-                infix_operator: None,
-            });
+            return Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(Boolean(
+                ast::BooleanLiteral::False,
+            )))));
         }
         Err(SyntaxError::BadGrammarElement)
     }
@@ -481,12 +439,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .map_err(|_| SyntaxError::InvalidRange)?;
 
         let number: usize = literal.parse().map_err(|_| SyntaxError::BadLiteral)?;
-        Ok(MELCompilerContext {
-            ast: Some(Expr::Literal(Box::new(Number(ast::NumberLiteral {
-                literal: number,
-            })))),
-            infix_operator: None,
-        })
+        Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(Number(
+            ast::NumberLiteral { literal: number },
+        )))))
     }
 
     fn visit_string_literal(
@@ -499,14 +454,11 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .utf8_text(self.source.as_bytes())
             .map_err(|_| SyntaxError::InvalidRange)?;
 
-        Ok(MELCompilerContext {
-            ast: Some(Expr::Literal(Box::new(ast::Literal::String(
-                ast::StringLiteral {
-                    literal: literal.to_string(),
-                },
-            )))),
-            infix_operator: None,
-        })
+        Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(
+            ast::Literal::String(ast::StringLiteral {
+                literal: literal.to_string(),
+            }),
+        ))))
     }
 
     fn visit_comparison_operator(
@@ -519,39 +471,29 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         if walker.node().grammar_name() == "eq" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Comparison(ast::ComparisonOperator::Eq)),
-            });
+            return Ok(MELCompilerContext::Operator(
+                BinaryInfixOperator::Comparison(ast::ComparisonOperator::Eq),
+            ));
         } else if walker.node().grammar_name() == "lt" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Comparison(ast::ComparisonOperator::Lt)),
-            });
+            return Ok(MELCompilerContext::Operator(
+                BinaryInfixOperator::Comparison(ast::ComparisonOperator::Lt),
+            ));
         } else if walker.node().grammar_name() == "lte" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Comparison(
-                    ast::ComparisonOperator::Lte,
-                )),
-            });
+            return Ok(MELCompilerContext::Operator(
+                BinaryInfixOperator::Comparison(ast::ComparisonOperator::Lte),
+            ));
         } else if walker.node().grammar_name() == "gt" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Comparison(ast::ComparisonOperator::Gt)),
-            });
+            return Ok(MELCompilerContext::Operator(
+                BinaryInfixOperator::Comparison(ast::ComparisonOperator::Gt),
+            ));
         } else if walker.node().grammar_name() == "gte" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Comparison(
-                    ast::ComparisonOperator::Gte,
-                )),
-            });
+            return Ok(MELCompilerContext::Operator(
+                BinaryInfixOperator::Comparison(ast::ComparisonOperator::Gte),
+            ));
         } else if walker.node().grammar_name() == "ne" {
-            return Ok(MELCompilerContext {
-                ast: None,
-                infix_operator: Some(BinaryInfixOperator::Comparison(ast::ComparisonOperator::Ne)),
-            });
+            return Ok(MELCompilerContext::Operator(
+                BinaryInfixOperator::Comparison(ast::ComparisonOperator::Ne),
+            ));
         }
 
         Err(SyntaxError::BadGrammarElement)
