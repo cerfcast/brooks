@@ -21,22 +21,179 @@ use brooks_macros::grammar_name;
 use std::fmt::Debug;
 pub trait AST: Debug {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[grammar_name(mel)]
 pub struct Mel {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[grammar_name(function_call_expr)]
-pub struct FunctionCall {}
+pub struct FunctionCall {
+    pub callee: Identifier,
+    pub arguments: ArgumentList,
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(identifier)]
+pub struct Identifier {
+    pub identifier: String,
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(argument)]
+pub struct Argument {
+    pub expr: Expr,
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(argument_list)]
+pub struct ArgumentList {
+    pub arguments: Vec<Argument>,
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(binary_infix_operator)]
+pub enum BinaryInfixOperator {
+    Logic(LogicOperator),
+    Comparison,
+    Math(MathOperator),
+    Concat,
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for BinaryInfixOperator {
+    fn to_string(&self) -> String {
+        match self {
+            BinaryInfixOperator::Logic(lo) => lo.to_string(),
+            BinaryInfixOperator::Math(m) => m.to_string(),
+            _ => "Unknown".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(logic_operator)]
+pub enum LogicOperator {
+    And,
+    Or,
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for LogicOperator {
+    fn to_string(&self) -> String {
+        match self {
+            LogicOperator::And => "and".into(),
+            LogicOperator::Or => "or".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(math_operator)]
+pub enum MathOperator {
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Modulo,
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for MathOperator {
+    fn to_string(&self) -> String {
+        match self {
+            MathOperator::Plus => "plus".into(),
+            MathOperator::Minus => "minus".into(),
+            MathOperator::Multiply => "multiply".into(),
+            MathOperator::Divide => "divide".into(),
+            MathOperator::Modulo => "modulo".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(binary_expr)]
+pub struct BinaryExpr {
+    pub left: Expr,
+    pub op: BinaryInfixOperator,
+    pub right: Expr,
+}
 
 /// A MEL Expression
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[grammar_name(expr)]
 pub enum Expr {
-    FunctionCall(FunctionCall),
-    BinaryInfixOperation,
+    FunctionCall(Box<FunctionCall>),
+    BinaryExpr(Box<BinaryExpr>),
+    Identifier(Box<Identifier>),
+    ArgumentList(Box<ArgumentList>),
+    Argument(Box<Argument>),
 }
 
 impl AST for Mel {}
 impl AST for Expr {}
 impl AST for FunctionCall {}
+impl AST for Argument {}
+impl AST for ArgumentList {}
+impl AST for Identifier {}
+
+#[derive(Debug, Clone)]
+pub enum AstVisitorError {}
+
+pub type AstVisitorResult<T> = Result<T, AstVisitorError>;
+
+pub trait AstVisitor<T> {
+    fn visit_function_call(
+        &self,
+        ast: FunctionCall,
+        context: T,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<T>;
+    fn visit_identifier(
+        &self,
+        ast: Identifier,
+        context: T,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<T>;
+    fn visit_argument_list(
+        &self,
+        ast: ArgumentList,
+        context: T,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<T>;
+    fn visit_argument(
+        &self,
+        ast: Argument,
+        context: T,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<T>;
+    fn visit_binary_expr(
+        &self,
+        ast: BinaryExpr,
+        context: T,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<T>;
+}
+
+pub struct AstVisitorDriver {}
+
+impl AstVisitorDriver {
+    #[allow(dead_code)]
+    pub fn visit<T, U: AstVisitor<T>>(
+        &self,
+        node: Expr,
+        visitor: &U,
+        context: T,
+    ) -> AstVisitorResult<T> {
+        match node {
+            Expr::Argument(argument) => visitor.visit_argument(*argument, context, self),
+            Expr::ArgumentList(argument_list) => {
+                visitor.visit_argument_list(*argument_list, context, self)
+            }
+            Expr::Identifier(identifier) => visitor.visit_identifier(*identifier, context, self),
+            Expr::FunctionCall(function_call) => {
+                visitor.visit_function_call(*function_call, context, self)
+            }
+            Expr::BinaryExpr(binary_expr) => visitor.visit_binary_expr(*binary_expr, context, self),
+        }
+    }
+}
