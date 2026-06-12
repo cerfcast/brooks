@@ -13,15 +13,15 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands
+    command: Commands,
 }
 
 #[derive(Subcommand)]
 enum Commands {
     Compile {
         #[arg(long)]
-        path: String
-    }
+        path: String,
+    },
 }
 
 fn main() {

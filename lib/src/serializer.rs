@@ -486,7 +486,7 @@ mod tests {
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
 
-     #[test]
+    #[test]
     fn serialize_boolean_expression3() {
         let code = "(1 < 2) != true";
         let expected = "Binary Expression:
@@ -516,7 +516,7 @@ mod tests {
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
 
-   #[test]
+    #[test]
     fn serialize_number_expression() {
         let code = "5 + 4";
         let expected = "Binary Expression:

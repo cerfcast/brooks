@@ -550,9 +550,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         } else if walker.node().grammar_name() == "ne" {
             return Ok(MELCompilerContext {
                 ast: None,
-                infix_operator: Some(BinaryInfixOperator::Comparison(
-                    ast::ComparisonOperator::Ne,
-                )),
+                infix_operator: Some(BinaryInfixOperator::Comparison(ast::ComparisonOperator::Ne)),
             });
         }
 
