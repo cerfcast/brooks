@@ -55,7 +55,7 @@ pub enum BinaryInfixOperator {
     Logic(LogicOperator),
     Comparison,
     Math(MathOperator),
-    Concat,
+    Concat(StringConcatOperator),
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +64,10 @@ pub enum LogicOperator {
     And,
     Or,
 }
+
+#[derive(Debug, Clone)]
+#[grammar_name(string_concat)]
+pub struct StringConcatOperator {}
 
 #[derive(Debug, Clone)]
 #[grammar_name(math_operator)]
@@ -99,6 +103,7 @@ pub enum Expr {
 pub enum Literal {
     Boolean(BooleanLiteral),
     Number(NumberLiteral),
+    String(StringLiteral),
 }
 
 #[derive(Debug, Clone)]
@@ -112,6 +117,12 @@ pub enum BooleanLiteral {
 #[grammar_name(number_literal)]
 pub struct NumberLiteral {
     pub literal: usize,
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(string_literal)]
+pub struct StringLiteral {
+    pub literal: String,
 }
 
 #[derive(Debug, Clone)]

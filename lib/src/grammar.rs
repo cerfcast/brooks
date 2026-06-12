@@ -15,6 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+/// The trait that makes it possible to add a grammar node to the compiler.
+///
+/// Use the `grammar_name` macro to derive it automatically.
 pub trait GrammarNode {
     fn name() -> String;
 }

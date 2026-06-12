@@ -23,7 +23,7 @@ use crate::ast::Expr::BinaryExpr;
 use crate::ast::Literal::{Boolean, Number};
 use crate::ast::LogicOperator::{And, Or};
 use crate::ast::MathOperator::{Divide, Minus, Modulo, Multiply, Plus};
-use crate::ast::{Argument, BinaryInfixOperator};
+use crate::ast::{Argument, BinaryInfixOperator, StringConcatOperator};
 use crate::{
     ast::{self, ArgumentList, Expr, Identifier},
     grammar::GrammarNode,
@@ -71,6 +71,12 @@ pub trait SyntaxVisitor<T> {
         context: T,
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
+    fn visit_string_concat_operator(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
     fn visit_logic_operator(
         &self,
         syntax: Node,
@@ -108,6 +114,12 @@ pub trait SyntaxVisitor<T> {
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
     fn visit_number_literal(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_string_literal(
         &self,
         syntax: Node,
         context: T,
@@ -279,6 +291,25 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             infix_operator: None,
         })
     }
+
+    fn visit_string_concat_operator(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let mut walker = syntax.walk();
+        walker.goto_first_child();
+
+        if walker.node().grammar_name() == "string_concat" {
+            return Ok(MELCompilerContext {
+                ast: None,
+                infix_operator: Some(BinaryInfixOperator::Concat(StringConcatOperator {})),
+            });
+        }
+        Err(SyntaxError::BadGrammarElement)
+    }
+
     fn visit_logic_operator(
         &self,
         syntax: Node,
@@ -451,6 +482,26 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             infix_operator: None,
         })
     }
+
+    fn visit_string_literal(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let literal = syntax
+            .utf8_text(self.source.as_bytes())
+            .map_err(|_| SyntaxError::InvalidRange)?;
+
+        Ok(MELCompilerContext {
+            ast: Some(Expr::Literal(Box::new(ast::Literal::String(
+                ast::StringLiteral {
+                    literal: literal.to_string(),
+                },
+            )))),
+            infix_operator: None,
+        })
+    }
 }
 
 pub struct SyntaxVisitorDriver {}
@@ -497,6 +548,10 @@ impl SyntaxVisitorDriver {
                 U::visit_logic_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
+                ast::StringConcatOperator::name(),
+                U::visit_string_concat_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            ),
+            (
                 ast::BinaryExpr::name(),
                 U::visit_binary_expr as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
@@ -515,6 +570,10 @@ impl SyntaxVisitorDriver {
             (
                 ast::NumberLiteral::name(),
                 U::visit_number_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            ),
+            (
+                ast::StringLiteral::name(),
+                U::visit_string_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
         ]);
         match hm.get(node.grammar_name()) {
@@ -628,6 +687,13 @@ mod tests {
     #[test]
     fn parse_number_literal() {
         let code = "5";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_string_literal() {
+        let code = "\"testing\"";
         let compile_result = compile(code);
         assert!(compile_result.is_ok());
     }

@@ -26,7 +26,8 @@ impl ToString for ast::BinaryInfixOperator {
         match self {
             ast::BinaryInfixOperator::Logic(lo) => lo.to_string(),
             ast::BinaryInfixOperator::Math(m) => m.to_string(),
-            _ => "Unknown".into(),
+            ast::BinaryInfixOperator::Concat(_) => "concat".to_string(),
+            ast::BinaryInfixOperator::Comparison => todo!(),
         }
     }
 }
@@ -60,6 +61,7 @@ impl ToString for ast::Literal {
         match self {
             ast::Literal::Boolean(bl) => bl.to_string(),
             ast::Literal::Number(nl) => nl.to_string(),
+            ast::Literal::String(sl) => sl.to_string(),
         }
     }
 }
@@ -76,6 +78,13 @@ impl ToString for ast::BooleanLiteral {
 
 #[allow(clippy::to_string_trait_impl)]
 impl ToString for ast::NumberLiteral {
+    fn to_string(&self) -> String {
+        self.literal.to_string()
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::StringLiteral {
     fn to_string(&self) -> String {
         self.literal.to_string()
     }
@@ -446,6 +455,32 @@ mod tests {
 \tOperation: plus
 \tRight:
 \t\tLiteral: 4";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = compiled.ast.expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(ast, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_string_expression() {
+        let code = "\"testing\" . \"one\"";
+        let expected = "Binary Expression:
+\tLeft:
+\t\tLiteral: \"testing\"
+\tOperation: concat
+\tRight:
+\t\tLiteral: \"one\"";
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
