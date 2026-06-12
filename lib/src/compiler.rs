@@ -20,7 +20,7 @@ use std::fmt::Debug;
 use tree_sitter::{self, Node};
 
 use crate::ast::Expr::BinaryExpr;
-use crate::ast::Literal::Boolean;
+use crate::ast::Literal::{Boolean, Number};
 use crate::ast::LogicOperator::{And, Or};
 use crate::ast::MathOperator::{Divide, Minus, Modulo, Multiply, Plus};
 use crate::ast::{Argument, BinaryInfixOperator};
@@ -34,6 +34,7 @@ pub enum SyntaxError {
     NoSuchVisitor(String),
     EmptyContext,
     BadGrammarElement,
+    BadLiteral,
     InvalidRange,
     UnexpectedExprType(String, String),
 }
@@ -101,6 +102,12 @@ pub trait SyntaxVisitor<T> {
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
     fn visit_boolean_literal(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_number_literal(
         &self,
         syntax: Node,
         context: T,
@@ -426,6 +433,24 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         }
         Err(SyntaxError::BadGrammarElement)
     }
+    fn visit_number_literal(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let literal = syntax
+            .utf8_text(self.source.as_bytes())
+            .map_err(|_| SyntaxError::InvalidRange)?;
+
+        let number: usize = literal.parse().map_err(|_| SyntaxError::BadLiteral)?;
+        Ok(MELCompilerContext {
+            ast: Some(Expr::Literal(Box::new(Number(ast::NumberLiteral {
+                literal: number,
+            })))),
+            infix_operator: None,
+        })
+    }
 }
 
 pub struct SyntaxVisitorDriver {}
@@ -486,6 +511,10 @@ impl SyntaxVisitorDriver {
             (
                 ast::BooleanLiteral::name(),
                 U::visit_boolean_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            ),
+            (
+                ast::NumberLiteral::name(),
+                U::visit_number_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
         ]);
         match hm.get(node.grammar_name()) {
@@ -592,6 +621,13 @@ mod tests {
     #[test]
     fn parse_binary_literal() {
         let code = "true";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_number_literal() {
+        let code = "5";
         let compile_result = compile(code);
         assert!(compile_result.is_ok());
     }

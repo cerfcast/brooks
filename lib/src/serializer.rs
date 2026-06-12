@@ -59,6 +59,7 @@ impl ToString for ast::Literal {
     fn to_string(&self) -> String {
         match self {
             ast::Literal::Boolean(bl) => bl.to_string(),
+            ast::Literal::Number(nl) => nl.to_string(),
         }
     }
 }
@@ -70,6 +71,13 @@ impl ToString for ast::BooleanLiteral {
             ast::BooleanLiteral::True => "true".into(),
             ast::BooleanLiteral::False => "false".into(),
         }
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::NumberLiteral {
+    fn to_string(&self) -> String {
+        self.literal.to_string()
     }
 }
 
@@ -412,6 +420,32 @@ mod tests {
 \tOperation: or
 \tRight:
 \t\tLiteral: false";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = compiled.ast.expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(ast, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_number_expression() {
+        let code = "5 + 4";
+        let expected = "Binary Expression:
+\tLeft:
+\t\tLiteral: 5
+\tOperation: plus
+\tRight:
+\t\tLiteral: 4";
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");

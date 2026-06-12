@@ -98,6 +98,7 @@ pub enum Expr {
 #[grammar_name(literal)]
 pub enum Literal {
     Boolean(BooleanLiteral),
+    Number(NumberLiteral),
 }
 
 #[derive(Debug, Clone)]
@@ -105,6 +106,12 @@ pub enum Literal {
 pub enum BooleanLiteral {
     True,
     False,
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(number_literal)]
+pub struct NumberLiteral {
+    pub literal: usize,
 }
 
 #[derive(Debug, Clone)]
