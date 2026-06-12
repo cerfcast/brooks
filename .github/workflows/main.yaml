@@ -58,6 +58,7 @@ jobs:
         working-directory: ./lib/parser
       - run: cargo build
       - run: cargo doc -p brooks-lib --no-deps
+      - run: rm target/doc/.lock
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
