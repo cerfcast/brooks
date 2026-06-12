@@ -1,19 +1,15 @@
 =================================
 Simple
 =================================
-[ testing = 5 ]
+testing = 5
 ---
 (mel
- (list
-  (expr_list
-   (expr
-	  (assignment_expr
-     (identifier)
-	   (literal
-	    (number_literal)
-	   )
-		)
-	 )
+ (expr
+  (assignment_expr
+   (identifier)
+   (literal
+    (number_literal)
+   )
   )
  )
 )
