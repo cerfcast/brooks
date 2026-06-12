@@ -58,12 +58,16 @@ jobs:
         working-directory: ./lib/parser
       - run: cargo build
       - run: cargo doc -p brooks-lib --no-deps
-      - run: rm target/doc/.lock
-      - name: Finalize documentation
+      - name: Fix file permissions
+        shell: sh
         run: |
-          CRATE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]' | cut -f2 -d"/")
-          echo "<meta http-equiv=\"refresh\" content=\"0; url=${CRATE_NAME/-/_}\">" > target/doc/index.html
-          touch target/doc/.nojekyll
+            chmod -c -R +rX "target/doc" |
+            while read line; do
+                echo "::warning title=Invalid file permissions automatically fixed::$line"
+            done
+      - name: Generate index.html file
+        run: |
+            echo "<meta http-equiv=refresh content=0;url=brooks_lib/index.html>" > target/doc/index.htm
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
