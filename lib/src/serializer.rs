@@ -107,8 +107,8 @@ impl ToString for ast::StringLiteral {
 pub struct AstTextSerializer {}
 
 pub struct AstTextSerializerContext {
-    serialized: String,
-    indent: usize,
+    pub serialized: String,
+    pub indent: usize,
 }
 
 impl AstTextSerializerContext {

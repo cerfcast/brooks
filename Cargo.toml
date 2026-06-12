@@ -11,5 +11,6 @@ members=["lib", "macros"]
 brooks-lib = { path = "lib" }
 brooks-macros = { path = "macros" }
 clap = { version = "4.6.1", features = ["derive"] }
+clio = { version = "0.3.5", features = ["clap-parse"] }
 insta = "1.48.0"
 insta-cmd = "0.6.0"
