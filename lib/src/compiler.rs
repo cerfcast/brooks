@@ -20,6 +20,7 @@ use std::fmt::Debug;
 use tree_sitter::{self, Node};
 
 use crate::ast::Expr::BinaryExpr;
+use crate::ast::Literal::Boolean;
 use crate::ast::LogicOperator::{And, Or};
 use crate::ast::MathOperator::{Divide, Minus, Modulo, Multiply, Plus};
 use crate::ast::{Argument, BinaryInfixOperator};
@@ -88,6 +89,18 @@ pub trait SyntaxVisitor<T> {
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
     fn visit_infix_operator(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_literal(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_boolean_literal(
         &self,
         syntax: Node,
         context: T,
@@ -379,6 +392,40 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
         driver.visit(walker.node(), self, context.clone())
     }
+
+    fn visit_literal(
+        &self,
+        syntax: Node,
+        context: MELCompilerContext,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let mut walker = syntax.walk();
+        walker.goto_first_child();
+        driver.visit(walker.node(), self, context)
+    }
+
+    fn visit_boolean_literal(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let literal = syntax
+            .utf8_text(self.source.as_bytes())
+            .map_err(|_| SyntaxError::InvalidRange)?;
+        if literal == "true" {
+            return Ok(MELCompilerContext {
+                ast: Some(Expr::Literal(Box::new(Boolean(ast::BooleanLiteral::True)))),
+                infix_operator: None,
+            });
+        } else if literal == "false" {
+            return Ok(MELCompilerContext {
+                ast: Some(Expr::Literal(Box::new(Boolean(ast::BooleanLiteral::False)))),
+                infix_operator: None,
+            });
+        }
+        Err(SyntaxError::BadGrammarElement)
+    }
 }
 
 pub struct SyntaxVisitorDriver {}
@@ -431,6 +478,14 @@ impl SyntaxVisitorDriver {
             (
                 ast::MathOperator::name(),
                 U::visit_math_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            ),
+            (
+                ast::Literal::name(),
+                U::visit_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            ),
+            (
+                ast::BooleanLiteral::name(),
+                U::visit_boolean_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
         ]);
         match hm.get(node.grammar_name()) {
@@ -530,6 +585,13 @@ mod tests {
     #[test]
     fn parse_binary_math_expr_with_grouping2() {
         let code = "(a + b) - c";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_binary_literal() {
+        let code = "true";
         let compile_result = compile(code);
         assert!(compile_result.is_ok());
     }

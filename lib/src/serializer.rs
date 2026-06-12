@@ -16,9 +16,62 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::ast::{
-    Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
+    self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
     FunctionCall, Identifier,
 };
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::BinaryInfixOperator {
+    fn to_string(&self) -> String {
+        match self {
+            ast::BinaryInfixOperator::Logic(lo) => lo.to_string(),
+            ast::BinaryInfixOperator::Math(m) => m.to_string(),
+            _ => "Unknown".into(),
+        }
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::LogicOperator {
+    fn to_string(&self) -> String {
+        match self {
+            ast::LogicOperator::And => "and".into(),
+            ast::LogicOperator::Or => "or".into(),
+        }
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::MathOperator {
+    fn to_string(&self) -> String {
+        match self {
+            ast::MathOperator::Plus => "plus".into(),
+            ast::MathOperator::Minus => "minus".into(),
+            ast::MathOperator::Multiply => "multiply".into(),
+            ast::MathOperator::Divide => "divide".into(),
+            ast::MathOperator::Modulo => "modulo".into(),
+        }
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::Literal {
+    fn to_string(&self) -> String {
+        match self {
+            ast::Literal::Boolean(bl) => bl.to_string(),
+        }
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::BooleanLiteral {
+    fn to_string(&self) -> String {
+        match self {
+            ast::BooleanLiteral::True => "true".into(),
+            ast::BooleanLiteral::False => "false".into(),
+        }
+    }
+}
 
 pub struct AstTextSerializer {}
 
@@ -127,6 +180,15 @@ impl AstVisitor<AstTextSerializerContext> for AstTextSerializer {
 
         context = context.unindent();
         Ok(context)
+    }
+
+    fn visit_literal(
+        &self,
+        ast: ast::Literal,
+        context: AstTextSerializerContext,
+        _driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext> {
+        Ok(context.append("\t".repeat(context.indent) + "Literal: " + &ast.to_string()))
     }
 }
 
@@ -324,6 +386,32 @@ mod tests {
 \t\t\tOperation: modulo
 \t\t\tRight:
 \t\t\t\tIdentifier: c";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = compiled.ast.expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(ast, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_boolean_expression() {
+        let code = "true or false";
+        let expected = "Binary Expression:
+\tLeft:
+\t\tLiteral: true
+\tOperation: or
+\tRight:
+\t\tLiteral: false";
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");

@@ -19,7 +19,6 @@ use crate::grammar::GrammarNode;
 use brooks_macros::grammar_name;
 
 use std::fmt::Debug;
-pub trait AST: Debug {}
 
 #[derive(Debug, Clone)]
 #[grammar_name(mel)]
@@ -59,32 +58,11 @@ pub enum BinaryInfixOperator {
     Concat,
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for BinaryInfixOperator {
-    fn to_string(&self) -> String {
-        match self {
-            BinaryInfixOperator::Logic(lo) => lo.to_string(),
-            BinaryInfixOperator::Math(m) => m.to_string(),
-            _ => "Unknown".into(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 #[grammar_name(logic_operator)]
 pub enum LogicOperator {
     And,
     Or,
-}
-
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for LogicOperator {
-    fn to_string(&self) -> String {
-        match self {
-            LogicOperator::And => "and".into(),
-            LogicOperator::Or => "or".into(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -97,19 +75,6 @@ pub enum MathOperator {
     Modulo,
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for MathOperator {
-    fn to_string(&self) -> String {
-        match self {
-            MathOperator::Plus => "plus".into(),
-            MathOperator::Minus => "minus".into(),
-            MathOperator::Multiply => "multiply".into(),
-            MathOperator::Divide => "divide".into(),
-            MathOperator::Modulo => "modulo".into(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 #[grammar_name(binary_expr)]
 pub struct BinaryExpr {
@@ -118,7 +83,6 @@ pub struct BinaryExpr {
     pub right: Expr,
 }
 
-/// A MEL Expression
 #[derive(Debug, Clone)]
 #[grammar_name(expr)]
 pub enum Expr {
@@ -127,14 +91,21 @@ pub enum Expr {
     Identifier(Box<Identifier>),
     ArgumentList(Box<ArgumentList>),
     Argument(Box<Argument>),
+    Literal(Box<Literal>),
 }
 
-impl AST for Mel {}
-impl AST for Expr {}
-impl AST for FunctionCall {}
-impl AST for Argument {}
-impl AST for ArgumentList {}
-impl AST for Identifier {}
+#[derive(Debug, Clone)]
+#[grammar_name(literal)]
+pub enum Literal {
+    Boolean(BooleanLiteral),
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(boolean_literal)]
+pub enum BooleanLiteral {
+    True,
+    False,
+}
 
 #[derive(Debug, Clone)]
 pub enum AstVisitorError {}
@@ -172,6 +143,12 @@ pub trait AstVisitor<T> {
         context: T,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<T>;
+    fn visit_literal(
+        &self,
+        ast: Literal,
+        context: T,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<T>;
 }
 
 pub struct AstVisitorDriver {}
@@ -194,6 +171,7 @@ impl AstVisitorDriver {
                 visitor.visit_function_call(*function_call, context, self)
             }
             Expr::BinaryExpr(binary_expr) => visitor.visit_binary_expr(*binary_expr, context, self),
+            Expr::Literal(literal) => visitor.visit_literal(*literal, context, self),
         }
     }
 }
