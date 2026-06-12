@@ -43,4 +43,26 @@ jobs:
       - uses: actions/checkout@v2
       - run: cargo fmt -p brooks-lib
       - run: cargo fmt -p brooks-macros
+  generate-docs:
+    name: Generate Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v4
+      - uses: tree-sitter/setup-action@v2
+      # Because our tree-sitter code is in a subdirectory,
+      # and working-directory does not apply to uses, we
+      # are forced to specify calls to the CI ourselves.
+      # See https://github.com/orgs/community/discussions/25742
+      - run: tree-sitter generate
+        working-directory: ./lib/parser
+      - run: cargo build
+      - run: cargo doc -p brooks-lib --no-deps
+      - name: Upload
+        uses: actions/upload-pages-artifact@v2
+        with:
+          name: Documentation
+          path: target/doc
+      - name: Deploy
+        uses: actions/deploy-pages@v4
 
