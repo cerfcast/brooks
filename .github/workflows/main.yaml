@@ -58,18 +58,20 @@ jobs:
         working-directory: ./lib/parser
       - run: cargo build
       - run: cargo doc -p brooks-lib --no-deps
+      - name: Delete lock file
+        shell: sh
+        run: rm -f target/doc/.lock
       - name: Fix file permissions
         shell: sh
         run: chmod -R a+rX target/doc
-      - name: List file permissions
-        shell: sh
-        run: ls -latr target/doc
       - name: Generate index.html file
         run: |
             echo "<meta http-equiv=refresh content=0;url=brooks_lib/index.html>" > target/doc/index.htm
+      - name: List file permissions
+        shell: sh
+        run: ls -latr target/doc
       - name: Upload
         uses: actions/upload-artifact@v4
-        with:
           name: github-pages
           path: target/doc
   deploy-docs:
