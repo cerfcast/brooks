@@ -10,3 +10,6 @@ members=["lib", "macros"]
 [dependencies]
 brooks-lib = { path = "lib" }
 brooks-macros = { path = "macros" }
+clap = { version = "4.6.1", features = ["derive"] }
+insta = "1.48.0"
+insta-cmd = "0.6.0"

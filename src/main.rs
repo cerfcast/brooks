@@ -5,7 +5,25 @@
 )]
 use brooks_lib;
 
+#[cfg(test)]
+mod test;
+
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Compile {
+        #[arg(long)]
+        path: String
+    }
+}
+
 fn main() {
-    // TODO
-    println!("TODO")
+    let cli = Cli::parse();
 }
