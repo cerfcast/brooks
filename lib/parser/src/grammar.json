@@ -315,6 +315,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "ne"
+        },
+        {
+          "type": "SYMBOL",
           "name": "regex_eq"
         },
         {
@@ -400,6 +404,10 @@
     "eq": {
       "type": "STRING",
       "value": "=="
+    },
+    "ne": {
+      "type": "STRING",
+      "value": "!="
     },
     "regex_eq": {
       "type": "STRING",

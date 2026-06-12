@@ -148,6 +148,10 @@
           "named": true
         },
         {
+          "type": "ne",
+          "named": true
+        },
+        {
           "type": "regex_eq",
           "named": true
         }
@@ -401,6 +405,10 @@
   },
   {
     "type": "mul",
+    "named": true
+  },
+  {
+    "type": "ne",
     "named": true
   },
   {
