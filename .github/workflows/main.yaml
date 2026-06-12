@@ -72,6 +72,7 @@ jobs:
         run: ls -latr target/doc
       - name: Upload
         uses: actions/upload-artifact@v4
+        with:
           name: github-pages
           path: target/doc
   deploy-docs:
