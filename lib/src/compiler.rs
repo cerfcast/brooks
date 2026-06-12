@@ -19,7 +19,6 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use tree_sitter::{self, Node};
 
-use crate::ast::BinaryInfixOperator::Comparison;
 use crate::ast::Expr::BinaryExpr;
 use crate::ast::Literal::{Boolean, Number};
 use crate::ast::LogicOperator::{And, Or};
