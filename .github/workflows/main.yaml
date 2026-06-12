@@ -59,7 +59,7 @@ jobs:
       - run: cargo build
       - run: cargo doc -p brooks-lib --no-deps
       - name: Upload
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           name: Documentation
           path: target/doc
