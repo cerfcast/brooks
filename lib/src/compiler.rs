@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use tree_sitter::{self, Node};
 
+use crate::ast::BinaryInfixOperator::Comparison;
 use crate::ast::Expr::BinaryExpr;
 use crate::ast::Literal::{Boolean, Number};
 use crate::ast::LogicOperator::{And, Or};
@@ -72,6 +73,12 @@ pub trait SyntaxVisitor<T> {
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
     fn visit_string_concat_operator(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_comparison_operator(
         &self,
         syntax: Node,
         context: T,
@@ -502,6 +509,56 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             infix_operator: None,
         })
     }
+
+    fn visit_comparison_operator(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let mut walker = syntax.walk();
+        walker.goto_first_child();
+
+        if walker.node().grammar_name() == "eq" {
+            return Ok(MELCompilerContext {
+                ast: None,
+                infix_operator: Some(BinaryInfixOperator::Comparison(ast::ComparisonOperator::Eq)),
+            });
+        } else if walker.node().grammar_name() == "lt" {
+            return Ok(MELCompilerContext {
+                ast: None,
+                infix_operator: Some(BinaryInfixOperator::Comparison(ast::ComparisonOperator::Lt)),
+            });
+        } else if walker.node().grammar_name() == "lte" {
+            return Ok(MELCompilerContext {
+                ast: None,
+                infix_operator: Some(BinaryInfixOperator::Comparison(
+                    ast::ComparisonOperator::Lte,
+                )),
+            });
+        } else if walker.node().grammar_name() == "gt" {
+            return Ok(MELCompilerContext {
+                ast: None,
+                infix_operator: Some(BinaryInfixOperator::Comparison(ast::ComparisonOperator::Gt)),
+            });
+        } else if walker.node().grammar_name() == "gte" {
+            return Ok(MELCompilerContext {
+                ast: None,
+                infix_operator: Some(BinaryInfixOperator::Comparison(
+                    ast::ComparisonOperator::Gte,
+                )),
+            });
+        } else if walker.node().grammar_name() == "ne" {
+            return Ok(MELCompilerContext {
+                ast: None,
+                infix_operator: Some(BinaryInfixOperator::Comparison(
+                    ast::ComparisonOperator::Ne,
+                )),
+            });
+        }
+
+        Err(SyntaxError::BadGrammarElement)
+    }
 }
 
 pub struct SyntaxVisitorDriver {}
@@ -550,6 +607,10 @@ impl SyntaxVisitorDriver {
             (
                 ast::StringConcatOperator::name(),
                 U::visit_string_concat_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            ),
+            (
+                ast::ComparisonOperator::name(),
+                U::visit_comparison_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
                 ast::BinaryExpr::name(),
@@ -673,6 +734,34 @@ mod tests {
     #[test]
     fn parse_binary_math_expr_with_grouping2() {
         let code = "(a + b) - c";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_binary_comparison() {
+        let code = "a == b";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_binary_comparison2() {
+        let code = "a != b";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_binary_comparison3() {
+        let code = "a <= b";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_binary_comparison4() {
+        let code = "a < b";
         let compile_result = compile(code);
         assert!(compile_result.is_ok());
     }

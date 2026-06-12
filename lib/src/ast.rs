@@ -53,9 +53,20 @@ pub struct ArgumentList {
 #[grammar_name(binary_infix_operator)]
 pub enum BinaryInfixOperator {
     Logic(LogicOperator),
-    Comparison,
+    Comparison(ComparisonOperator),
     Math(MathOperator),
     Concat(StringConcatOperator),
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(comparison_operator)]
+pub enum ComparisonOperator {
+    Eq,
+    Ne,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
 }
 
 #[derive(Debug, Clone)]

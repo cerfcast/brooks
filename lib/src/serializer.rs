@@ -27,7 +27,7 @@ impl ToString for ast::BinaryInfixOperator {
             ast::BinaryInfixOperator::Logic(lo) => lo.to_string(),
             ast::BinaryInfixOperator::Math(m) => m.to_string(),
             ast::BinaryInfixOperator::Concat(_) => "concat".to_string(),
-            ast::BinaryInfixOperator::Comparison => todo!(),
+            ast::BinaryInfixOperator::Comparison(c) => c.to_string(),
         }
     }
 }
@@ -38,6 +38,20 @@ impl ToString for ast::LogicOperator {
         match self {
             ast::LogicOperator::And => "and".into(),
             ast::LogicOperator::Or => "or".into(),
+        }
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::ComparisonOperator {
+    fn to_string(&self) -> String {
+        match self {
+            ast::ComparisonOperator::Eq => "==".into(),
+            ast::ComparisonOperator::Lt => "<".into(),
+            ast::ComparisonOperator::Lte => "<=".into(),
+            ast::ComparisonOperator::Gt => ">".into(),
+            ast::ComparisonOperator::Gte => ">=".into(),
+            ast::ComparisonOperator::Ne => "!=".into(),
         }
     }
 }
@@ -447,6 +461,62 @@ mod tests {
     }
 
     #[test]
+    fn serialize_boolean_expression2() {
+        let code = "true < false";
+        let expected = "Binary Expression:
+\tLeft:
+\t\tLiteral: true
+\tOperation: <
+\tRight:
+\t\tLiteral: false";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = compiled.ast.expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(ast, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+     #[test]
+    fn serialize_boolean_expression3() {
+        let code = "(1 < 2) != true";
+        let expected = "Binary Expression:
+\tLeft:
+\t\tBinary Expression:
+\t\t\tLeft:
+\t\t\t\tLiteral: 1
+\t\t\tOperation: <
+\t\t\tRight:
+\t\t\t\tLiteral: 2
+\tOperation: !=
+\tRight:
+\t\tLiteral: true";
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = compiled.ast.expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(ast, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+   #[test]
     fn serialize_number_expression() {
         let code = "5 + 4";
         let expected = "Binary Expression:
