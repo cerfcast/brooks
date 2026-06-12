@@ -74,8 +74,5 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Upload
+      - name: Deploy Docs
         uses: actions/deploy-pages@v4
-        with:
-          name: Documentation
-          path: target/doc
