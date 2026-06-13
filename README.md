@@ -22,6 +22,13 @@ We want Brooks to
 
 Of course, those goals are all _very_ aspirational at this point!
 
+### Documentation
+
+The core of Brooks is a Rust library for parsing and manipulating expressions of the MEL. The most up-to-date
+documentation for the library is available online at
+
+[https://cerfcast.github.io/brooks/brooks_lib/index.html](https://cerfcast.github.io/brooks/brooks_lib/index.html)
+
 ### Contributing
 
 We would _love_ your contributions! More information on how to contribute will be coming soon!
