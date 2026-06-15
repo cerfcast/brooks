@@ -104,6 +104,10 @@ impl ToString for ast::StringLiteral {
     }
 }
 
+
+#[derive(Debug, Clone, Default)]
+pub struct AstTextSerializerError {}
+
 pub struct AstTextSerializer {}
 
 pub struct AstTextSerializerContext {
@@ -132,13 +136,13 @@ impl AstTextSerializerContext {
     }
 }
 
-impl AstVisitor<AstTextSerializerContext> for AstTextSerializer {
+impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSerializer {
     fn visit_function_call(
         &self,
         ast: FunctionCall,
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<AstTextSerializerContext> {
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError > {
         let mut context = context.append(
             ("\t".repeat(context.indent) + "Function Call:\n").to_string()
                 + &("\t".repeat(context.indent + 1) + "Callee: " + &ast.callee.identifier + "\n")
@@ -153,7 +157,7 @@ impl AstVisitor<AstTextSerializerContext> for AstTextSerializer {
         ast: Identifier,
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<AstTextSerializerContext> {
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
         let output = "\t".repeat(context.indent) + "Identifier: " + &ast.identifier;
         Ok(context.append(output))
     }
@@ -163,7 +167,7 @@ impl AstVisitor<AstTextSerializerContext> for AstTextSerializer {
         ast: ArgumentList,
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<AstTextSerializerContext> {
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
         let mut context = context.append("\t".repeat(context.indent) + "Arguments:\n");
         context = context.indent();
         let mut first = true;
@@ -182,7 +186,7 @@ impl AstVisitor<AstTextSerializerContext> for AstTextSerializer {
         ast: Argument,
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<AstTextSerializerContext> {
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
         driver.visit(ast.expr, self, context)
     }
 
@@ -191,7 +195,7 @@ impl AstVisitor<AstTextSerializerContext> for AstTextSerializer {
         ast: BinaryExpr,
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<AstTextSerializerContext> {
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
         let mut context = context.append("\t".repeat(context.indent) + "Binary Expression:\n");
 
         context = context.indent();
@@ -218,7 +222,7 @@ impl AstVisitor<AstTextSerializerContext> for AstTextSerializer {
         ast: ast::Literal,
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<AstTextSerializerContext> {
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
         Ok(context.append("\t".repeat(context.indent) + "Literal: " + &ast.to_string()))
     }
 }

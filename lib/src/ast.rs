@@ -158,57 +158,57 @@ pub enum Type {
 #[derive(Debug, Clone)]
 pub enum AstVisitorError {}
 
-pub type AstVisitorResult<T> = Result<T, AstVisitorError>;
+pub type AstVisitorResult<T, E> = Result<T, E>;
 
-pub trait AstVisitor<T> {
+pub trait AstVisitor<T, E> {
     fn visit_function_call(
         &self,
         ast: FunctionCall,
         context: T,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<T>;
+    ) -> AstVisitorResult<T, E>;
     fn visit_identifier(
         &self,
         ast: Identifier,
         context: T,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<T>;
+    ) -> AstVisitorResult<T, E>;
     fn visit_argument_list(
         &self,
         ast: ArgumentList,
         context: T,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<T>;
+    ) -> AstVisitorResult<T, E>;
     fn visit_argument(
         &self,
         ast: Argument,
         context: T,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<T>;
+    ) -> AstVisitorResult<T, E>;
     fn visit_binary_expr(
         &self,
         ast: BinaryExpr,
         context: T,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<T>;
+    ) -> AstVisitorResult<T, E>;
     fn visit_literal(
         &self,
         ast: Literal,
         context: T,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<T>;
+    ) -> AstVisitorResult<T, E>;
 }
 
 pub struct AstVisitorDriver {}
 
 impl AstVisitorDriver {
     #[allow(dead_code)]
-    pub fn visit<T, U: AstVisitor<T>>(
+    pub fn visit<T, E>(
         &self,
         node: Expr,
-        visitor: &U,
+        visitor: &impl AstVisitor<T, E>,
         context: T,
-    ) -> AstVisitorResult<T> {
+    ) -> AstVisitorResult<T, E> {
         match node {
             Expr::Argument(argument) => visitor.visit_argument(*argument, context, self),
             Expr::ArgumentList(argument_list) => {
