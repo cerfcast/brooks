@@ -16,6 +16,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 #[allow(dead_code)]
+pub mod analysis;
+#[allow(dead_code)]
 pub mod ast;
 #[allow(dead_code)]
 pub mod compiler;
@@ -23,5 +25,3 @@ pub mod compiler;
 pub mod grammar;
 #[allow(dead_code)]
 pub mod serializer;
-#[allow(dead_code)]
-pub mod analysis;

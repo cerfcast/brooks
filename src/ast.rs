@@ -21,11 +21,10 @@ use brooks_macros::grammar_name;
 
 use std::fmt::Debug;
 
-
 #[derive(Debug, Clone, Default)]
 pub struct Location {
     pub start: usize,
-    pub extent: usize
+    pub extent: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -150,7 +149,7 @@ pub enum Type {
     Integer,
     String,
     Params(Vec<Type>),
-    Function(Box::<Type>, Vec<Type>),
+    Function(Box<Type>, Vec<Type>),
     #[default]
     None,
 }

@@ -104,7 +104,6 @@ impl ToString for ast::StringLiteral {
     }
 }
 
-
 #[derive(Debug, Clone, Default)]
 pub struct AstTextSerializerError {}
 
@@ -142,7 +141,7 @@ impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSer
         ast: FunctionCall,
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError > {
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
         let mut context = context.append(
             ("\t".repeat(context.indent) + "Function Call:\n").to_string()
                 + &("\t".repeat(context.indent + 1) + "Callee: " + &ast.callee.identifier + "\n")
