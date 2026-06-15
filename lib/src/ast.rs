@@ -136,6 +136,17 @@ pub struct StringLiteral {
     pub literal: String,
 }
 
+#[derive(Default, Debug, Clone, PartialEq)]
+pub enum Type {
+    Boolean,
+    Integer,
+    String,
+    Params(Vec<Type>),
+    Function(Box::<Type>, Vec<Type>),
+    #[default]
+    None,
+}
+
 #[derive(Debug, Clone)]
 pub enum AstVisitorError {}
 
