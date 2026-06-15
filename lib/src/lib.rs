@@ -23,3 +23,5 @@ pub mod compiler;
 pub mod grammar;
 #[allow(dead_code)]
 pub mod serializer;
+#[allow(dead_code)]
+pub mod analysis;
