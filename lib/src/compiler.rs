@@ -40,7 +40,7 @@ pub enum SyntaxError {
 }
 pub type SyntaxVisitorResult<T> = Result<T, SyntaxError>;
 
-pub trait SyntaxVisitor<T> {
+pub trait SyntaxVisitor<T>: Sized {
     fn visit_function_call(
         &self,
         syntax: Node,
@@ -52,7 +52,12 @@ pub trait SyntaxVisitor<T> {
         syntax: Node,
         context: T,
         driver: &SyntaxVisitorDriver,
-    ) -> SyntaxVisitorResult<T>;
+    ) -> SyntaxVisitorResult<T> {
+        let node = syntax
+            .named_child(0)
+            .ok_or(SyntaxError::BadGrammarElement)?;
+        driver.visit(node, self, context)
+    }
     fn visit_identifier(
         &self,
         syntax: Node,
@@ -195,18 +200,6 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 arguments: *argument_list,
             },
         ))))
-    }
-    fn visit_expr(
-        &self,
-        syntax: Node,
-        context: MELCompilerContext,
-        driver: &SyntaxVisitorDriver,
-    ) -> SyntaxVisitorResult<MELCompilerContext> {
-        // An expr is just a wrapper. Navigate deeper (through its named child).
-        let node = syntax
-            .named_child(0)
-            .ok_or(SyntaxError::BadGrammarElement)?;
-        driver.visit(node, self, context)
     }
 
     fn visit_mel(
