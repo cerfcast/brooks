@@ -16,9 +16,17 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::grammar::GrammarNode;
+//use brooks_macros::{ParseUnparse, grammar_name};
 use brooks_macros::grammar_name;
 
 use std::fmt::Debug;
+
+
+#[derive(Debug, Clone, Default)]
+pub struct Location {
+    pub start: usize,
+    pub extent: usize
+}
 
 #[derive(Debug, Clone)]
 #[grammar_name(mel)]
