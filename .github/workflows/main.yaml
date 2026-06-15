@@ -15,9 +15,9 @@ jobs:
       # are forced to specify calls to the CI ourselves.
       # See https://github.com/orgs/community/discussions/25742
       - run: tree-sitter generate
-        working-directory: ./lib/parser
+        working-directory: ./parser
       - run: tree-sitter test
-        working-directory: ./lib/parser
+        working-directory: ./parser
   library-tests:
     name: Library Tests
     runs-on: ubuntu-latest
@@ -30,19 +30,16 @@ jobs:
       # are forced to specify calls to the CI ourselves.
       # See https://github.com/orgs/community/discussions/25742
       - run: tree-sitter generate
-        working-directory: ./lib/parser
+        working-directory: ./parser
       - run: cargo build
       - run: cargo test
-      - run: cargo test -p brooks-lib
-      - run: cargo test -p brooks-macros
-      - run: cargo test --manifest-path lib/parser/Cargo.toml
+      - run: cargo test --manifest-path parser/Cargo.toml
   library-format-tests:
     name: Library Format Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: cargo fmt -p brooks-lib
-      - run: cargo fmt -p brooks-macros
+      - run: cargo fmt
   generate-docs:
     name: Generate Docs
     runs-on: ubuntu-latest
@@ -60,9 +57,9 @@ jobs:
       # are forced to specify calls to the CI ourselves.
       # See https://github.com/orgs/community/discussions/25742
       - run: tree-sitter generate
-        working-directory: ./lib/parser
+        working-directory: ./parser
       - run: cargo build
-      - run: cargo doc -p brooks-lib --no-deps
+      - run: cargo doc --no-deps
       - name: Delete lock file
         shell: sh
         run: rm -f target/doc/.lock
