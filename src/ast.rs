@@ -15,49 +15,48 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::grammar::GrammarNode;
-//use brooks_macros::{ParseUnparse, grammar_name};
-use brooks_macros::grammar_name;
-
+use crate::grammar::{GrammarNode, GrammarLocation};
+use brooks_macros::{grammar_location, grammar_name};
 use std::fmt::Debug;
 
-#[derive(Debug, Clone, Default)]
-pub struct Location {
-    pub start: usize,
-    pub extent: usize,
+#[grammar_name(mel)]
+#[grammar_location]
+#[derive(Debug, Clone)]
+pub struct Mel {
+    pub testing: usize
 }
 
-#[derive(Debug, Clone)]
-#[grammar_name(mel)]
-pub struct Mel {}
-
-#[derive(Debug, Clone)]
 #[grammar_name(function_call_expr)]
+#[grammar_location]
+#[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub callee: Identifier,
     pub arguments: ArgumentList,
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(identifier)]
+#[grammar_location]
+#[derive(Debug, Clone)]
 pub struct Identifier {
     pub identifier: String,
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(argument)]
+#[grammar_location]
+#[derive(Debug, Clone)]
 pub struct Argument {
     pub expr: Expr,
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(argument_list)]
+#[grammar_location]
+#[derive(Debug, Clone)]
 pub struct ArgumentList {
     pub arguments: Vec<Argument>,
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(binary_infix_operator)]
+#[derive(Debug, Clone)]
 pub enum BinaryInfixOperator {
     Logic(LogicOperator),
     Comparison(ComparisonOperator),
@@ -65,8 +64,8 @@ pub enum BinaryInfixOperator {
     Concat(StringConcatOperator),
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(comparison_operator)]
+#[derive(Debug, Clone)]
 pub enum ComparisonOperator {
     Eq,
     Ne,
@@ -76,19 +75,19 @@ pub enum ComparisonOperator {
     Gte,
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(logic_operator)]
+#[derive(Debug, Clone)]
 pub enum LogicOperator {
     And,
     Or,
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(string_concat)]
+#[derive(Debug, Clone)]
 pub struct StringConcatOperator {}
 
-#[derive(Debug, Clone)]
 #[grammar_name(math_operator)]
+#[derive(Debug, Clone)]
 pub enum MathOperator {
     Plus,
     Minus,
@@ -97,35 +96,49 @@ pub enum MathOperator {
     Modulo,
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(binary_expr)]
+#[grammar_location]
+#[derive(Debug, Clone)]
 pub struct BinaryExpr {
     pub left: Expr,
     pub op: BinaryInfixOperator,
     pub right: Expr,
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(expr)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     FunctionCall(Box<FunctionCall>),
     BinaryExpr(Box<BinaryExpr>),
     Identifier(Box<Identifier>),
     ArgumentList(Box<ArgumentList>),
     Argument(Box<Argument>),
-    Literal(Box<Literal>),
+    Literal(Box<Literal>, GrammarLocation),
 }
 
-#[derive(Debug, Clone)]
+impl Expr {
+    pub fn location(&self) -> GrammarLocation {
+        match self {
+            Expr::FunctionCall(function_call) => function_call.location.clone(),
+            Expr::BinaryExpr(binary_expr) => binary_expr.location.clone(),
+            Expr::Identifier(identifier) => identifier.location.clone(),
+            Expr::ArgumentList(argument_list) => argument_list.location.clone(),
+            Expr::Argument(argument) => argument.location.clone(),
+            Expr::Literal(_, location) => location.clone(),
+        }
+    }
+}
+
 #[grammar_name(literal)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     Boolean(BooleanLiteral),
     Number(NumberLiteral),
     String(StringLiteral),
 }
 
-#[derive(Debug, Clone)]
 #[grammar_name(boolean_literal)]
+#[derive(Debug, Clone)]
 pub enum BooleanLiteral {
     True,
     False,
@@ -192,7 +205,7 @@ pub trait AstVisitor<T, E> {
     ) -> AstVisitorResult<T, E>;
     fn visit_literal(
         &self,
-        ast: Literal,
+        ast: (Literal, GrammarLocation),
         context: T,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<T, E>;
@@ -218,7 +231,7 @@ impl AstVisitorDriver {
                 visitor.visit_function_call(*function_call, context, self)
             }
             Expr::BinaryExpr(binary_expr) => visitor.visit_binary_expr(*binary_expr, context, self),
-            Expr::Literal(literal) => visitor.visit_literal(*literal, context, self),
+            Expr::Literal(literal, location) => visitor.visit_literal((*literal, location), context, self),
         }
     }
 }

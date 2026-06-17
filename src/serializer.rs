@@ -15,9 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::ast::{
-    self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
-    FunctionCall, Identifier,
+use crate::{
+    ast::{
+        self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
+        FunctionCall, Identifier,
+    },
+    grammar::GrammarLocation,
 };
 
 #[allow(clippy::to_string_trait_impl)]
@@ -218,11 +221,11 @@ impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSer
 
     fn visit_literal(
         &self,
-        ast: ast::Literal,
+        ast: (ast::Literal, GrammarLocation),
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
-        Ok(context.append("\t".repeat(context.indent) + "Literal: " + &ast.to_string()))
+        Ok(context.append("\t".repeat(context.indent) + "Literal: " + &ast.0.to_string()))
     }
 }
 

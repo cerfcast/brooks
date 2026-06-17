@@ -22,6 +22,12 @@ pub trait GrammarNode {
     fn name() -> String;
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct GrammarLocation {
+    pub start: usize,
+    pub extent: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::ast::Mel;

@@ -24,6 +24,7 @@ use crate::ast::Literal::{Boolean, Number};
 use crate::ast::LogicOperator::{And, Or};
 use crate::ast::MathOperator::{Divide, Minus, Modulo, Multiply, Plus};
 use crate::ast::{Argument, BinaryInfixOperator, StringConcatOperator};
+use crate::grammar::GrammarLocation;
 use crate::{
     ast::{self, ArgumentList, Expr, Identifier},
     grammar::GrammarNode,
@@ -198,6 +199,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             ast::FunctionCall {
                 callee: *callee,
                 arguments: *argument_list,
+                location: syntax.into(),
             },
         ))))
     }
@@ -225,6 +227,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .map_err(|_| SyntaxError::InvalidRange)?;
         let id = Identifier {
             identifier: identifier.to_string(),
+            location: syntax.into(),
         };
         Ok(MELCompilerContext::Expr(Expr::Identifier(Box::new(id))))
     }
@@ -241,7 +244,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         match _driver.visit(walker.node(), self, _context.clone())? {
             MELCompilerContext::Expr(expr) => Ok(MELCompilerContext::Expr(Expr::Argument(
-                Box::new(ast::Argument { expr }),
+                Box::new(ast::Argument {
+                    expr,
+                    location: syntax.into(),
+                }),
             ))),
             _ => Err(SyntaxError::EmptyContext),
         }
@@ -266,7 +272,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         }
 
         Ok(MELCompilerContext::Expr(Expr::ArgumentList(Box::new(
-            ArgumentList { arguments: args },
+            ArgumentList {
+                arguments: args,
+                location: syntax.into(),
+            },
         ))))
     }
 
@@ -375,6 +384,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 left,
                 op: operator,
                 right,
+                location: syntax.into(),
             },
         ))))
     }
@@ -413,11 +423,11 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         if literal == "true" {
             return Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(Boolean(
                 ast::BooleanLiteral::True,
-            )))));
+            )), syntax.into())));
         } else if literal == "false" {
             return Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(Boolean(
                 ast::BooleanLiteral::False,
-            )))));
+            )), syntax.into())));
         }
         Err(SyntaxError::BadGrammarElement)
     }
@@ -434,7 +444,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let number: usize = literal.parse().map_err(|_| SyntaxError::BadLiteral)?;
         Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(Number(
             ast::NumberLiteral { literal: number },
-        )))))
+        )), syntax.into())))
     }
 
     fn visit_string_literal(
@@ -451,7 +461,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             ast::Literal::String(ast::StringLiteral {
                 literal: literal.to_string(),
             }),
-        ))))
+        ), syntax.into())))
     }
 
     fn visit_comparison_operator(
@@ -572,6 +582,15 @@ impl SyntaxVisitorDriver {
         match hm.get(node.grammar_name()) {
             Some(callable) => (callable)(visitor, node, context, self),
             None => Err(SyntaxError::NoSuchVisitor(node.grammar_name().into())),
+        }
+    }
+}
+
+impl From<Node<'_>> for GrammarLocation {
+    fn from(value: Node) -> Self {
+        GrammarLocation {
+            start: value.start_byte(),
+            extent: value.end_byte() - value.start_byte(),
         }
     }
 }
