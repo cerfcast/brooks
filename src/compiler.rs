@@ -421,13 +421,15 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .utf8_text(self.source.as_bytes())
             .map_err(|_| SyntaxError::InvalidRange)?;
         if literal == "true" {
-            return Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(Boolean(
-                ast::BooleanLiteral::True,
-            )), syntax.into())));
+            return Ok(MELCompilerContext::Expr(Expr::Literal(
+                Box::new(Boolean(ast::BooleanLiteral::True)),
+                syntax.into(),
+            )));
         } else if literal == "false" {
-            return Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(Boolean(
-                ast::BooleanLiteral::False,
-            )), syntax.into())));
+            return Ok(MELCompilerContext::Expr(Expr::Literal(
+                Box::new(Boolean(ast::BooleanLiteral::False)),
+                syntax.into(),
+            )));
         }
         Err(SyntaxError::BadGrammarElement)
     }
@@ -442,9 +444,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .map_err(|_| SyntaxError::InvalidRange)?;
 
         let number: usize = literal.parse().map_err(|_| SyntaxError::BadLiteral)?;
-        Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(Number(
-            ast::NumberLiteral { literal: number },
-        )), syntax.into())))
+        Ok(MELCompilerContext::Expr(Expr::Literal(
+            Box::new(Number(ast::NumberLiteral { literal: number })),
+            syntax.into(),
+        )))
     }
 
     fn visit_string_literal(
@@ -457,11 +460,12 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .utf8_text(self.source.as_bytes())
             .map_err(|_| SyntaxError::InvalidRange)?;
 
-        Ok(MELCompilerContext::Expr(Expr::Literal(Box::new(
-            ast::Literal::String(ast::StringLiteral {
+        Ok(MELCompilerContext::Expr(Expr::Literal(
+            Box::new(ast::Literal::String(ast::StringLiteral {
                 literal: literal.to_string(),
-            }),
-        ), syntax.into())))
+            })),
+            syntax.into(),
+        )))
     }
 
     fn visit_comparison_operator(

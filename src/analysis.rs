@@ -23,7 +23,8 @@ use crate::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
         Expr, FunctionCall, Identifier,
         Type::{self, Function},
-    }, grammar::GrammarLocation,
+    },
+    grammar::GrammarLocation,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -104,7 +105,7 @@ impl Display for MelTypeCheckerError {
             Mismatch(expected, found) => write!(f, "Expected {:?}, found {:?}", expected, found),
             UnknownIdentifier(i) => write!(f, "Unknown identifier {:?}", i),
             MissingContext(c) => write!(f, "Missing compiler context: {:?}", c),
-            Incalculable => write!(f, "Incalculable type in expression")
+            Incalculable => write!(f, "Incalculable type in expression"),
         }
     }
 }
@@ -172,7 +173,7 @@ impl AstVisitor<MelTypeCheckerContext, MelTypeCheckerLocatableError> for MelType
             _ => {
                 return Err(MelTypeCheckerLocatableError {
                     error: Mismatch(Function(Box::new(Type::None), vec![]), found_callee),
-                    location: ast.location.clone()
+                    location: ast.location.clone(),
                 });
             }
         };
@@ -255,14 +256,14 @@ impl AstVisitor<MelTypeCheckerContext, MelTypeCheckerLocatableError> for MelType
             .as_ref()
             .ok_or(MelTypeCheckerLocatableError {
                 error: MissingContext("Parameters expected".to_string()),
-                location: ast.location.clone()
+                location: ast.location.clone(),
             })?;
         let arg = driver
             .visit(ast.expr.clone(), self, context.clone())?
             .expr
             .ok_or(MelTypeCheckerLocatableError {
                 error: Incalculable,
-                location: ast.location.clone()
+                location: ast.location.clone(),
             })?;
         if arg.tipe != params[0] {
             return Err(MelTypeCheckerLocatableError {
@@ -301,7 +302,7 @@ impl AstVisitor<MelTypeCheckerContext, MelTypeCheckerLocatableError> for MelType
         if left != right {
             return Err(MelTypeCheckerLocatableError {
                 error: Mismatch(left.tipe, right.tipe),
-                location: ast.location.clone()
+                location: ast.location.clone(),
             });
         }
         Ok(context.update_expr(TypedExpr {
@@ -345,7 +346,8 @@ mod tests {
             Type::{self, Boolean, Function, Integer},
         },
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
-        expect_expr, grammar::GrammarLocation,
+        expect_expr,
+        grammar::GrammarLocation,
     };
     use std::assert_matches;
 
@@ -446,7 +448,10 @@ mod tests {
             result,
             Err(MelTypeCheckerLocatableError {
                 error: MelTypeCheckerError::Mismatch(Integer, ast::Type::String),
-                location: GrammarLocation { start: 0, extent:  13} 
+                location: GrammarLocation {
+                    start: 0,
+                    extent: 13
+                }
             })
         );
     }
@@ -647,7 +652,10 @@ mod tests {
             result,
             MelTypeCheckerLocatableError {
                 error: MelTypeCheckerError::Mismatch(Boolean, Integer),
-                location: GrammarLocation{start: 5, extent: 14}
+                location: GrammarLocation {
+                    start: 5,
+                    extent: 14
+                }
             }
         );
     }

@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::grammar::{GrammarNode, GrammarLocation};
+use crate::grammar::{GrammarLocation, GrammarNode};
 use brooks_macros::{grammar_location, grammar_name};
 use std::fmt::Debug;
 
@@ -23,7 +23,7 @@ use std::fmt::Debug;
 #[grammar_location]
 #[derive(Debug, Clone)]
 pub struct Mel {
-    pub testing: usize
+    pub testing: usize,
 }
 
 #[grammar_name(function_call_expr)]
@@ -231,7 +231,9 @@ impl AstVisitorDriver {
                 visitor.visit_function_call(*function_call, context, self)
             }
             Expr::BinaryExpr(binary_expr) => visitor.visit_binary_expr(*binary_expr, context, self),
-            Expr::Literal(literal, location) => visitor.visit_literal((*literal, location), context, self),
+            Expr::Literal(literal, location) => {
+                visitor.visit_literal((*literal, location), context, self)
+            }
         }
     }
 }
