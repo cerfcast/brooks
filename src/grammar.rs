@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
+
 /// The trait that makes it possible to add a grammar node to the compiler.
 ///
 /// Use the `grammar_name` macro to derive it automatically.
@@ -26,6 +28,12 @@ pub trait GrammarNode {
 pub struct GrammarLocation {
     pub start: usize,
     pub extent: usize,
+}
+
+impl Display for GrammarLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} to {}", self.start, self.start + self.extent)
+    }
 }
 
 #[cfg(test)]

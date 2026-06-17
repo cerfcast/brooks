@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::{
     analysis::MelTypeCheckerError::{Incalculable, Mismatch, MissingContext, UnknownIdentifier},
@@ -98,10 +98,27 @@ pub enum MelTypeCheckerError {
     Incalculable,
 }
 
+impl Display for MelTypeCheckerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Mismatch(expected, found) => write!(f, "Expected {:?}, found {:?}", expected, found),
+            UnknownIdentifier(i) => write!(f, "Unknown identifier {:?}", i),
+            MissingContext(c) => write!(f, "Missing compiler context: {:?}", c),
+            Incalculable => write!(f, "Incalculable type in expression")
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MelTypeCheckerLocatableError {
     pub error: MelTypeCheckerError,
     pub location: GrammarLocation,
+}
+
+impl Display for MelTypeCheckerLocatableError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.error, self.location)
+    }
 }
 
 #[derive(Debug, Clone, Default)]
