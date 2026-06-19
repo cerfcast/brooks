@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    analysis::{self, Analyzed},
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
         FunctionCall, Identifier,
@@ -104,6 +105,38 @@ impl ToString for ast::NumberLiteral {
 impl ToString for ast::StringLiteral {
     fn to_string(&self) -> String {
         self.literal.to_string()
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::Type {
+    fn to_string(&self) -> String {
+        match self {
+            ast::Type::Boolean => "Bool".into(),
+            ast::Type::Integer => "Integer".into(),
+            ast::Type::String => "String".into(),
+            ast::Type::Params(items) => format!(
+                "Parameters: {}",
+                items.iter().fold("".to_string(), |o, n| o + &n.to_string())
+            ),
+            ast::Type::Function(result, args) => format!(
+                "Return Type: {}, Argument Types: {}",
+                result.to_string(),
+                args.iter().fold("".to_string(), |o, n| o + &n.to_string())
+            ),
+            ast::Type::None => "None".to_string(),
+        }
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for analysis::CompiledConstant {
+    fn to_string(&self) -> String {
+        match self {
+            analysis::CompiledConstant::Integer(i) => i.to_string(),
+            analysis::CompiledConstant::String(s) => s.clone(),
+            analysis::CompiledConstant::Boolean(b) => b.to_string(),
+        }
     }
 }
 
@@ -594,6 +627,229 @@ mod tests {
         };
         let result = driver
             .visit(&ast, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+}
+
+impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for AstTextSerializer {
+    fn visit_function_call(
+        &self,
+        ast: &FunctionCall<Analyzed>,
+        context: AstTextSerializerContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        let mut context = context.append(
+            ("\t".repeat(context.indent) + "Function Call:\n").to_string()
+                + &("\t".repeat(context.indent + 1) + "Callee: " + &ast.callee.identifier + "\n")
+                    .to_string(),
+        );
+        context = self.visit_argument_list(&ast.arguments, context.indent(), driver)?;
+
+        context = context.append("\n".into());
+        context = context.append(
+            "\t".repeat(context.indent)
+                + &format!("Type: {}", ast.aug.as_ref().unwrap().tipe.to_string()),
+        );
+
+        Ok(context.unindent())
+    }
+
+    fn visit_identifier(
+        &self,
+        ast: &Identifier<Analyzed>,
+        context: AstTextSerializerContext,
+        _driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        let output = "\t".repeat(context.indent) + "Identifier: " + &ast.identifier;
+        Ok(context.append(output))
+    }
+
+    fn visit_argument_list(
+        &self,
+        ast: &ArgumentList<Analyzed>,
+        context: AstTextSerializerContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        let mut context = context.append("\t".repeat(context.indent) + "Arguments:\n");
+        context = context.indent();
+        let mut first = true;
+        for arg in &ast.arguments {
+            if !first {
+                context = context.append("\n".into())
+            }
+            first = false;
+            context = self.visit_argument(arg, context, driver)?;
+        }
+        Ok(context.unindent())
+    }
+
+    fn visit_argument(
+        &self,
+        ast: &Argument<Analyzed>,
+        context: AstTextSerializerContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        driver.visit(&ast.expr, self, context)
+    }
+
+    fn visit_binary_expr(
+        &self,
+        ast: &BinaryExpr<Analyzed>,
+        context: AstTextSerializerContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        let mut context = context.append("\t".repeat(context.indent) + "Binary Expression:\n");
+
+        context = context.indent();
+
+        context = context.append("\t".repeat(context.indent) + "Left:\n");
+        context = driver.visit(&ast.left, self, context.indent())?;
+        context = context.unindent();
+
+        context = context.append("\n".into());
+
+        context = context
+            .append("\t".repeat(context.indent) + &format!("Operation: {}\n", ast.op.to_string()));
+
+        context = context.append("\t".repeat(context.indent) + "Right:\n");
+        context = driver.visit(&ast.right, self, context.indent())?;
+        context = context.unindent();
+
+        context = context.append("\n".into());
+        context = context.append(
+            "\t".repeat(context.indent)
+                + &format!("Type: {}", ast.aug.as_ref().unwrap().tipe.to_string()),
+        );
+        context = context.append("\n".into());
+
+        context = context.append(
+            "\t".repeat(context.indent)
+                + &ast
+                    .aug
+                    .as_ref()
+                    .unwrap()
+                    .constant
+                    .as_ref()
+                    .map(|c| format!("Constant value: {}", c.to_string()))
+                    .unwrap_or("Not a constant".to_string()),
+        );
+
+        context = context.unindent();
+        Ok(context)
+    }
+
+    fn visit_literal(
+        &self,
+        ast: (&ast::Literal, &GrammarLocation, &Option<Analyzed>),
+        context: AstTextSerializerContext,
+        _driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        Ok(context.append("\t".repeat(context.indent) + "Literal: " + &ast.0.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod analyzed_serializer_tests {
+    use std::sync::Arc;
+
+    use crate::{
+        analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
+        ast::Type::{self, Function},
+        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        expect_expr,
+        serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},
+    };
+
+    #[test]
+    fn serialize_analyzed_string_expression() {
+        let code = "\"testing\" . \"one\"";
+        let expected = "Binary Expression:
+\tLeft:
+\t\tLiteral: testing
+\tOperation: concat
+\tRight:
+\t\tLiteral: one
+\tType: String
+\tConstant value: testingone";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&result, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_analyzed_function_call() {
+        let code = "use(5)";
+        let expected = "Function Call:
+\tCallee: use
+\tArguments:
+\t\tLiteral: 5
+\tType: Return Type: Integer, Argument Types: Integer";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            "use",
+            Function(Arc::new(Type::Integer), vec![Type::Integer]),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&result, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }

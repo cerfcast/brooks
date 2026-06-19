@@ -86,8 +86,8 @@ pub enum CompiledConstant {
 
 #[derive(Debug, Clone)]
 pub struct Analyzed {
-    tipe: Type,
-    constant: Option<CompiledConstant>,
+    pub tipe: Type,
+    pub constant: Option<CompiledConstant>,
 }
 
 impl Expr<Analyzed> {
@@ -153,9 +153,9 @@ impl Display for MelAnalysisLocatableError {
 
 #[derive(Debug, Clone, Default)]
 pub struct MelAnalysisContext {
-    expr: Option<Expr<Analyzed>>,
-    params: Option<Vec<Type>>,
-    scopes: Scopes<Type>,
+    pub expr: Option<Expr<Analyzed>>,
+    pub params: Option<Vec<Type>>,
+    pub scopes: Scopes<Type>,
 }
 
 impl MelAnalysisContext {
@@ -454,7 +454,7 @@ mod type_check_tests {
         },
         ast::{
             self, AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier,
-            Type::{self, Boolean, Function, Integer},
+            Type::{self, Function, Integer},
         },
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
