@@ -254,7 +254,7 @@ impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTex
 
     fn visit_literal(
         &self,
-        ast: (&ast::Literal, &GrammarLocation, &Option<()>),
+        ast: (&ast::Literal, &GrammarLocation, &()),
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
@@ -649,7 +649,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         context = context.append("\n".into());
         context = context.append(
             "\t".repeat(context.indent)
-                + &format!("Type: {}", ast.aug.as_ref().unwrap().tipe.to_string()),
+                + &format!("Type: {}", ast.aug.tipe.to_string()),
         );
 
         Ok(context.unindent())
@@ -719,7 +719,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         context = context.append("\n".into());
         context = context.append(
             "\t".repeat(context.indent)
-                + &format!("Type: {}", ast.aug.as_ref().unwrap().tipe.to_string()),
+                + &format!("Type: {}", ast.aug.tipe.to_string()),
         );
         context = context.append("\n".into());
 
@@ -727,8 +727,6 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
             "\t".repeat(context.indent)
                 + &ast
                     .aug
-                    .as_ref()
-                    .unwrap()
                     .constant
                     .as_ref()
                     .map(|c| format!("Constant value: {}", c.to_string()))
@@ -741,7 +739,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
     fn visit_literal(
         &self,
-        ast: (&ast::Literal, &GrammarLocation, &Option<Analyzed>),
+        ast: (&ast::Literal, &GrammarLocation, &Analyzed),
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
@@ -753,7 +751,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
         context = context.append(
             "\t".repeat(context.indent)
-                + &format!("Type: {}", ast.2.as_ref().unwrap().tipe.to_string()),
+                + &format!("Type: {}", ast.2.tipe.to_string()),
         );
         context = context.append("\n".into());
 
@@ -761,8 +759,6 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
             "\t".repeat(context.indent)
                 + &ast
                     .2
-                    .as_ref()
-                    .unwrap()
                     .constant
                     .as_ref()
                     .map(|c| format!("Constant value: {}", c.to_string()))

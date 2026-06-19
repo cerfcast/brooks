@@ -24,7 +24,7 @@ use std::{fmt::Debug, sync::Arc};
 #[derive(Debug, Clone)]
 pub struct Mel<A: Debug + Clone> {
     pub testing: usize,
-    pub aug: Option<A>,
+    pub aug: A,
 }
 
 #[grammar_name(function_call_expr)]
@@ -33,7 +33,7 @@ pub struct Mel<A: Debug + Clone> {
 pub struct FunctionCall<A: Debug + Clone> {
     pub callee: Identifier<A>,
     pub arguments: ArgumentList<A>,
-    pub aug: Option<A>,
+    pub aug: A,
 }
 
 #[grammar_name(identifier)]
@@ -41,7 +41,7 @@ pub struct FunctionCall<A: Debug + Clone> {
 #[derive(Debug, Clone)]
 pub struct Identifier<A: Debug + Clone> {
     pub identifier: String,
-    pub aug: Option<A>,
+    pub aug: A,
 }
 
 #[grammar_name(argument)]
@@ -49,7 +49,7 @@ pub struct Identifier<A: Debug + Clone> {
 #[derive(Debug, Clone)]
 pub struct Argument<A: Debug + Clone> {
     pub expr: Expr<A>,
-    pub aug: Option<A>,
+    pub aug: A,
 }
 
 #[grammar_name(argument_list)]
@@ -57,7 +57,7 @@ pub struct Argument<A: Debug + Clone> {
 #[derive(Debug, Clone)]
 pub struct ArgumentList<A: Debug + Clone> {
     pub arguments: Vec<Argument<A>>,
-    pub aug: Option<A>,
+    pub aug: A,
 }
 
 #[grammar_name(binary_infix_operator)]
@@ -108,7 +108,7 @@ pub struct BinaryExpr<A: Debug + Clone> {
     pub left: Expr<A>,
     pub op: BinaryInfixOperator,
     pub right: Expr<A>,
-    pub aug: Option<A>,
+    pub aug: A,
 }
 
 #[grammar_name(expr)]
@@ -119,7 +119,7 @@ pub enum Expr<A: Debug + Clone> {
     Identifier(Arc<Identifier<A>>),
     ArgumentList(Arc<ArgumentList<A>>),
     Argument(Arc<Argument<A>>),
-    Literal(Literal, GrammarLocation, Option<A>),
+    Literal(Literal, GrammarLocation, A),
 }
 
 impl<A: Debug + Clone> Expr<A> {
@@ -211,7 +211,7 @@ pub trait AstVisitor<T, A: Debug + Clone, E> {
     ) -> AstVisitorResult<T, E>;
     fn visit_literal(
         &self,
-        ast: (&Literal, &GrammarLocation, &Option<A>),
+        ast: (&Literal, &GrammarLocation, &A),
         context: T,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<T, E>;

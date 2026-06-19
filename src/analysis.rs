@@ -307,10 +307,10 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 callee: (*callee).clone(),
                 location: ast.location.clone(),
                 arguments: (*args).clone(),
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Function(fn_params.0.clone(), fn_params.1.clone()),
                     constant: None,
-                }),
+                },
             }))),
         )
     }
@@ -332,10 +332,10 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         Ok(context.update_expr(Expr::Identifier(Arc::new(Identifier {
             identifier: ast.identifier.clone(),
             location: ast.location.clone(),
-            aug: Some(Analyzed {
+            aug: Analyzed {
                 tipe: found_id,
                 constant: None,
-            }),
+            },
         }))))
     }
 
@@ -380,10 +380,10 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             context.update_expr(Expr::ArgumentList(Arc::new(ArgumentList {
                 arguments: arg_types,
                 location: ast.location.clone(),
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::None,
                     constant: None,
-                }),
+                },
             }))),
         )
     }
@@ -418,10 +418,10 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         Ok(context.update_expr(Expr::Argument(Arc::new(Argument {
             expr: arg,
             location: ast.location.clone(),
-            aug: Some(Analyzed {
+            aug: Analyzed {
                 tipe: arg_type,
                 constant: None,
-            }),
+            },
         }))))
     }
 
@@ -471,16 +471,16 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             right,
             op: ast.op.clone(),
             location: ast.location.clone(),
-            aug: Some(Analyzed {
+            aug: Analyzed {
                 tipe: result_type,
                 constant: None,
-            }),
+            },
         }))))
     }
 
     fn visit_literal(
         &self,
-        ast: (&ast::Literal, &GrammarLocation, &Option<()>),
+        ast: (&ast::Literal, &GrammarLocation, &()),
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
@@ -488,26 +488,26 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             (b @ ast::Literal::Boolean(_), location, _) => Ok(context.update_expr(Expr::Literal(
                 b.clone(),
                 location.clone(),
-                Some(Analyzed {
+                Analyzed {
                     tipe: Type::Boolean,
                     constant: None,
-                }),
+                },
             ))),
             (n @ ast::Literal::Number(_), location, _) => Ok(context.update_expr(Expr::Literal(
                 n.clone(),
                 location.clone(),
-                Some(Analyzed {
+                Analyzed {
                     tipe: Type::Integer,
                     constant: None,
-                }),
+                },
             ))),
             (s @ ast::Literal::String(_), location, _) => Ok(context.update_expr(Expr::Literal(
                 s.clone(),
                 location.clone(),
-                Some(Analyzed {
+                Analyzed {
                     tipe: Type::String,
                     constant: None,
-                }),
+                },
             ))),
         }
     }
@@ -522,7 +522,7 @@ mod type_check_tests {
         },
         ast::{
             self, AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier,
-            Type::{self, Function, Integer, Boolean},
+            Type::{self, Boolean, Function, Integer},
         },
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
@@ -555,10 +555,10 @@ mod type_check_tests {
 
         assert_matches!(
             aug,
-            Some(Analyzed {
+            Analyzed {
                 tipe: Type::Integer,
                 constant: None,
-            })
+            }
         )
     }
 
@@ -592,10 +592,10 @@ mod type_check_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Integer,
                     constant: _
-                })
+                }
             }
         )
     }
@@ -630,10 +630,10 @@ mod type_check_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Integer,
                     constant: _
-                })
+                }
             }
         );
     }
@@ -721,10 +721,10 @@ mod type_check_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Integer,
                     constant: _
-                })
+                }
             }
         );
     }
@@ -760,10 +760,10 @@ mod type_check_tests {
             Identifier::<Analyzed> {
                 identifier: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Integer,
                     constant: _
-                })
+                }
             }
         );
     }
@@ -803,10 +803,10 @@ mod type_check_tests {
                 callee: _,
                 location: _,
                 arguments: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Function(_, _),
                     constant: _
-                })
+                }
             }
         );
     }
@@ -874,10 +874,10 @@ mod type_check_tests {
                 callee: _,
                 arguments: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Function(_, _),
                     constant: _
-                })
+                }
             }
         );
     }
@@ -917,10 +917,10 @@ mod type_check_tests {
                 callee: _,
                 arguments: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Function(_, _),
                     constant: _
-                })
+                }
             }
         );
     }
@@ -1024,10 +1024,10 @@ mod type_check_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Boolean,
                     constant: None,
-                })
+                }
             }
         );
     }
@@ -1055,7 +1055,7 @@ mod type_check_tests {
                 error: MelAnalysisError::Mismatch(Boolean, Integer),
                 location: GrammarLocation {
                     start: 0,
-                    extent: 9 
+                    extent: 9
                 }
             }
         );
@@ -1238,9 +1238,9 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                     Some(
                         Self::evaluate_binary_expr(
                             &cl,
-                            left.tipe().unwrap(),
+                            left.tipe(),
                             &cr,
-                            right.tipe().unwrap(),
+                            right.tipe(),
                             ast.op.clone(),
                         )
                         .map_err(|e| MelAnalysisLocatableError {
@@ -1261,17 +1261,17 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                 right,
                 op: ast.op.clone(),
                 location: ast.location.clone(),
-                aug: Some(Analyzed {
-                    tipe: expr.tipe().unwrap(),
+                aug: Analyzed {
+                    tipe: expr.tipe(),
                     constant,
-                }),
+                },
             }))),
         )
     }
 
     fn visit_literal(
         &self,
-        _ast: (&ast::Literal, &GrammarLocation, &Option<()>),
+        _ast: (&ast::Literal, &GrammarLocation, &()),
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
@@ -1279,28 +1279,28 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
             (b @ ast::Literal::Boolean(v), location, _) => Ok(context.update_expr(Expr::Literal(
                 b.clone(),
                 location.clone(),
-                Some(Analyzed {
+                Analyzed {
                     tipe: Type::Boolean,
                     constant: Some(CompiledConstant::Boolean(*v == BooleanLiteral::True)),
-                }),
+                },
             ))),
             (n @ ast::Literal::Number(NumberLiteral { literal: v }), location, _) => Ok(context
                 .update_expr(Expr::Literal(
                     n.clone(),
                     location.clone(),
-                    Some(Analyzed {
+                    Analyzed {
                         tipe: Type::Integer,
                         constant: Some(CompiledConstant::Integer(*v as i64)),
-                    }),
+                    },
                 ))),
             (s @ ast::Literal::String(StringLiteral { literal: v }), location, _) => Ok(context
                 .update_expr(Expr::Literal(
                     s.clone(),
                     location.clone(),
-                    Some(Analyzed {
+                    Analyzed {
                         tipe: Type::String,
                         constant: Some(CompiledConstant::String(v.clone())),
-                    }),
+                    },
                 ))),
         }
     }
@@ -1354,10 +1354,10 @@ mod optimizer_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Integer,
                     constant: Some(CompiledConstant::Integer(8)),
-                })
+                }
             }
         );
     }
@@ -1398,10 +1398,10 @@ mod optimizer_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Integer,
                     constant: Some(CompiledConstant::Integer(96)),
-                })
+                }
             }
         );
     }
@@ -1442,10 +1442,10 @@ mod optimizer_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Integer,
                     constant: Some(CompiledConstant::Integer(11)),
-                })
+                }
             }
         );
     }
@@ -1486,10 +1486,10 @@ mod optimizer_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Integer,
                     constant: Some(CompiledConstant::Integer(0)),
-                })
+                }
             }
         );
     }
@@ -1530,10 +1530,10 @@ mod optimizer_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::String,
                     constant: Some(CompiledConstant::String(a)),
-                })
+                }
             } if a == "testingone"
         );
     }
@@ -1574,10 +1574,10 @@ mod optimizer_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::String,
                     constant: Some(CompiledConstant::String(a)),
-                })
+                }
             } if a == "testingonetwo"
         );
     }
@@ -1618,10 +1618,10 @@ mod optimizer_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Boolean,
                     constant: Some(CompiledConstant::Boolean(true)),
-                })
+                }
             }
         );
     }
@@ -1662,10 +1662,10 @@ mod optimizer_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Boolean,
                     constant: Some(CompiledConstant::Boolean(false)),
-                })
+                }
             }
         );
     }
@@ -1706,10 +1706,10 @@ mod optimizer_tests {
                 right: _,
                 op: _,
                 location: _,
-                aug: Some(Analyzed {
+                aug: Analyzed {
                     tipe: Type::Boolean,
                     constant: None,
-                })
+                }
             }
         );
     }

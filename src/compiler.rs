@@ -208,7 +208,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 callee: (*callee).clone(),
                 arguments: (*argument_list).clone(),
                 location: syntax.into(),
-                aug: None,
+                aug: (),
             },
         ))))
     }
@@ -237,7 +237,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let id = Identifier {
             identifier: identifier.to_string(),
             location: syntax.into(),
-            aug: None,
+            aug: (),
         };
         Ok(MELCompilerContext::Expr(Expr::Identifier(Arc::new(id))))
     }
@@ -257,7 +257,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 Arc::new(ast::Argument {
                     expr,
                     location: syntax.into(),
-                    aug: None,
+                    aug: (),
                 }),
             ))),
             _ => Err(SyntaxError::EmptyContext),
@@ -286,7 +286,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             ArgumentList {
                 arguments: args,
                 location: syntax.into(),
-                aug: None,
+                aug: (),
             },
         ))))
     }
@@ -397,7 +397,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 op: operator,
                 right,
                 location: syntax.into(),
-                aug: None,
+                aug: (),
             },
         ))))
     }
@@ -437,13 +437,13 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             return Ok(MELCompilerContext::Expr(Expr::Literal(
                 Boolean(ast::BooleanLiteral::True),
                 syntax.into(),
-                None,
+                (),
             )));
         } else if literal == "false" {
             return Ok(MELCompilerContext::Expr(Expr::Literal(
                 Boolean(ast::BooleanLiteral::False),
                 syntax.into(),
-                None,
+                (),
             )));
         }
         Err(SyntaxError::BadGrammarElement)
@@ -462,7 +462,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         Ok(MELCompilerContext::Expr(Expr::Literal(
             Number(ast::NumberLiteral { literal: number }),
             syntax.into(),
-            None,
+            (),
         )))
     }
 
@@ -481,7 +481,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 literal: Self::strip_quotes(literal),
             }),
             syntax.into(),
-            None,
+            (),
         )))
     }
 
