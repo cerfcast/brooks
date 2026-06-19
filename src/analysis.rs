@@ -815,6 +815,84 @@ mod type_check_tests {
     }
 
     #[test]
+    fn test_type_check_function_call_in_expression2() {
+        let expr = "use_me(5, \"testing\")";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            "use_me",
+            Function(Arc::new(Type::Integer), vec![Type::Integer, Type::String]),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze expression");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::FunctionCall(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            FunctionCall::<Analyzed> {
+                callee: _,
+                arguments: _,
+                location: _,
+                aug: Some(Analyzed {
+                    tipe: Type::Integer,
+                    constant: _
+                })
+            }
+        );
+    }
+
+    #[test]
+    fn test_type_check_function_call_in_expression3() {
+        let expr = "use_me(5, \"testing\")";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            "use_me",
+            Function(Arc::new(Type::Integer), vec![Type::Integer, Type::Integer]),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with type error");
+
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::Mismatch(Type::String, Integer),
+                location: GrammarLocation {
+                    start: 10,
+                    extent: 9
+                }
+            }
+        );
+    }
+
+    #[test]
     fn test_type_check_function_call_in_expression_mismatch() {
         let expr = "5 + (use_me(5) + 10)";
 
