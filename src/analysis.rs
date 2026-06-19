@@ -18,10 +18,13 @@
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use crate::{
-    analysis::MelAnalysisError::{Incalculable, Mismatch, MissingContext, UnknownIdentifier},
+    analysis::MelAnalysisError::{
+        Incalculable, Mismatch, MissingContext, OptimizationNotSupported, UnknownIdentifier,
+    },
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
-        BooleanLiteral, Expr, FunctionCall, Identifier, NumberLiteral, StringLiteral,
+        BinaryInfixOperator, BooleanLiteral, Expr, FunctionCall, Identifier,
+        NumberLiteral, StringLiteral,
         Type::{self, Function},
     },
     grammar::GrammarLocation,
@@ -125,6 +128,7 @@ pub enum MelAnalysisError {
     Mismatch(Type, Type),
     UnknownIdentifier(String),
     MissingContext(String),
+    OptimizationNotSupported(String),
     Incalculable,
 }
 
@@ -135,6 +139,7 @@ impl Display for MelAnalysisError {
             UnknownIdentifier(i) => write!(f, "Unknown identifier {:?}", i),
             MissingContext(c) => write!(f, "Missing compiler context: {:?}", c),
             Incalculable => write!(f, "Incalculable type in expression"),
+            OptimizationNotSupported(o) => write!(f, "Optimization not supported: {o}"),
         }
     }
 }
@@ -959,8 +964,25 @@ impl MelOptimizer {
         op: ast::BinaryInfixOperator,
     ) -> Result<CompiledConstant, MelAnalysisError> {
         match op {
-            ast::BinaryInfixOperator::Logic(_) => todo!(),
-            ast::BinaryInfixOperator::Comparison(_) => todo!(),
+            ast::BinaryInfixOperator::Comparison(_) => Err(
+                MelAnalysisError::OptimizationNotSupported("Comparison operator".into()),
+            ),
+            ast::BinaryInfixOperator::Logic(logic_operator) => {
+                let left = if let CompiledConstant::Boolean(l) = left {
+                    l
+                } else {
+                    return Err(MelAnalysisError::Mismatch(Type::Boolean, left_type));
+                };
+                let right = if let CompiledConstant::Boolean(r) = right {
+                    r
+                } else {
+                    return Err(MelAnalysisError::Mismatch(Type::Boolean, right_type));
+                };
+                match logic_operator {
+                    ast::LogicOperator::And => Ok(CompiledConstant::Boolean(*left && *right)),
+                    ast::LogicOperator::Or => Ok(CompiledConstant::Boolean(*left || *right)),
+                }
+            }
             ast::BinaryInfixOperator::Math(math_operator) => {
                 let left = if let CompiledConstant::Integer(l) = left {
                     l
@@ -1080,31 +1102,35 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
 
         match (left.constant(), right.constant()) {
             (Some(cl), Some(cr)) => {
-                let constant = Some(
-                    Self::evaluate_binary_expr(
-                        &cl,
-                        left.tipe().unwrap(),
-                        &cr,
-                        right.tipe().unwrap(),
-                        ast.op.clone(),
+                if !matches!(ast.op, BinaryInfixOperator::Comparison(_)) {
+                    let constant = Some(
+                        Self::evaluate_binary_expr(
+                            &cl,
+                            left.tipe().unwrap(),
+                            &cr,
+                            right.tipe().unwrap(),
+                            ast.op.clone(),
+                        )
+                        .map_err(|e| MelAnalysisLocatableError {
+                            error: e,
+                            location: ast.location.clone(),
+                        })?,
+                    );
+                    Ok(
+                        context.update_expr(Expr::BinaryExpr(Arc::new(ast::BinaryExpr {
+                            left,
+                            right,
+                            op: ast.op.clone(),
+                            location: ast.location.clone(),
+                            aug: Some(Analyzed {
+                                tipe: expr.tipe().unwrap(),
+                                constant,
+                            }),
+                        }))),
                     )
-                    .map_err(|e| MelAnalysisLocatableError {
-                        error: e,
-                        location: ast.location.clone(),
-                    })?,
-                );
-                Ok(
-                    context.update_expr(Expr::BinaryExpr(Arc::new(ast::BinaryExpr {
-                        left,
-                        right,
-                        op: ast.op.clone(),
-                        location: ast.location.clone(),
-                        aug: Some(Analyzed {
-                            tipe: expr.tipe().unwrap(),
-                            constant,
-                        }),
-                    }))),
-                )
+                } else {
+                    Ok(context.clone())
+                }
             }
             _ => Ok(context.clone()),
         }
@@ -1420,6 +1446,94 @@ mod optimizer_tests {
                     constant: Some(CompiledConstant::String(a)),
                 })
             } if a == "testingonetwo"
+        );
+    }
+
+    #[test]
+    fn test_optimize_logical_binary_expr() {
+        let expr = "true or false";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Some(Analyzed {
+                    tipe: Type::Boolean,
+                    constant: Some(CompiledConstant::Boolean(true)),
+                })
+            }
+        );
+    }
+
+    #[test]
+    fn test_optimize_logical_binary_expr2() {
+        let expr = "true and false";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Some(Analyzed {
+                    tipe: Type::Boolean,
+                    constant: Some(CompiledConstant::Boolean(false)),
+                })
+            }
         );
     }
 }
