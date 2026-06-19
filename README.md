@@ -12,6 +12,18 @@ The MEL is the language by which CDN operators can specify whether, when and wha
 to apply to requests that they serve. It is used, especially, in the specification of
 the [CDNI Processing Stages Metadata](https://datatracker.ietf.org/doc/draft-ietf-cdni-processing-stages-metadata/).
 
+### Try It Out
+
+There is a MEL Compiler Explorer[^ce] backed by a wasm compilation of this library online at
+
+[https://brooks.cerfca.st/](https://brooks.cerfca.st/)
+
+You can use it to explore the capabilities of Brooks implementation of MEL.
+
+If you are interested in the source code for the MEL Compiler Explorer, you can find it [here](https://github.com/cerfcast/brooks-wasm).
+
+[^ce]: Yes, we are jealous of [Matt](https://xania.org/)!
+
 ### Goals
 
 We want Brooks to
