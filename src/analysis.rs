@@ -1752,3 +1752,42 @@ mod optimizer_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod analysis_error_tests {
+    use crate::{
+        analysis::{
+            MelAnalysisContext, MelAnalysisError, MelAnalysisLocatableError,
+            MelAnalysisPreconditions, MelOptimizer,
+        },
+        ast::AstVisitorDriver,
+        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        expect_expr,
+    };
+    use std::assert_matches;
+
+    #[test]
+    fn test_invalid_context_error_binary_expr() {
+        let expr = "5 < 4";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let context = MelAnalysisContext::default();
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+
+        assert_matches!(
+            driver.visit(&ast, &visitor, context),
+            Err(MelAnalysisLocatableError {
+                error: MelAnalysisError::PreconditionFailure(
+                    MelAnalysisPreconditions::ContextMissingExpr(_)
+                ),
+                location: _
+            })
+        );
+    }
+}
