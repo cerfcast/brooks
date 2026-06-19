@@ -759,7 +759,8 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
         context = context.append(
             "\t".repeat(context.indent)
-                + &ast.2
+                + &ast
+                    .2
                     .as_ref()
                     .unwrap()
                     .constant
@@ -857,6 +858,56 @@ mod analyzed_serializer_tests {
             "use",
             Function(Arc::new(Type::Integer), vec![Type::Integer]),
         ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&result, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_analyzed_comparison_expr() {
+        let code = "5 < 4";
+        let expected = "Binary Expression:
+\tLeft:
+\t\tLiteral: 5
+\t\t\tType: Integer
+\t\t\tConstant value: 5
+\tOperation: <
+\tRight:
+\t\tLiteral: 4
+\t\t\tType: Integer
+\t\t\tConstant value: 4
+\tType: Bool
+\tNot a constant";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
 
         let result = driver
             .visit(&ast, &visitor, context)

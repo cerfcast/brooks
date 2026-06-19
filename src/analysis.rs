@@ -23,8 +23,8 @@ use crate::{
     },
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
-        BinaryInfixOperator, BooleanLiteral, Expr, FunctionCall, Identifier,
-        NumberLiteral, StringLiteral,
+        BinaryInfixOperator, BooleanLiteral, Expr, FunctionCall, Identifier, NumberLiteral,
+        StringLiteral,
         Type::{self, Function},
     },
     grammar::GrammarLocation,
@@ -403,13 +403,20 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             });
         }
 
+        let result_type = match &ast.op {
+            BinaryInfixOperator::Logic(_) => Type::Boolean,
+            BinaryInfixOperator::Comparison(_) => Type::Boolean,
+            BinaryInfixOperator::Math(_) => Type::Integer,
+            BinaryInfixOperator::Concat(_) => Type::String,
+        };
+
         Ok(context.update_expr(Expr::BinaryExpr(Arc::new(BinaryExpr {
             left,
             right,
             op: ast.op.clone(),
             location: ast.location.clone(),
             aug: Some(Analyzed {
-                tipe: left_type,
+                tipe: result_type,
                 constant: None,
             }),
         }))))
@@ -459,7 +466,7 @@ mod type_check_tests {
         },
         ast::{
             self, AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier,
-            Type::{self, Function, Integer},
+            Type::{self, Function, Integer, Boolean},
         },
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
@@ -930,6 +937,73 @@ mod type_check_tests {
             }
         );
     }
+
+    #[test]
+    fn test_type_check_comparison_expr() {
+        let expr = "5 < 4";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Some(Analyzed {
+                    tipe: Type::Boolean,
+                    constant: None,
+                })
+            }
+        );
+    }
+
+    #[test]
+    fn test_type_check_comparison_expr_mismatch() {
+        let expr = "5 < 4 + 5";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with type error");
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::Mismatch(Boolean, Integer),
+                location: GrammarLocation {
+                    start: 0,
+                    extent: 9 
+                }
+            }
+        );
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1100,10 +1174,10 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                 location: ast.location.clone(),
             })?;
 
-        match (left.constant(), right.constant()) {
+        let constant = match (left.constant(), right.constant()) {
             (Some(cl), Some(cr)) => {
                 if !matches!(ast.op, BinaryInfixOperator::Comparison(_)) {
-                    let constant = Some(
+                    Some(
                         Self::evaluate_binary_expr(
                             &cl,
                             left.tipe().unwrap(),
@@ -1115,25 +1189,26 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                             error: e,
                             location: ast.location.clone(),
                         })?,
-                    );
-                    Ok(
-                        context.update_expr(Expr::BinaryExpr(Arc::new(ast::BinaryExpr {
-                            left,
-                            right,
-                            op: ast.op.clone(),
-                            location: ast.location.clone(),
-                            aug: Some(Analyzed {
-                                tipe: expr.tipe().unwrap(),
-                                constant,
-                            }),
-                        }))),
                     )
                 } else {
-                    Ok(context.clone())
+                    None
                 }
             }
-            _ => Ok(context.clone()),
-        }
+            _ => None,
+        };
+
+        Ok(
+            context.update_expr(Expr::BinaryExpr(Arc::new(ast::BinaryExpr {
+                left,
+                right,
+                op: ast.op.clone(),
+                location: ast.location.clone(),
+                aug: Some(Analyzed {
+                    tipe: expr.tipe().unwrap(),
+                    constant,
+                }),
+            }))),
+        )
     }
 
     fn visit_literal(
@@ -1532,6 +1607,50 @@ mod optimizer_tests {
                 aug: Some(Analyzed {
                     tipe: Type::Boolean,
                     constant: Some(CompiledConstant::Boolean(false)),
+                })
+            }
+        );
+    }
+
+    #[test]
+    fn test_optimize_comparison_expr() {
+        let expr = "5 < 4";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Some(Analyzed {
+                    tipe: Type::Boolean,
+                    constant: None,
                 })
             }
         );
