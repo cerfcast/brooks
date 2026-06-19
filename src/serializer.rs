@@ -745,7 +745,29 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
-        Ok(context.append("\t".repeat(context.indent) + "Literal: " + &ast.0.to_string()))
+        let mut context =
+            context.append("\t".repeat(context.indent) + "Literal: " + &ast.0.to_string());
+        context = context.append("\n".into());
+
+        context = context.indent();
+
+        context = context.append(
+            "\t".repeat(context.indent)
+                + &format!("Type: {}", ast.2.as_ref().unwrap().tipe.to_string()),
+        );
+        context = context.append("\n".into());
+
+        context = context.append(
+            "\t".repeat(context.indent)
+                + &ast.2
+                    .as_ref()
+                    .unwrap()
+                    .constant
+                    .as_ref()
+                    .map(|c| format!("Constant value: {}", c.to_string()))
+                    .unwrap_or("Not a constant".to_string()),
+        );
+        Ok(context.unindent())
     }
 }
 
@@ -767,9 +789,13 @@ mod analyzed_serializer_tests {
         let expected = "Binary Expression:
 \tLeft:
 \t\tLiteral: testing
+\t\t\tType: String
+\t\t\tConstant value: testing
 \tOperation: concat
 \tRight:
 \t\tLiteral: one
+\t\t\tType: String
+\t\t\tConstant value: one
 \tType: String
 \tConstant value: testingone";
 
@@ -813,6 +839,8 @@ mod analyzed_serializer_tests {
 \tCallee: use
 \tArguments:
 \t\tLiteral: 5
+\t\t\tType: Integer
+\t\t\tNot a constant
 \tType: Return Type: Integer, Argument Types: Integer";
 
         let compile_result = compile(code);
