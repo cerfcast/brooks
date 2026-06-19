@@ -870,12 +870,14 @@ mod type_check_tests {
         let result = driver
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with miscounted params/args");
-        assert_matches!(result, MelAnalysisLocatableError {
-            error: MelAnalysisError::Miscount(2, 1),
-            location: _,
-        })
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::Miscount(2, 1),
+                location: _,
+            }
+        )
     }
-
 
     #[test]
     fn test_type_check_function_call_in_expression() {

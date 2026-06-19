@@ -647,10 +647,8 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         context = self.visit_argument_list(&ast.arguments, context.indent(), driver)?;
 
         context = context.append("\n".into());
-        context = context.append(
-            "\t".repeat(context.indent)
-                + &format!("Type: {}", ast.aug.tipe.to_string()),
-        );
+        context = context
+            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe.to_string()));
 
         Ok(context.unindent())
     }
@@ -717,10 +715,8 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         context = context.unindent();
 
         context = context.append("\n".into());
-        context = context.append(
-            "\t".repeat(context.indent)
-                + &format!("Type: {}", ast.aug.tipe.to_string()),
-        );
+        context = context
+            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe.to_string()));
         context = context.append("\n".into());
 
         context = context.append(
@@ -749,10 +745,8 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
         context = context.indent();
 
-        context = context.append(
-            "\t".repeat(context.indent)
-                + &format!("Type: {}", ast.2.tipe.to_string()),
-        );
+        context = context
+            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.2.tipe.to_string()));
         context = context.append("\n".into());
 
         context = context.append(
