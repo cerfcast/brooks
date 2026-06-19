@@ -411,7 +411,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         let arg_type = arg.tipe();
         if arg_type != params[0] {
             return Err(MelAnalysisLocatableError {
-                error: Mismatch(arg_type, params[0].clone()),
+                error: Mismatch(params[0].clone(), arg_type),
                 location: arg.location(),
             });
         }
@@ -951,7 +951,7 @@ mod type_check_tests {
         assert_matches!(
             result,
             MelAnalysisLocatableError {
-                error: MelAnalysisError::Mismatch(Type::String, Integer),
+                error: MelAnalysisError::Mismatch(Integer, Type::String),
                 location: GrammarLocation {
                     start: 10,
                     extent: 9
