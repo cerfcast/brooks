@@ -21,7 +21,7 @@ use crate::{
     analysis::{
         MelAnalysisAssertions::{ContextMissingExpr, ContextMissingParams, ContextWrongExprType},
         MelAnalysisError::{
-            AssertionFailure, Incalculable, Mismatch, OptimizationNotSupported,
+            AssertionFailure, Incalculable, Miscount, Mismatch, OptimizationNotSupported,
             PreconditionFailure, UnknownIdentifier,
         },
     },
@@ -180,6 +180,7 @@ impl Display for MelAnalysisPreconditions {
 #[derive(Debug, Clone)]
 pub enum MelAnalysisError {
     Mismatch(Type, Type),
+    Miscount(usize, usize),
     UnknownIdentifier(String),
     AssertionFailure(MelAnalysisAssertions),
     PreconditionFailure(MelAnalysisPreconditions),
@@ -191,6 +192,7 @@ impl Display for MelAnalysisError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Mismatch(expected, found) => write!(f, "Expected {:?}, found {:?}", expected, found),
+            Miscount(expected, found) => write!(f, "Expected {expected} arguments, found {found}"),
             UnknownIdentifier(i) => write!(f, "Unknown identifier {:?}", i),
             AssertionFailure(c) => write!(f, "Missing compiler context: {:?}", c),
             PreconditionFailure(c) => {
@@ -349,6 +351,13 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             error: AssertionFailure(ContextMissingParams),
             location: ast.location.clone(),
         })?;
+
+        if params.len() != ast.arguments.len() {
+            return Err(MelAnalysisLocatableError {
+                error: MelAnalysisError::Miscount(params.len(), ast.arguments.len()),
+                location: ast.location.clone(),
+            });
+        }
 
         let mut arg_types: Vec<Argument<Analyzed>> = vec![];
         for arg in ast.arguments.iter().zip(params) {
@@ -838,6 +847,35 @@ mod type_check_tests {
             location: _,
         } if a == "use_me");
     }
+
+    #[test]
+    fn test_type_check_function_call_error_wrong_argument_count() {
+        let expr = "use(5)";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            "use",
+            Function(Arc::new(Type::Integer), vec![Type::Integer, Type::String]),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with miscounted params/args");
+        assert_matches!(result, MelAnalysisLocatableError {
+            error: MelAnalysisError::Miscount(2, 1),
+            location: _,
+        })
+    }
+
 
     #[test]
     fn test_type_check_function_call_in_expression() {
