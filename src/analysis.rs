@@ -15,11 +15,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, fmt::Display, sync::Arc};
 
 use crate::{
-    analysis::MelAnalysisError::{
-        Incalculable, Mismatch, MissingContext, OptimizationNotSupported, UnknownIdentifier,
+    analysis::{
+        MelAnalysisAssertions::{ContextMissingExpr, ContextMissingParams, ContextWrongExprType},
+        MelAnalysisError::{
+            AssertionFailure, Incalculable, Mismatch, OptimizationNotSupported,
+            PreconditionFailure, UnknownIdentifier,
+        },
     },
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
@@ -94,14 +98,14 @@ pub struct Analyzed {
 }
 
 impl Expr<Analyzed> {
-    pub fn tipe(&self) -> Option<Type> {
+    pub fn tipe(&self) -> Type {
         match self {
-            Expr::FunctionCall(function_call) => function_call.aug.as_ref().map(|a| a.tipe.clone()),
-            Expr::BinaryExpr(binary_expr) => binary_expr.aug.as_ref().map(|a| a.tipe.clone()),
-            Expr::Identifier(identifier) => identifier.aug.as_ref().map(|a| a.tipe.clone()),
-            Expr::ArgumentList(argument_list) => argument_list.aug.as_ref().map(|a| a.tipe.clone()),
-            Expr::Argument(argument) => argument.aug.as_ref().map(|a| a.tipe.clone()),
-            Expr::Literal(_, _, aug) => aug.as_ref().map(|a| a.tipe.clone()),
+            Expr::FunctionCall(function_call) => function_call.aug.tipe.clone(),
+            Expr::BinaryExpr(binary_expr) => binary_expr.aug.tipe.clone(),
+            Expr::Identifier(identifier) => identifier.aug.tipe.clone(),
+            Expr::ArgumentList(argument_list) => argument_list.aug.tipe.clone(),
+            Expr::Argument(argument) => argument.aug.tipe.clone(),
+            Expr::Literal(_, _, aug) => aug.tipe.clone(),
         }
     }
 
@@ -114,11 +118,61 @@ impl Expr<Analyzed> {
             Expr::Argument(argument) => &argument.aug,
             Expr::Literal(_, _, aug) => aug,
         };
+        analyzed.constant.clone()
+    }
+}
 
-        if let Some(analyzed) = analyzed {
-            analyzed.constant.clone()
-        } else {
-            None
+impl<A: Clone + Debug> Display for Expr<A> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::FunctionCall(_) => write!(f, "FunctionCall"),
+            Expr::BinaryExpr(_) => write!(f, "BinaryExpr"),
+            Expr::Identifier(_) => write!(f, "Identifier"),
+            Expr::ArgumentList(_) => write!(f, "ArgumentList"),
+            Expr::Argument(_) => write!(f, "Argument"),
+            Expr::Literal(_, _, _) => write!(f, "Literal"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum MelAnalysisAssertions {
+    ContextMissing,
+    ContextMissingExpr(String),
+    ContextWrongExprType(String, String, String),
+    ContextMissingParams,
+}
+
+impl Display for MelAnalysisAssertions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MelAnalysisAssertions::ContextMissing => write!(f, "Missing analysis context"),
+            ContextWrongExprType(expected, actual, whre) => write!(
+                f,
+                "Wrong expression type in analysis context; expected {} but found {} in {}",
+                expected, actual, whre
+            ),
+            MelAnalysisAssertions::ContextMissingParams => {
+                write!(f, "Missing parameters in analysis context")
+            }
+            MelAnalysisAssertions::ContextMissingExpr(s) => {
+                write!(f, "Missing expression in {}", s)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum MelAnalysisPreconditions {
+    ContextMissingExpr(String),
+}
+
+impl Display for MelAnalysisPreconditions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MelAnalysisPreconditions::ContextMissingExpr(s) => {
+                write!(f, "Missing expression in {}", s)
+            }
         }
     }
 }
@@ -127,7 +181,8 @@ impl Expr<Analyzed> {
 pub enum MelAnalysisError {
     Mismatch(Type, Type),
     UnknownIdentifier(String),
-    MissingContext(String),
+    AssertionFailure(MelAnalysisAssertions),
+    PreconditionFailure(MelAnalysisPreconditions),
     OptimizationNotSupported(String),
     Incalculable,
 }
@@ -137,8 +192,11 @@ impl Display for MelAnalysisError {
         match self {
             Mismatch(expected, found) => write!(f, "Expected {:?}, found {:?}", expected, found),
             UnknownIdentifier(i) => write!(f, "Unknown identifier {:?}", i),
-            MissingContext(c) => write!(f, "Missing compiler context: {:?}", c),
-            Incalculable => write!(f, "Incalculable type in expression"),
+            AssertionFailure(c) => write!(f, "Missing compiler context: {:?}", c),
+            PreconditionFailure(c) => {
+                write!(f, "Precondition not satisfied during analysis: {:?}", c)
+            }
+            Incalculable => write!(f, "Incalculable expression analysis"),
             OptimizationNotSupported(o) => write!(f, "Optimization not supported: {o}"),
         }
     }
@@ -199,7 +257,11 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         let callee = self.visit_identifier(&ast.callee, context.clone(), driver)?;
         let callee = match callee.expr.unwrap() {
             Expr::Identifier(id) => Ok(id),
-            _ => Err(MissingContext("TODO".into())),
+            e => Err(AssertionFailure(ContextWrongExprType(
+                "Identifier".to_string(),
+                e.to_string(),
+                "visit_function_call".to_string(),
+            ))),
         }
         .map_err(|e| MelAnalysisLocatableError {
             error: e,
@@ -229,7 +291,11 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         let args = self.visit_argument_list(&ast.arguments, context_with_params, driver)?;
         let args = match args.expr.unwrap() {
             Expr::ArgumentList(argument_list) => Ok(argument_list),
-            _ => Err(MissingContext("TODO".into())),
+            e => Err(AssertionFailure(ContextWrongExprType(
+                "ArgumentList".to_string(),
+                e.to_string(),
+                "visit_function_call".to_string(),
+            ))),
         }
         .map_err(|e| MelAnalysisLocatableError {
             error: e,
@@ -280,7 +346,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
         let params = context.params.as_ref().ok_or(MelAnalysisLocatableError {
-            error: MissingContext("Parameters expected".to_string()),
+            error: AssertionFailure(ContextMissingParams),
             location: ast.location.clone(),
         })?;
 
@@ -290,12 +356,18 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 .visit_argument(arg.0, context.update_params(vec![arg.1.clone()]), driver)?
                 .expr
                 .ok_or(MelAnalysisLocatableError {
-                    error: Incalculable,
+                    error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                        "visit_argument_list".into(),
+                    )),
                     location: arg.0.location.clone(),
                 })?;
             let arg = match arg {
                 Expr::Argument(argument) => Ok(argument),
-                _ => Err(MissingContext("TODO".into())),
+                e => Err(AssertionFailure(ContextWrongExprType(
+                    "Argument".to_string(),
+                    e.to_string(),
+                    "visit_argument_list".to_string(),
+                ))),
             }
             .map_err(|e| MelAnalysisLocatableError {
                 error: e,
@@ -323,23 +395,20 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
         let params = context.params.as_ref().ok_or(MelAnalysisLocatableError {
-            error: MissingContext("Parameters expected".to_string()),
+            error: AssertionFailure(ContextMissingParams),
             location: ast.location.clone(),
         })?;
+
         let arg = driver.visit(&ast.expr, self, context.clone())?.expr.ok_or(
             MelAnalysisLocatableError {
-                error: Incalculable,
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_argument".into(),
+                )),
                 location: ast.location.clone(),
             },
         )?;
 
-        let arg_type = arg
-            .tipe()
-            .ok_or(MissingContext("Could not get type of argument".into()))
-            .map_err(|e| MelAnalysisLocatableError {
-                error: e,
-                location: ast.location.clone(),
-            })?;
+        let arg_type = arg.tipe();
         if arg_type != params[0] {
             return Err(MelAnalysisLocatableError {
                 error: Mismatch(arg_type, params[0].clone()),
@@ -364,7 +433,9 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
         let left = driver.visit(&ast.left, self, context.clone())?.expr.ok_or(
             MelAnalysisLocatableError {
-                error: Incalculable,
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_binary_expr".into(),
+                )),
                 location: ast.left.location(),
             },
         )?;
@@ -372,29 +443,14 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             .visit(&ast.right, self, context.clone())?
             .expr
             .ok_or(MelAnalysisLocatableError {
-                error: Incalculable,
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_binary_expr".into(),
+                )),
                 location: ast.right.location(),
             })?;
 
-        let left_type = left
-            .tipe()
-            .ok_or(MissingContext(
-                "Could not get type of left expression in binary expression".into(),
-            ))
-            .map_err(|e| MelAnalysisLocatableError {
-                error: e,
-                location: ast.location.clone(),
-            })?;
-
-        let right_type = right
-            .tipe()
-            .ok_or(MissingContext(
-                "Could not get type of left expression in binary expression".into(),
-            ))
-            .map_err(|e| MelAnalysisLocatableError {
-                error: e,
-                location: ast.location.clone(),
-            })?;
+        let left_type = left.tipe();
+        let right_type = right.tipe();
 
         if left_type != right_type {
             return Err(MelAnalysisLocatableError {
@@ -1137,7 +1193,9 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
         let expr = context.expr.as_ref().ok_or(MelAnalysisLocatableError {
-            error: MissingContext("Visiting binary expression in optimizer analysis".into()),
+            error: MelAnalysisError::PreconditionFailure(
+                MelAnalysisPreconditions::ContextMissingExpr("visit_binary_expr".into()),
+            ),
             location: ast.location.clone(),
         })?;
 
@@ -1154,9 +1212,9 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
             )?
             .expr
             .ok_or(MelAnalysisLocatableError {
-                error: MissingContext(
-                    "Left operand of binary expression in optimizer analysis".into(),
-                ),
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_binary_expr".into(),
+                )),
                 location: ast.location.clone(),
             })?;
 
@@ -1168,9 +1226,9 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
             )?
             .expr
             .ok_or(MelAnalysisLocatableError {
-                error: MissingContext(
-                    "Right operand of binary expression in optimizer analysis".into(),
-                ),
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_binary_expr".into(),
+                )),
                 location: ast.location.clone(),
             })?;
 
