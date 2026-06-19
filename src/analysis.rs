@@ -220,7 +220,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             }
         };
 
-        let context_with_params = context.update_params(fn_params.1);
+        let context_with_params = context.update_params(fn_params.1.clone());
         let args = self.visit_argument_list(&ast.arguments, context_with_params, driver)?;
         let args = match args.expr.unwrap() {
             Expr::ArgumentList(argument_list) => Ok(argument_list),
@@ -237,7 +237,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 location: ast.location.clone(),
                 arguments: (*args).clone(),
                 aug: Some(Analyzed {
-                    tipe: (*fn_params.0).clone(),
+                    tipe: Type::Function(fn_params.0.clone(), fn_params.1.clone()),
                     constant: None,
                 }),
             }))),
@@ -736,7 +736,7 @@ mod type_check_tests {
                 location: _,
                 arguments: _,
                 aug: Some(Analyzed {
-                    tipe: Type::Integer,
+                    tipe: Function(_, _),
                     constant: _
                 })
             }
@@ -807,7 +807,7 @@ mod type_check_tests {
                 arguments: _,
                 location: _,
                 aug: Some(Analyzed {
-                    tipe: Type::Integer,
+                    tipe: Function(_, _),
                     constant: _
                 })
             }
@@ -850,7 +850,7 @@ mod type_check_tests {
                 arguments: _,
                 location: _,
                 aug: Some(Analyzed {
-                    tipe: Type::Integer,
+                    tipe: Function(_, _),
                     constant: _
                 })
             }
@@ -917,7 +917,7 @@ mod type_check_tests {
         assert_matches!(
             result,
             MelAnalysisLocatableError {
-                error: MelAnalysisError::Mismatch(Boolean, Integer),
+                error: MelAnalysisError::Mismatch(Function(_, _), Integer),
                 location: GrammarLocation {
                     start: 5,
                     extent: 14
