@@ -43,6 +43,6 @@ mod tests {
 
     #[test]
     fn test_grammar_node() {
-        assert_eq!(Mel::name(), "mel")
+        assert_eq!(Mel::<()>::name(), "mel")
     }
 }

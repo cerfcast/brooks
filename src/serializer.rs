@@ -138,10 +138,10 @@ impl AstTextSerializerContext {
     }
 }
 
-impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSerializer {
+impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTextSerializer {
     fn visit_function_call(
         &self,
-        ast: FunctionCall,
+        ast: &FunctionCall<()>,
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
@@ -150,13 +150,13 @@ impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSer
                 + &("\t".repeat(context.indent + 1) + "Callee: " + &ast.callee.identifier + "\n")
                     .to_string(),
         );
-        context = self.visit_argument_list(ast.arguments, context.indent(), driver)?;
+        context = self.visit_argument_list(&ast.arguments, context.indent(), driver)?;
         Ok(context.unindent())
     }
 
     fn visit_identifier(
         &self,
-        ast: Identifier,
+        ast: &Identifier<()>,
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
@@ -166,14 +166,14 @@ impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSer
 
     fn visit_argument_list(
         &self,
-        ast: ArgumentList,
+        ast: &ArgumentList<()>,
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
         let mut context = context.append("\t".repeat(context.indent) + "Arguments:\n");
         context = context.indent();
         let mut first = true;
-        for arg in ast.arguments {
+        for arg in &ast.arguments {
             if !first {
                 context = context.append("\n".into())
             }
@@ -185,16 +185,16 @@ impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSer
 
     fn visit_argument(
         &self,
-        ast: Argument,
+        ast: &Argument<()>,
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
-        driver.visit(ast.expr, self, context)
+        driver.visit(&ast.expr, self, context)
     }
 
     fn visit_binary_expr(
         &self,
-        ast: BinaryExpr,
+        ast: &BinaryExpr<()>,
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
@@ -203,7 +203,7 @@ impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSer
         context = context.indent();
 
         context = context.append("\t".repeat(context.indent) + "Left:\n");
-        context = driver.visit(ast.left, self, context.indent())?;
+        context = driver.visit(&ast.left, self, context.indent())?;
         context = context.unindent();
 
         context = context.append("\n".into());
@@ -212,7 +212,7 @@ impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSer
             .append("\t".repeat(context.indent) + &format!("Operation: {}\n", ast.op.to_string()));
 
         context = context.append("\t".repeat(context.indent) + "Right:\n");
-        context = driver.visit(ast.right, self, context.indent())?;
+        context = driver.visit(&ast.right, self, context.indent())?;
         context = context.unindent();
 
         context = context.unindent();
@@ -221,7 +221,7 @@ impl AstVisitor<AstTextSerializerContext, AstTextSerializerError> for AstTextSer
 
     fn visit_literal(
         &self,
-        ast: (ast::Literal, GrammarLocation),
+        ast: (&ast::Literal, &GrammarLocation, &Option<()>),
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
@@ -262,7 +262,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -290,7 +290,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -318,7 +318,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -350,7 +350,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -383,7 +383,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -416,7 +416,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -449,7 +449,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -477,7 +477,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -505,7 +505,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -537,7 +537,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -565,7 +565,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
@@ -575,10 +575,10 @@ mod tests {
         let code = "\"testing\" . \"one\"";
         let expected = "Binary Expression:
 \tLeft:
-\t\tLiteral: \"testing\"
+\t\tLiteral: testing
 \tOperation: concat
 \tRight:
-\t\tLiteral: \"one\"";
+\t\tLiteral: one";
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
@@ -593,7 +593,7 @@ mod tests {
             indent: 0,
         };
         let result = driver
-            .visit(ast, &visitor, context)
+            .visit(&ast, &visitor, context)
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }

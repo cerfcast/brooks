@@ -7,10 +7,12 @@ pub fn grammar_name(attr: TokenStream, item: TokenStream) -> TokenStream {
     let meta: Meta = syn::parse(attr).unwrap();
     let ast: DeriveInput = syn::parse(item).unwrap();
     let name = &ast.ident;
+
+    let (x, y, z) = ast.generics.split_for_impl();
     let mp = meta.path().get_ident().unwrap();
     let generated = quote! {
         #ast
-        impl GrammarNode for #name {
+        impl #x GrammarNode for #name #y #z {
             fn name() -> String {
                 stringify!(#mp).to_string()
             }
@@ -22,14 +24,14 @@ pub fn grammar_name(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn grammar_location(_: TokenStream, item: TokenStream) -> TokenStream {
-    let ast: DeriveInput = syn::parse(item).unwrap();
+    let mut ast: DeriveInput = syn::parse(item).unwrap();
 
-    let items = match &ast.data {
-        syn::Data::Struct(data_struct) => data_struct.fields.clone(),
+    let mut strct = match &ast.data {
+        syn::Data::Struct(data_struct) => data_struct.clone(),
         _ => todo!(),
     };
 
-    let mut items = match items {
+    let mut items = match strct.fields {
         syn::Fields::Named(fields_named) => fields_named,
         _ => todo!(),
     };
@@ -50,17 +52,12 @@ pub fn grammar_location(_: TokenStream, item: TokenStream) -> TokenStream {
         }),
     });
 
-    let name = &ast.ident;
-
-    let mut replacement_attrs = proc_macro2::TokenStream::new();
-    for a in ast.attrs {
-        a.to_tokens(&mut replacement_attrs);
-    }
+    strct.fields = syn::Fields::Named(items);
+    ast.data = syn::Data::Struct(strct);
+    let ts = ast.to_token_stream();
 
     let generated = quote! {
-        #replacement_attrs
-        pub struct #name
-            #items
+        #ts
     };
 
     return generated.into();

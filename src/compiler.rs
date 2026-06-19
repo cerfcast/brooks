@@ -17,6 +17,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::sync::Arc;
 use tree_sitter::{self, Node};
 
 use crate::ast::Expr::BinaryExpr;
@@ -148,7 +149,7 @@ pub trait SyntaxVisitor<T>: Sized {
 /// A context for compilation used when visiting the parse tree.
 #[derive(Default, Clone)]
 pub enum MELCompilerContext {
-    Expr(ast::Expr),
+    Expr(ast::Expr<()>),
     Operator(ast::BinaryInfixOperator),
     #[default]
     Empty,
@@ -169,6 +170,13 @@ pub struct MELCompiler {
     source: String,
 }
 
+impl MELCompiler {
+    pub fn strip_quotes(str: &str) -> String {
+        let result = str.strip_prefix("\"").unwrap_or(str);
+        result.strip_suffix("\"").unwrap_or(result).into()
+    }
+}
+
 impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
     fn visit_function_call(
         &self,
@@ -181,25 +189,26 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         let callee = match _driver.visit(walker.node(), self, _context.clone())? {
             MELCompilerContext::Expr(ast::Expr::Identifier(id)) => {
-                Result::<Box<Identifier>, SyntaxError>::Ok(id)
+                Result::<Arc<Identifier<()>>, SyntaxError>::Ok(id)
             }
-            _ => Result::<Box<Identifier>, SyntaxError>::Err(SyntaxError::EmptyContext),
+            _ => Result::<Arc<Identifier<()>>, SyntaxError>::Err(SyntaxError::EmptyContext),
         }?;
 
         walker.goto_next_sibling();
 
         let argument_list = match _driver.visit(walker.node(), self, _context.clone())? {
             MELCompilerContext::Expr(ast::Expr::ArgumentList(args)) => {
-                Result::<Box<ArgumentList>, SyntaxError>::Ok(args)
+                Result::<Arc<ArgumentList<()>>, SyntaxError>::Ok(args)
             }
-            _ => Result::<Box<ArgumentList>, SyntaxError>::Err(SyntaxError::EmptyContext),
+            _ => Result::<Arc<ArgumentList<()>>, SyntaxError>::Err(SyntaxError::EmptyContext),
         }?;
 
-        Ok(MELCompilerContext::Expr(Expr::FunctionCall(Box::new(
-            ast::FunctionCall {
-                callee: *callee,
-                arguments: *argument_list,
+        Ok(MELCompilerContext::Expr(Expr::FunctionCall(Arc::new(
+            ast::FunctionCall::<()> {
+                callee: (*callee).clone(),
+                arguments: (*argument_list).clone(),
                 location: syntax.into(),
+                aug: None,
             },
         ))))
     }
@@ -228,8 +237,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let id = Identifier {
             identifier: identifier.to_string(),
             location: syntax.into(),
+            aug: None,
         };
-        Ok(MELCompilerContext::Expr(Expr::Identifier(Box::new(id))))
+        Ok(MELCompilerContext::Expr(Expr::Identifier(Arc::new(id))))
     }
 
     fn visit_argument(
@@ -244,9 +254,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         match _driver.visit(walker.node(), self, _context.clone())? {
             MELCompilerContext::Expr(expr) => Ok(MELCompilerContext::Expr(Expr::Argument(
-                Box::new(ast::Argument {
+                Arc::new(ast::Argument {
                     expr,
                     location: syntax.into(),
+                    aug: None,
                 }),
             ))),
             _ => Err(SyntaxError::EmptyContext),
@@ -260,21 +271,22 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<MELCompilerContext> {
         let mut walker = syntax.walk();
-        let mut args: Vec<Argument> = vec![];
+        let mut args: Vec<Argument<()>> = vec![];
         for arg in syntax.named_children(&mut walker) {
             let argument = match driver.visit(arg, self, context.clone())? {
                 MELCompilerContext::Expr(Expr::Argument(arg)) => {
-                    Result::<Box<Argument>, SyntaxError>::Ok(arg)
+                    Result::<Arc<Argument<()>>, SyntaxError>::Ok(arg)
                 }
-                _ => Result::<Box<Argument>, SyntaxError>::Err(SyntaxError::EmptyContext),
+                _ => Result::<Arc<Argument<()>>, SyntaxError>::Err(SyntaxError::EmptyContext),
             }?;
-            args.push(*argument);
+            args.push((*argument).clone());
         }
 
-        Ok(MELCompilerContext::Expr(Expr::ArgumentList(Box::new(
+        Ok(MELCompilerContext::Expr(Expr::ArgumentList(Arc::new(
             ArgumentList {
                 arguments: args,
                 location: syntax.into(),
+                aug: None,
             },
         ))))
     }
@@ -359,8 +371,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         let left = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext::Expr(left) => Result::<Expr, SyntaxError>::Ok(left),
-            _ => Result::<Expr, SyntaxError>::Err(SyntaxError::EmptyContext),
+            MELCompilerContext::Expr(left) => Result::<Expr<()>, SyntaxError>::Ok(left),
+            _ => Result::<Expr<()>, SyntaxError>::Err(SyntaxError::EmptyContext),
         }?;
 
         walker.goto_next_sibling();
@@ -375,16 +387,17 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_next_sibling();
 
         let right = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext::Expr(right) => Result::<Expr, SyntaxError>::Ok(right),
-            _ => Result::<Expr, SyntaxError>::Err(SyntaxError::EmptyContext),
+            MELCompilerContext::Expr(right) => Result::<Expr<()>, SyntaxError>::Ok(right),
+            _ => Result::<Expr<()>, SyntaxError>::Err(SyntaxError::EmptyContext),
         }?;
 
-        Ok(MELCompilerContext::Expr(BinaryExpr(Box::new(
+        Ok(MELCompilerContext::Expr(BinaryExpr(Arc::new(
             ast::BinaryExpr {
                 left,
                 op: operator,
                 right,
                 location: syntax.into(),
+                aug: None,
             },
         ))))
     }
@@ -422,13 +435,15 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .map_err(|_| SyntaxError::InvalidRange)?;
         if literal == "true" {
             return Ok(MELCompilerContext::Expr(Expr::Literal(
-                Box::new(Boolean(ast::BooleanLiteral::True)),
+                Boolean(ast::BooleanLiteral::True),
                 syntax.into(),
+                None,
             )));
         } else if literal == "false" {
             return Ok(MELCompilerContext::Expr(Expr::Literal(
-                Box::new(Boolean(ast::BooleanLiteral::False)),
+                Boolean(ast::BooleanLiteral::False),
                 syntax.into(),
+                None,
             )));
         }
         Err(SyntaxError::BadGrammarElement)
@@ -445,8 +460,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         let number: usize = literal.parse().map_err(|_| SyntaxError::BadLiteral)?;
         Ok(MELCompilerContext::Expr(Expr::Literal(
-            Box::new(Number(ast::NumberLiteral { literal: number })),
+            Number(ast::NumberLiteral { literal: number }),
             syntax.into(),
+            None,
         )))
     }
 
@@ -461,10 +477,11 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .map_err(|_| SyntaxError::InvalidRange)?;
 
         Ok(MELCompilerContext::Expr(Expr::Literal(
-            Box::new(ast::Literal::String(ast::StringLiteral {
-                literal: literal.to_string(),
-            })),
+            ast::Literal::String(ast::StringLiteral {
+                literal: Self::strip_quotes(literal),
+            }),
             syntax.into(),
+            None,
         )))
     }
 
@@ -519,27 +536,27 @@ impl SyntaxVisitorDriver {
     ) -> SyntaxVisitorResult<T> {
         let hm: HashMap<String, _> = HashMap::from([
             (
-                ast::FunctionCall::name(),
+                ast::FunctionCall::<()>::name(),
                 U::visit_function_call as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
-                ast::Expr::name(),
+                ast::Expr::<()>::name(),
                 U::visit_expr as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
-                ast::Mel::name(),
+                ast::Mel::<()>::name(),
                 U::visit_mel as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
-                ast::Identifier::name(),
+                ast::Identifier::<()>::name(),
                 U::visit_identifier as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
-                ast::ArgumentList::name(),
+                ast::ArgumentList::<()>::name(),
                 U::visit_argument_list as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
-                ast::Argument::name(),
+                ast::Argument::<()>::name(),
                 U::visit_argument as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
@@ -559,7 +576,7 @@ impl SyntaxVisitorDriver {
                 U::visit_comparison_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
-                ast::BinaryExpr::name(),
+                ast::BinaryExpr::<()>::name(),
                 U::visit_binary_expr as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             ),
             (
