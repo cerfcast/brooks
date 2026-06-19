@@ -1,20 +1,35 @@
 use proc_macro::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{DeriveInput, Field, Ident, Meta, PathSegment, TypePath, spanned::Spanned, token};
+use syn::{
+    DeriveInput, Field, Ident, PathSegment, TypePath, punctuated::Punctuated, spanned::Spanned,
+    token,
+};
+
+use syn::Token;
+use syn::parse::Parser;
 
 #[proc_macro_attribute]
 pub fn grammar_name(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let meta: Meta = syn::parse(attr).unwrap();
+    let parser = Punctuated::<Ident, Token![,]>::parse_terminated;
+    let path = parser.parse(attr).unwrap();
+
     let ast: DeriveInput = syn::parse(item).unwrap();
     let name = &ast.ident;
 
     let (x, y, z) = ast.generics.split_for_impl();
-    let mp = meta.path().get_ident().unwrap();
+
+    let names = path
+        .iter()
+        .fold(proc_macro2::TokenStream::new(), |mut ts, n| {
+            ts.extend(quote! { stringify!(#n).to_string(), });
+            return ts;
+        });
+
     let generated = quote! {
         #ast
         impl #x GrammarNode for #name #y #z {
-            fn name() -> String {
-                stringify!(#mp).to_string()
+            fn name() -> Vec<String> {
+                vec![#names]
             }
         }
     };

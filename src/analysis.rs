@@ -1074,7 +1074,7 @@ mod type_check_tests {
 
     #[test]
     fn test_type_check_comparison_expr_mismatch() {
-        let expr = "5 < 4 + 5";
+        let expr = "(5 < 4) + 5";
 
         let compile_result = compile(expr);
         let compiled = compile_result.expect("Compilation error");
@@ -1095,7 +1095,7 @@ mod type_check_tests {
                 error: MelAnalysisError::Mismatch(Boolean, Integer),
                 location: GrammarLocation {
                     start: 0,
-                    extent: 9
+                    extent: 11
                 }
             }
         );

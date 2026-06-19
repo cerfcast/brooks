@@ -63,11 +63,7 @@ Function Call (Name Starts With Number)
    (ERROR
     (UNEXPECTED 's')
    )
-   (binary_infix_operator
-    (logic_operator
-     (or)
-    )
-   )
+   (or)
    (expr
     (function_call_expr
      (identifier)

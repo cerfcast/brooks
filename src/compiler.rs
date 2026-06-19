@@ -527,79 +527,109 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 pub struct SyntaxVisitorDriver {}
 
 impl SyntaxVisitorDriver {
-    #[allow(dead_code)]
     pub fn visit<T, U: SyntaxVisitor<T>>(
         &self,
         node: Node,
         visitor: &U,
         context: T,
     ) -> SyntaxVisitorResult<T> {
-        let hm: HashMap<String, _> = HashMap::from([
-            (
-                ast::FunctionCall::<()>::name(),
+        type Visitor<T, U> = fn(&U, Node, T, &SyntaxVisitorDriver) -> SyntaxVisitorResult<T>;
+
+        let mut hm: HashMap<String, Visitor<T, U>> = HashMap::new();
+
+        // Register each of the appropriate visitor functions with the grammar nodes (as
+        // defined by the grammar_node macro).
+        ast::FunctionCall::<()>::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_function_call as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::Expr::<()>::name(),
+            );
+        });
+        ast::Expr::<()>::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_expr as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::Mel::<()>::name(),
+            );
+        });
+        ast::Mel::<()>::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_mel as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::Identifier::<()>::name(),
+            );
+        });
+        ast::Identifier::<()>::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_identifier as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::ArgumentList::<()>::name(),
+            );
+        });
+        ast::ArgumentList::<()>::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_argument_list as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::Argument::<()>::name(),
+            );
+        });
+        ast::Argument::<()>::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_argument as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::BinaryInfixOperator::name(),
-                U::visit_infix_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::LogicOperator::name(),
+            );
+        });
+        ast::LogicOperator::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_logic_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::StringConcatOperator::name(),
+            );
+        });
+        ast::StringConcatOperator::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_string_concat_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::ComparisonOperator::name(),
+            );
+        });
+        ast::ComparisonOperator::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_comparison_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::BinaryExpr::<()>::name(),
+            );
+        });
+        ast::BinaryExpr::<()>::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_binary_expr as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::MathOperator::name(),
+            );
+        });
+        ast::MathOperator::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_math_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::Literal::name(),
+            );
+        });
+        ast::Literal::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::BooleanLiteral::name(),
+            );
+        });
+        ast::BooleanLiteral::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_boolean_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::NumberLiteral::name(),
+            );
+        });
+        ast::NumberLiteral::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_number_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-            (
-                ast::StringLiteral::name(),
+            );
+        });
+        ast::StringLiteral::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
                 U::visit_string_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
-            ),
-        ]);
+            );
+        });
+
         match hm.get(node.grammar_name()) {
             Some(callable) => (callable)(visitor, node, context, self),
             None => Err(SyntaxError::NoSuchVisitor(node.grammar_name().into())),

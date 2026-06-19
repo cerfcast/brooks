@@ -11,11 +11,7 @@ Associativity Check (Simple Binary)
      (number_literal)
     )
    )
-   (binary_infix_operator
-    (math_operator
-     (plus)
-    )
-   )
+   (plus)
    (expr
     (literal
      (number_literal)
@@ -39,11 +35,7 @@ Associativity Check (Left to Right)
        (number_literal)
       )
      )
-     (binary_infix_operator
-      (math_operator
-       (plus)
-      )
-     )
+     (plus)
      (expr
       (literal
        (number_literal)
@@ -51,11 +43,7 @@ Associativity Check (Left to Right)
      )
     )
    )
-   (binary_infix_operator
-    (math_operator
-     (minus)
-    )
-   )
+   (minus)
    (expr
     (literal
      (number_literal)
@@ -65,39 +53,27 @@ Associativity Check (Left to Right)
  )
 )
 =================================
-Associativity Check (Extra Grouping)
+Precedence Check (Multiplication)
 =================================
-5 + 2 - 3 * 6
+5 + 3 * 6
 ---
 (mel
  (expr
   (binary_expr
    (expr
+    (literal
+     (number_literal)
+    )
+   )
+   (plus)
+   (expr
     (binary_expr
      (expr
-      (binary_expr
-       (expr
-        (literal
-         (number_literal)
-        )
-       )
-       (binary_infix_operator
-        (math_operator
-         (plus)
-        )
-       )
-       (expr
-        (literal
-         (number_literal)
-        )
-       )
+      (literal
+       (number_literal)
       )
      )
-     (binary_infix_operator
-      (math_operator
-       (minus)
-      )
-     )
+     (mul)
      (expr
       (literal
        (number_literal)
@@ -105,19 +81,75 @@ Associativity Check (Extra Grouping)
      )
     )
    )
-   (binary_infix_operator
-    (math_operator
-    (mul)
-    )
-   )
+  )
+ )
+)
+=================================
+Precedence Check (Division)
+=================================
+5 + 3 / 6
+---
+(mel
+ (expr
+  (binary_expr
    (expr
     (literal
      (number_literal)
     )
    )
+   (plus)
+   (expr
+    (binary_expr
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+     (div)
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+    )
+   )
   )
  )
 )
+=================================
+Precedence Check (Modulo)
+=================================
+5 + 3 % 6
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (literal
+     (number_literal)
+    )
+   )
+   (plus)
+   (expr
+    (binary_expr
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+     (modulo)
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+    )
+   )
+  )
+ )
+)
+
+
 =================================
 Associativity Check (No Grouping)
 =================================
@@ -133,11 +165,7 @@ Associativity Check (No Grouping)
        (number_literal)
       )
      )
-     (binary_infix_operator
-      (math_operator
-       (plus)
-      )
-     )
+     (plus)
      (expr
       (literal
        (number_literal)
@@ -145,11 +173,7 @@ Associativity Check (No Grouping)
      )
     )
    )
-   (binary_infix_operator
-    (math_operator
-     (minus)
-    )
-   )
+   (minus)
    (expr
     (literal
      (number_literal)
@@ -159,7 +183,7 @@ Associativity Check (No Grouping)
  )
 )
 =================================
-Associativity Check (Grouping)
+Associativity Check (Explicit Grouping)
 =================================
 5 + ( 2 - 3 )
 ---
@@ -171,11 +195,7 @@ Associativity Check (Grouping)
      (number_literal)
     )
    )
-   (binary_infix_operator
-    (math_operator
-     (plus)
-    )
-   )
+   (plus)
    (expr
     (binary_expr
      (expr
@@ -183,11 +203,7 @@ Associativity Check (Grouping)
        (number_literal)
       )
      )
-     (binary_infix_operator
-      (math_operator
-       (minus)
-      )
-     )
+     (minus)
      (expr
       (literal
        (number_literal)
@@ -211,61 +227,15 @@ true and ! false
      (boolean_literal)
     )
    )
-   (binary_infix_operator
-    (logic_operator
-     (and)
-    )
-   )
+   (and)
    (expr
     (prefix_expr
-     (prefix_operator
-      (bang)
-     )
+     (bang)
      (expr
       (literal
        (boolean_literal)
       )
      )
-    )
-   )
-  )
- )
-)
-=================================
-Math Check (Modulo)
-=================================
-5 % 2 - 3
----
-(mel
- (expr
-  (binary_expr
-   (expr
-    (binary_expr
-     (expr
-      (literal
-       (number_literal)
-      )
-     )
-     (binary_infix_operator
-      (math_operator
-       (modulo)
-      )
-     )
-     (expr
-      (literal
-       (number_literal)
-      )
-     )
-    )
-   )
-   (binary_infix_operator
-    (math_operator
-     (minus)
-    )
-   )
-   (expr
-    (literal
-     (number_literal)
     )
    )
   )
@@ -284,11 +254,7 @@ Boolean Check (Regex Equality)
      (string_literal)
     )
    )
-   (binary_infix_operator
-    (comparison_operator
-     (regex_eq)
-    )
-   )
+   (regex_eq)
    (expr
     (literal
      (regex_literal)

@@ -21,7 +21,7 @@ use std::fmt::Display;
 ///
 /// Use the `grammar_name` macro to derive it automatically.
 pub trait GrammarNode {
-    fn name() -> String;
+    fn name() -> Vec<String>;
 }
 
 #[derive(Debug, Clone, Default)]
@@ -43,6 +43,6 @@ mod tests {
 
     #[test]
     fn test_grammar_node() {
-        assert_eq!(Mel::<()>::name(), "mel")
+        assert_eq!(Mel::<()>::name()[0], "mel")
     }
 }

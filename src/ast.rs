@@ -60,7 +60,6 @@ pub struct ArgumentList<A: Debug + Clone> {
     pub aug: A,
 }
 
-#[grammar_name(binary_infix_operator)]
 #[derive(Debug, Clone)]
 pub enum BinaryInfixOperator {
     Logic(LogicOperator),
@@ -69,7 +68,7 @@ pub enum BinaryInfixOperator {
     Concat(StringConcatOperator),
 }
 
-#[grammar_name(comparison_operator)]
+#[grammar_name(eq, ne, lt, lte, gt, gte)]
 #[derive(Debug, Clone)]
 pub enum ComparisonOperator {
     Eq,
@@ -80,7 +79,7 @@ pub enum ComparisonOperator {
     Gte,
 }
 
-#[grammar_name(logic_operator)]
+#[grammar_name(and, or)]
 #[derive(Debug, Clone)]
 pub enum LogicOperator {
     And,
@@ -91,7 +90,7 @@ pub enum LogicOperator {
 #[derive(Debug, Clone)]
 pub struct StringConcatOperator {}
 
-#[grammar_name(math_operator)]
+#[grammar_name(plus, minus, mul, div, modulo)]
 #[derive(Debug, Clone)]
 pub enum MathOperator {
     Plus,

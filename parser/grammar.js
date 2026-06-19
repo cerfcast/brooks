@@ -16,8 +16,15 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 /// <reference types="tree-sitter-cli/dsl" />
-// @ts-check
 
+const precedences = {
+  LOGIC: 1,
+  COMPARISON: 2,
+  CONCAT: 3,
+  ADDITIVE: 4,
+  MULTIPLICATIVE: 5,
+  UNARY: 5,
+}
 export default grammar({
   name: "mel",
 
@@ -48,10 +55,39 @@ export default grammar({
     assignment_expr: $ => seq($.identifier, "=", $.literal),
     function_call_expr: $ => seq($.identifier, $.argument_list),
 
-    // Assume that all binary expressions are left associative.
-    binary_expr: $ => prec.left(1, seq($.expr, $.binary_infix_operator, $.expr)),
-    // Assume that prefix operators are right associative (and have high precedence).
-    prefix_expr: $ => prec.right(2, seq($.prefix_operator, $.expr)),
+    binary_expr: $ => choice(
+    ...[
+      [$.and, precedences.LOGIC],
+      [$.or, precedences.LOGIC],
+
+      [$.lt, precedences.COMPARISON],
+      [$.lte, precedences.COMPARISON],
+      [$.gt, precedences.COMPARISON],
+      [$.gte, precedences.COMPARISON],
+      [$.eq, precedences.COMPARISON],
+      [$.ne, precedences.COMPARISON],
+      [$.regex_eq, precedences.COMPARISON],
+
+      [$.string_concat, precedences.CONCAT],
+
+      [$.plus, precedences.ADDITIVE],
+      [$.minus, precedences.ADDITIVE],
+
+      [$.mul, precedences.MULTIPLICATIVE],
+      [$.div, precedences.MULTIPLICATIVE],
+      [$.modulo, precedences.MULTIPLICATIVE],
+    ].map(([op, precedence]) => 
+      prec.left(precedence, seq($.expr, op, $.expr))
+    )),
+
+    prefix_expr: $ => choice(
+      ...[
+        [$.bang, precedences.UNARY]
+      ].map(([op, precedence]) => 
+        prec.right(precedence, seq(op, $.expr))
+      )
+    ),
+
     _literal_expr: $ => $.literal,
 
     literal: $ => choice($.string_literal, $.number_literal, $.boolean_literal, $.regex_literal),
@@ -61,15 +97,6 @@ export default grammar({
     string_literal: _ => /"[a-z A-Z]*"/,
     boolean_literal: _ => choice("true", "false"),
     regex_literal: _ => /"\/[a-z A-Z]*\/i?"/,
-
-    // Binary infix operators.
-    binary_infix_operator: $ => choice($.logic_operator, $.comparison_operator, $.math_operator, $.string_concat),
-    logic_operator: $ => choice($.and, $.or),
-    comparison_operator: $ => choice($.eq, $.ne, $.regex_eq, $.lt, $.lte, $.gt, $.gte),
-    math_operator: $ => choice($.plus, $.minus, $.mul, $.div, $.modulo),
-
-    // Unary prefix operators.
-    prefix_operator: $ => choice($.bang),
 
     // Operators
     plus: _ => '+',
