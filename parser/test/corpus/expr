@@ -263,4 +263,57 @@ Boolean Check (Regex Equality)
   )
  )
 )
-
+=================================
+Ternary Expression Check
+=================================
+true ? 1 : 5
+---
+(mel
+ (expr
+  (ternary_expr
+   (expr
+    (literal
+     (boolean_literal)
+    )
+   )
+   (ternary)
+   (expr
+    (literal
+     (number_literal)
+    )
+   )
+   (expr
+    (literal
+     (number_literal)
+    )
+   )
+  )
+ )
+)
+=================================
+Ternary Expression Check
+=================================
+true ? 1 : 5 < 10 + 7
+---
+(mel
+ (expr
+  (ternary_expr
+   (expr
+    (literal
+     (boolean_literal)
+    )
+   )
+   (ternary)
+   (expr
+    (literal
+     (number_literal)
+    )
+   )
+   (expr
+    (literal
+     (number_literal)
+    )
+   )
+  )
+ )
+)

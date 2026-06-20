@@ -21,6 +21,7 @@ use std::sync::Arc;
 use tree_sitter::{self, Node};
 
 use crate::ast::Expr::BinaryExpr;
+use crate::ast::Expr::TernaryExpr;
 use crate::ast::Literal::{Boolean, Number};
 use crate::ast::LogicOperator::{And, Or};
 use crate::ast::MathOperator::{Divide, Minus, Modulo, Multiply, Plus};
@@ -108,7 +109,13 @@ pub trait SyntaxVisitor<T>: Sized {
         context: T,
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
-    fn visit_infix_operator(
+    fn visit_ternary_operator(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_ternary_expr(
         &self,
         syntax: Node,
         context: T,
@@ -150,7 +157,8 @@ pub trait SyntaxVisitor<T>: Sized {
 #[derive(Default, Clone)]
 pub enum MELCompilerContext {
     Expr(ast::Expr<()>),
-    Operator(ast::BinaryInfixOperator),
+    BinaryOperator(ast::BinaryInfixOperator),
+    TernaryOperator(ast::TernaryOperator),
     #[default]
     Empty,
 }
@@ -301,9 +309,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         if walker.node().grammar_name() == "string_concat" {
-            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Concat(
-                StringConcatOperator {},
-            )));
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Concat(StringConcatOperator {}),
+            ));
         }
         Err(SyntaxError::BadGrammarElement)
     }
@@ -318,11 +326,13 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         if walker.node().grammar_name() == "and" {
-            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Logic(
-                And,
-            )));
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Logic(And),
+            ));
         } else if walker.node().grammar_name() == "or" {
-            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Logic(Or)));
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Logic(Or),
+            ));
         }
         Err(SyntaxError::BadGrammarElement)
     }
@@ -337,25 +347,25 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         if walker.node().grammar_name() == "plus" {
-            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
-                Plus,
-            )));
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Math(Plus),
+            ));
         } else if walker.node().grammar_name() == "minus" {
-            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
-                Minus,
-            )));
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Math(Minus),
+            ));
         } else if walker.node().grammar_name() == "mul" {
-            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
-                Multiply,
-            )));
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Math(Multiply),
+            ));
         } else if walker.node().grammar_name() == "div" {
-            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
-                Divide,
-            )));
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Math(Divide),
+            ));
         } else if walker.node().grammar_name() == "modulo" {
-            return Ok(MELCompilerContext::Operator(BinaryInfixOperator::Math(
-                Modulo,
-            )));
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Math(Modulo),
+            ));
         }
         Err(SyntaxError::BadGrammarElement)
     }
@@ -378,7 +388,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_next_sibling();
 
         let operator = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext::Operator(oper) => {
+            MELCompilerContext::BinaryOperator(oper) => {
                 Result::<BinaryInfixOperator, SyntaxError>::Ok(oper)
             }
             _ => Result::<BinaryInfixOperator, SyntaxError>::Err(SyntaxError::EmptyContext),
@@ -402,15 +412,82 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         ))))
     }
 
-    fn visit_infix_operator(
+    fn visit_ternary_operator(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let mut walker = syntax.walk();
+        walker.goto_first_child();
+        if walker.node().grammar_name() == "ternary_question" {
+            return Ok(MELCompilerContext::TernaryOperator(
+                ast::TernaryOperator::Question,
+            ));
+        } else if walker.node().grammar_name() == "ternary_colon" {
+            return Ok(MELCompilerContext::TernaryOperator(
+                ast::TernaryOperator::Colon,
+            ));
+        }
+        Err(SyntaxError::BadGrammarElement)
+    }
+
+    fn visit_ternary_expr(
         &self,
         syntax: Node,
         context: MELCompilerContext,
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<MELCompilerContext> {
         let mut walker = syntax.walk();
+
         walker.goto_first_child();
-        driver.visit(walker.node(), self, context.clone())
+
+        let condition = match driver.visit(walker.node(), self, context.clone())? {
+            MELCompilerContext::Expr(condition) => Result::<Expr<()>, SyntaxError>::Ok(condition),
+            _ => Result::<Expr<()>, SyntaxError>::Err(SyntaxError::EmptyContext),
+        }?;
+
+        walker.goto_next_sibling();
+
+        match driver.visit(walker.node(), self, context.clone())? {
+            MELCompilerContext::TernaryOperator(ast::TernaryOperator::Question) => {
+                Result::<(), SyntaxError>::Ok(())
+            }
+            _ => Result::<(), SyntaxError>::Err(SyntaxError::BadGrammarElement),
+        }?;
+
+        walker.goto_next_sibling();
+
+        let yes = match driver.visit(walker.node(), self, context.clone())? {
+            MELCompilerContext::Expr(yes) => Result::<Expr<()>, SyntaxError>::Ok(yes),
+            _ => Result::<Expr<()>, SyntaxError>::Err(SyntaxError::EmptyContext),
+        }?;
+
+        walker.goto_next_sibling();
+
+        match driver.visit(walker.node(), self, context.clone())? {
+            MELCompilerContext::TernaryOperator(ast::TernaryOperator::Colon) => {
+                Result::<(), SyntaxError>::Ok(())
+            }
+            _ => Result::<(), SyntaxError>::Err(SyntaxError::BadGrammarElement),
+        }?;
+
+        walker.goto_next_sibling();
+
+        let no = match driver.visit(walker.node(), self, context.clone())? {
+            MELCompilerContext::Expr(no) => Result::<Expr<()>, SyntaxError>::Ok(no),
+            _ => Result::<Expr<()>, SyntaxError>::Err(SyntaxError::EmptyContext),
+        }?;
+
+        Ok(MELCompilerContext::Expr(TernaryExpr(Arc::new(
+            ast::TernaryExpr {
+                condition,
+                yes,
+                no,
+                location: syntax.into(),
+                aug: (),
+            },
+        ))))
     }
 
     fn visit_literal(
@@ -495,27 +572,27 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         if walker.node().grammar_name() == "eq" {
-            return Ok(MELCompilerContext::Operator(
+            return Ok(MELCompilerContext::BinaryOperator(
                 BinaryInfixOperator::Comparison(ast::ComparisonOperator::Eq),
             ));
         } else if walker.node().grammar_name() == "lt" {
-            return Ok(MELCompilerContext::Operator(
+            return Ok(MELCompilerContext::BinaryOperator(
                 BinaryInfixOperator::Comparison(ast::ComparisonOperator::Lt),
             ));
         } else if walker.node().grammar_name() == "lte" {
-            return Ok(MELCompilerContext::Operator(
+            return Ok(MELCompilerContext::BinaryOperator(
                 BinaryInfixOperator::Comparison(ast::ComparisonOperator::Lte),
             ));
         } else if walker.node().grammar_name() == "gt" {
-            return Ok(MELCompilerContext::Operator(
+            return Ok(MELCompilerContext::BinaryOperator(
                 BinaryInfixOperator::Comparison(ast::ComparisonOperator::Gt),
             ));
         } else if walker.node().grammar_name() == "gte" {
-            return Ok(MELCompilerContext::Operator(
+            return Ok(MELCompilerContext::BinaryOperator(
                 BinaryInfixOperator::Comparison(ast::ComparisonOperator::Gte),
             ));
         } else if walker.node().grammar_name() == "ne" {
-            return Ok(MELCompilerContext::Operator(
+            return Ok(MELCompilerContext::BinaryOperator(
                 BinaryInfixOperator::Comparison(ast::ComparisonOperator::Ne),
             ));
         }
@@ -599,10 +676,22 @@ impl SyntaxVisitorDriver {
                 U::visit_binary_expr as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             );
         });
+        ast::TernaryExpr::<()>::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
+                U::visit_ternary_expr as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            );
+        });
         ast::MathOperator::name().iter().for_each(|name| {
             hm.insert(
                 name.clone(),
                 U::visit_math_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            );
+        });
+        ast::TernaryOperator::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
+                U::visit_ternary_operator as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             );
         });
         ast::Literal::name().iter().for_each(|name| {
@@ -785,6 +874,20 @@ mod tests {
     #[test]
     fn parse_string_literal() {
         let code = "\"testing\"";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_ternary_expr() {
+        let code = "true ? a : b";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_ternary_expr_associativity_check() {
+        let code = "true ? a : false ? \"b\" : 10";
         let compile_result = compile(code);
         assert!(compile_result.is_ok());
     }

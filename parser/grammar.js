@@ -18,12 +18,13 @@
 /// <reference types="tree-sitter-cli/dsl" />
 
 const precedences = {
-  LOGIC: 1,
-  COMPARISON: 2,
-  CONCAT: 3,
-  ADDITIVE: 4,
-  MULTIPLICATIVE: 5,
-  UNARY: 5,
+  TERNARY: 1,
+  LOGIC: 2,
+  COMPARISON: 3,
+  CONCAT: 4,
+  ADDITIVE: 5,
+  MULTIPLICATIVE: 6,
+  UNARY: 7,
 }
 export default grammar({
   name: "mel",
@@ -50,7 +51,7 @@ export default grammar({
     _hidden_expr: $ => choice($._grouped_expr, $._simple_expr),
 
     _grouped_expr: $ => seq("(", $._hidden_expr, ")"),
-    _simple_expr: $ => choice($.assignment_expr, $.function_call_expr, $.binary_expr, $.prefix_expr, $._literal_expr, $.identifier),
+    _simple_expr: $ => choice($.assignment_expr, $.function_call_expr, $.binary_expr, $.prefix_expr, $.ternary_expr, $._literal_expr, $.identifier),
 
     assignment_expr: $ => seq($.identifier, "=", $.literal),
     function_call_expr: $ => seq($.identifier, $.argument_list),
@@ -88,6 +89,8 @@ export default grammar({
       )
     ),
 
+    ternary_expr: $ => choice(prec.right(precedences.TERNARY, seq($.expr, $.ternary_question, $.expr, $.ternary_colon, $.expr))),
+
     _literal_expr: $ => $.literal,
 
     literal: $ => choice($.string_literal, $.number_literal, $.boolean_literal, $.regex_literal),
@@ -103,6 +106,9 @@ export default grammar({
     minus: _ => '-',
     bang: _ => '!',
     uneg: _ => '~',
+
+    ternary_question: _ => '?',
+    ternary_colon: _ => ':',
 
     and: _ => "and",
     or: _ => "or",

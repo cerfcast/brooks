@@ -260,6 +260,36 @@ impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTex
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
         Ok(context.append("\t".repeat(context.indent) + "Literal: " + &ast.0.to_string()))
     }
+
+    fn visit_ternary_expr(
+        &self,
+        ast: &ast::TernaryExpr<()>,
+        context: AstTextSerializerContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        let mut context = context.append("\t".repeat(context.indent) + "Ternary Expression:\n");
+
+        context = context.indent();
+
+        context = context.append("\t".repeat(context.indent) + "Condition:\n");
+        context = driver.visit(&ast.condition, self, context.indent())?;
+        context = context.unindent();
+
+        context = context.append("\n".into());
+
+        context = context.append("\t".repeat(context.indent) + "Yes:\n");
+        context = driver.visit(&ast.yes, self, context.indent())?;
+        context = context.unindent();
+
+        context = context.append("\n".into());
+
+        context = context.append("\t".repeat(context.indent) + "No:\n");
+        context = driver.visit(&ast.no, self, context.indent())?;
+        context = context.unindent();
+
+        context = context.unindent();
+        Ok(context)
+    }
 }
 
 #[cfg(test)]
@@ -630,6 +660,70 @@ mod tests {
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
+
+    #[test]
+    fn serialize_ternary_expr() {
+        let code = "true ? 1 : 5";
+        let expected = "Ternary Expression:
+\tCondition:
+\t\tLiteral: true
+\tYes:
+\t\tLiteral: 1
+\tNo:
+\t\tLiteral: 5";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_ternary_expr_proper_associativity() {
+        let code = "true ? a : false ? \"b\" : 10";
+        let expected = "Ternary Expression:
+\tCondition:
+\t\tLiteral: true
+\tYes:
+\t\tIdentifier: a
+\tNo:
+\t\tTernary Expression:
+\t\t\tCondition:
+\t\t\t\tLiteral: false
+\t\t\tYes:
+\t\t\t\tLiteral: b
+\t\t\tNo:
+\t\t\t\tLiteral: 10";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
 }
 
 impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for AstTextSerializer {
@@ -760,6 +854,52 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         );
         Ok(context.unindent())
     }
+
+    fn visit_ternary_expr(
+        &self,
+        ast: &ast::TernaryExpr<Analyzed>,
+        context: AstTextSerializerContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        let mut context = context.append("\t".repeat(context.indent) + "Ternary Expression:\n");
+
+        context = context.indent();
+
+        context = context.append("\t".repeat(context.indent) + "Condition:\n");
+        context = driver.visit(&ast.condition, self, context.indent())?;
+        context = context.unindent();
+
+        context = context.append("\n".into());
+
+        context = context.append("\t".repeat(context.indent) + "Yes:\n");
+        context = driver.visit(&ast.yes, self, context.indent())?;
+        context = context.unindent();
+
+        context = context.append("\n".into());
+
+        context = context.append("\t".repeat(context.indent) + "No:\n");
+        context = driver.visit(&ast.no, self, context.indent())?;
+        context = context.unindent();
+
+        context = context.append("\n".into());
+
+        context = context
+            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe.to_string()));
+        context = context.append("\n".into());
+
+        context = context.append(
+            "\t".repeat(context.indent)
+                + &ast
+                    .aug
+                    .constant
+                    .as_ref()
+                    .map(|c| format!("Constant value: {}", c.to_string()))
+                    .unwrap_or("Not a constant".to_string()),
+        );
+
+        context = context.unindent();
+        Ok(context)
+    }
 }
 
 #[cfg(test)]
@@ -888,6 +1028,130 @@ mod analyzed_serializer_tests {
 \t\t\tConstant value: 4
 \tType: Bool
 \tNot a constant";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&result, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_analyzed_ternary_expr() {
+        let code = "true ? 1 : 5";
+        let expected = "Ternary Expression:
+\tCondition:
+\t\tLiteral: true
+\t\t\tType: Bool
+\t\t\tConstant value: true
+\tYes:
+\t\tLiteral: 1
+\t\t\tType: Integer
+\t\t\tConstant value: 1
+\tNo:
+\t\tLiteral: 5
+\t\t\tType: Integer
+\t\t\tConstant value: 5
+\tType: Integer
+\tConstant value: 1";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&result, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_analyzed_ternary_expr2() {
+        let code = "false ? 1 : (5 + 2 + 3)";
+        let expected = "Ternary Expression:
+\tCondition:
+\t\tLiteral: false
+\t\t\tType: Bool
+\t\t\tConstant value: false
+\tYes:
+\t\tLiteral: 1
+\t\t\tType: Integer
+\t\t\tConstant value: 1
+\tNo:
+\t\tBinary Expression:
+\t\t\tLeft:
+\t\t\t\tBinary Expression:
+\t\t\t\t\tLeft:
+\t\t\t\t\t\tLiteral: 5
+\t\t\t\t\t\t\tType: Integer
+\t\t\t\t\t\t\tConstant value: 5
+\t\t\t\t\tOperation: plus
+\t\t\t\t\tRight:
+\t\t\t\t\t\tLiteral: 2
+\t\t\t\t\t\t\tType: Integer
+\t\t\t\t\t\t\tConstant value: 2
+\t\t\t\t\tType: Integer
+\t\t\t\t\tConstant value: 7
+\t\t\tOperation: plus
+\t\t\tRight:
+\t\t\t\tLiteral: 3
+\t\t\t\t\tType: Integer
+\t\t\t\t\tConstant value: 3
+\t\t\tType: Integer
+\t\t\tConstant value: 10
+\tType: Integer
+\tConstant value: 10";
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");

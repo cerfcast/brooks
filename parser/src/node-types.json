@@ -30,6 +30,10 @@
         {
           "type": "prefix_expr",
           "named": true
+        },
+        {
+          "type": "ternary_expr",
+          "named": true
         }
       ]
     }
@@ -179,6 +183,10 @@
         {
           "type": "prefix_expr",
           "named": true
+        },
+        {
+          "type": "ternary_expr",
+          "named": true
         }
       ]
     }
@@ -259,6 +267,29 @@
         },
         {
           "type": "expr",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "ternary_expr",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "expr",
+          "named": true
+        },
+        {
+          "type": "ternary_colon",
+          "named": true
+        },
+        {
+          "type": "ternary_question",
           "named": true
         }
       ]
@@ -362,6 +393,14 @@
   },
   {
     "type": "string_literal",
+    "named": true
+  },
+  {
+    "type": "ternary_colon",
+    "named": true
+  },
+  {
+    "type": "ternary_question",
     "named": true
   },
   {

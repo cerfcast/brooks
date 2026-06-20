@@ -110,11 +110,29 @@ pub struct BinaryExpr<A: Debug + Clone> {
     pub aug: A,
 }
 
+#[grammar_name(ternary_question, ternary_colon)]
+#[derive(Debug, Clone)]
+pub enum TernaryOperator {
+    Question,
+    Colon,
+}
+
+#[grammar_name(ternary_expr)]
+#[grammar_location]
+#[derive(Debug, Clone)]
+pub struct TernaryExpr<A: Debug + Clone> {
+    pub condition: Expr<A>,
+    pub yes: Expr<A>,
+    pub no: Expr<A>,
+    pub aug: A,
+}
+
 #[grammar_name(expr)]
 #[derive(Debug, Clone)]
 pub enum Expr<A: Debug + Clone> {
     FunctionCall(Arc<FunctionCall<A>>),
     BinaryExpr(Arc<BinaryExpr<A>>),
+    TernaryExpr(Arc<TernaryExpr<A>>),
     Identifier(Arc<Identifier<A>>),
     ArgumentList(Arc<ArgumentList<A>>),
     Argument(Arc<Argument<A>>),
@@ -126,6 +144,7 @@ impl<A: Debug + Clone> Expr<A> {
         match self {
             Expr::FunctionCall(function_call) => function_call.location.clone(),
             Expr::BinaryExpr(binary_expr) => binary_expr.location.clone(),
+            Expr::TernaryExpr(ternary_expr) => ternary_expr.location.clone(),
             Expr::Identifier(identifier) => identifier.location.clone(),
             Expr::ArgumentList(argument_list) => argument_list.location.clone(),
             Expr::Argument(argument) => argument.location.clone(),
@@ -208,6 +227,12 @@ pub trait AstVisitor<T, A: Debug + Clone, E> {
         context: T,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<T, E>;
+    fn visit_ternary_expr(
+        &self,
+        ast: &TernaryExpr<A>,
+        context: T,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<T, E>;
     fn visit_literal(
         &self,
         ast: (&Literal, &GrammarLocation, &A),
@@ -236,6 +261,9 @@ impl AstVisitorDriver {
                 visitor.visit_function_call(function_call, context, self)
             }
             Expr::BinaryExpr(binary_expr) => visitor.visit_binary_expr(binary_expr, context, self),
+            Expr::TernaryExpr(ternary_expr) => {
+                visitor.visit_ternary_expr(ternary_expr, context, self)
+            }
             Expr::Literal(literal, location, aug) => {
                 visitor.visit_literal((literal, location, aug), context, self)
             }

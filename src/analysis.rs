@@ -28,7 +28,7 @@ use crate::{
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
         BinaryInfixOperator, BooleanLiteral, Expr, FunctionCall, Identifier, NumberLiteral,
-        StringLiteral,
+        StringLiteral, TernaryExpr,
         Type::{self, Function},
     },
     grammar::GrammarLocation,
@@ -102,6 +102,7 @@ impl Expr<Analyzed> {
         match self {
             Expr::FunctionCall(function_call) => function_call.aug.tipe.clone(),
             Expr::BinaryExpr(binary_expr) => binary_expr.aug.tipe.clone(),
+            Expr::TernaryExpr(ternary_expr) => ternary_expr.aug.tipe.clone(),
             Expr::Identifier(identifier) => identifier.aug.tipe.clone(),
             Expr::ArgumentList(argument_list) => argument_list.aug.tipe.clone(),
             Expr::Argument(argument) => argument.aug.tipe.clone(),
@@ -113,6 +114,7 @@ impl Expr<Analyzed> {
         let analyzed = match self {
             Expr::FunctionCall(function_call) => &function_call.aug,
             Expr::BinaryExpr(binary_expr) => &binary_expr.aug,
+            Expr::TernaryExpr(ternary_expr) => &ternary_expr.aug,
             Expr::Identifier(identifier) => &identifier.aug,
             Expr::ArgumentList(argument_list) => &argument_list.aug,
             Expr::Argument(argument) => &argument.aug,
@@ -127,6 +129,7 @@ impl<A: Clone + Debug> Display for Expr<A> {
         match self {
             Expr::FunctionCall(_) => write!(f, "FunctionCall"),
             Expr::BinaryExpr(_) => write!(f, "BinaryExpr"),
+            Expr::TernaryExpr(_) => write!(f, "TernaryExpr"),
             Expr::Identifier(_) => write!(f, "Identifier"),
             Expr::ArgumentList(_) => write!(f, "ArgumentList"),
             Expr::Argument(_) => write!(f, "Argument"),
@@ -519,6 +522,69 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 },
             ))),
         }
+    }
+
+    fn visit_ternary_expr(
+        &self,
+        ast: &TernaryExpr<()>,
+        context: MelAnalysisContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+        let condition = driver
+            .visit(&ast.condition, self, context.clone())?
+            .expr
+            .ok_or(MelAnalysisLocatableError {
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_ternary_expr".into(),
+                )),
+                location: ast.condition.location(),
+            })?;
+        let yes = driver.visit(&ast.yes, self, context.clone())?.expr.ok_or(
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_ternary_expr".into(),
+                )),
+                location: ast.yes.location(),
+            },
+        )?;
+
+        let no = driver.visit(&ast.no, self, context.clone())?.expr.ok_or(
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_ternary_expr".into(),
+                )),
+                location: ast.no.location(),
+            },
+        )?;
+
+        let condition_type = condition.tipe();
+        let yes_type = yes.tipe();
+        let no_type = no.tipe();
+
+        if condition_type != Type::Boolean {
+            return Err(MelAnalysisLocatableError {
+                error: Mismatch(Type::Boolean, condition_type),
+                location: ast.location.clone(),
+            });
+        }
+
+        if yes_type != no_type {
+            return Err(MelAnalysisLocatableError {
+                error: Mismatch(yes_type, no_type),
+                location: ast.location.clone(),
+            });
+        }
+
+        Ok(context.update_expr(Expr::TernaryExpr(Arc::new(TernaryExpr {
+            condition,
+            yes,
+            no,
+            location: ast.location.clone(),
+            aug: Analyzed {
+                tipe: yes_type,
+                constant: None,
+            },
+        }))))
     }
 }
 
@@ -1343,6 +1409,111 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                     },
                 ))),
         }
+    }
+
+    fn visit_ternary_expr(
+        &self,
+        ast: &ast::TernaryExpr<()>,
+        context: MelAnalysisContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+        let expr = context.expr.as_ref().ok_or(MelAnalysisLocatableError {
+            error: MelAnalysisError::PreconditionFailure(
+                MelAnalysisPreconditions::ContextMissingExpr("visit_ternary_expr".into()),
+            ),
+            location: ast.location.clone(),
+        })?;
+
+        let analyzed_binary_expr = match expr {
+            Expr::TernaryExpr(ternary_expr) => (**ternary_expr).clone(),
+            _ => todo!(),
+        };
+
+        let condition = driver
+            .visit(
+                &ast.condition,
+                self,
+                context.update_expr(analyzed_binary_expr.condition),
+            )?
+            .expr
+            .ok_or(MelAnalysisLocatableError {
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_ternary_expr".into(),
+                )),
+                location: ast.location.clone(),
+            })?;
+        let yes = driver
+            .visit(
+                &ast.yes,
+                self,
+                context.update_expr(analyzed_binary_expr.yes),
+            )?
+            .expr
+            .ok_or(MelAnalysisLocatableError {
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_ternary_expr".into(),
+                )),
+                location: ast.location.clone(),
+            })?;
+
+        let no = driver
+            .visit(&ast.no, self, context.update_expr(analyzed_binary_expr.no))?
+            .expr
+            .ok_or(MelAnalysisLocatableError {
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_ternary_expr".into(),
+                )),
+                location: ast.location.clone(),
+            })?;
+
+        let condition_c = match condition.constant() {
+            Some(condition_c) => condition_c,
+            None => {
+                return Ok(
+                    context.update_expr(Expr::TernaryExpr(Arc::new(ast::TernaryExpr {
+                        condition,
+                        yes,
+                        no,
+                        location: ast.location.clone(),
+                        aug: Analyzed {
+                            tipe: expr.tipe(),
+                            constant: None,
+                        },
+                    }))),
+                );
+            }
+        };
+
+        let condition_c = match condition_c {
+            CompiledConstant::Boolean(b) => b,
+            e => {
+                return Err(MelAnalysisLocatableError {
+                    error: MelAnalysisError::AssertionFailure(
+                        MelAnalysisAssertions::ContextWrongExprType(
+                            "Boolean".to_string(),
+                            e.to_string(),
+                            "visit_ternary_expr".to_string(),
+                        ),
+                    ),
+                    location: ast.location.clone(),
+                });
+            }
+        };
+
+        let constant_result = if condition_c { &yes } else { &no }.constant();
+
+        Ok(
+            context.update_expr(Expr::TernaryExpr(Arc::new(ast::TernaryExpr {
+                condition,
+                yes,
+                no,
+                location: ast.location.clone(),
+                aug: Analyzed {
+                    tipe: expr.tipe(),
+                    constant: constant_result,
+                },
+            }))),
+        )
     }
 }
 
