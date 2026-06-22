@@ -276,12 +276,13 @@ true ? 1 : 5
      (boolean_literal)
     )
    )
-   (ternary)
+   (ternary_question)
    (expr
     (literal
      (number_literal)
     )
    )
+   (ternary_colon)
    (expr
     (literal
      (number_literal)
@@ -291,9 +292,9 @@ true ? 1 : 5
  )
 )
 =================================
-Ternary Expression Check
+Ternary Expression Check (Right Associativity)
 =================================
-true ? 1 : 5 < 10 + 7
+true ? true : false ? 1 : 2
 ---
 (mel
  (expr
@@ -303,12 +304,73 @@ true ? 1 : 5 < 10 + 7
      (boolean_literal)
     )
    )
-   (ternary)
+   (ternary_question)
+   (expr
+    (literal
+     (boolean_literal)
+    )
+   )
+   (ternary_colon)
+   (expr
+    (ternary_expr
+     (expr
+      (literal
+       (boolean_literal)
+      )
+     )
+     (ternary_question)
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+     (ternary_colon)
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+    )
+   )
+  )
+ )
+)
+=================================
+Ternary Expression Check (Left Grouping)
+=================================
+(true ? true : false) ? 1 : 2
+---
+(mel
+ (expr
+  (ternary_expr
+   (expr
+    (ternary_expr
+     (expr
+      (literal
+       (boolean_literal)
+      )
+     )
+     (ternary_question)
+     (expr
+      (literal
+       (boolean_literal)
+      )
+     )
+     (ternary_colon)
+     (expr
+      (literal
+       (boolean_literal)
+      )
+     )
+    )
+   )
+   (ternary_question)
    (expr
     (literal
      (number_literal)
     )
    )
+   (ternary_colon)
    (expr
     (literal
      (number_literal)
