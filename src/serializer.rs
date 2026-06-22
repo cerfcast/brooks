@@ -119,46 +119,6 @@ impl ToString for ast::StringLiteral {
 }
 
 #[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::Struct {
-    fn to_string(&self) -> String {
-        format!(
-            "Name: {}, Fields: {}",
-            self.name,
-            self.fields.keys().cloned().collect::<Vec<_>>().join(","),
-        )
-    }
-}
-
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::Type {
-    fn to_string(&self) -> String {
-        match self {
-            ast::Type::Boolean => "Bool".into(),
-            ast::Type::Integer => "Integer".into(),
-            ast::Type::String => "String".into(),
-            ast::Type::Params(items) => format!(
-                "Parameters: {}",
-                items
-                    .iter()
-                    .map(|c| c.to_string())
-                    .collect::<Vec<_>>()
-                    .join(","),
-            ),
-            ast::Type::Function(result, args) => format!(
-                "Return Type: {}, Argument Types: {}",
-                result.to_string(),
-                args.iter()
-                    .map(|a| a.to_string())
-                    .collect::<Vec<_>>()
-                    .join(","),
-            ),
-            ast::Type::Struct(s) => format!("Struct: {}", s.to_string()),
-            ast::Type::None => "None".to_string(),
-        }
-    }
-}
-
-#[allow(clippy::to_string_trait_impl)]
 impl ToString for analysis::CompiledConstant {
     fn to_string(&self) -> String {
         match self {
@@ -1042,12 +1002,12 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 mod analyzed_serializer_tests {
     use std::{collections::HashMap, sync::Arc};
 
+    use crate::tvs::{
+        Struct,
+        Type::{self, Function},
+    };
     use crate::{
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
-        ast::{
-            Struct,
-            Type::{self, Function},
-        },
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
         serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},

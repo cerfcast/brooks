@@ -29,9 +29,12 @@ use crate::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
         BinaryInfixOperator, BooleanLiteral, Expr, FunctionCall, Identifier,
         MemberAccessExpression, NumberLiteral, StringLiteral, TernaryExpr,
-        Type::{self, Function, Struct},
     },
     grammar::GrammarLocation,
+    tvs::{
+        self,
+        Type::{self, Function, Struct},
+    },
 };
 
 #[derive(Debug, Clone, Default)]
@@ -81,12 +84,6 @@ impl<I: Clone + Default> Default for Scopes<I> {
         Self {
             scopes: vec![Scope::default()],
         }
-    }
-}
-
-impl ast::Struct {
-    pub fn type_for_field(&self, field_name: &str) -> Option<Type> {
-        self.fields.get(field_name).cloned()
     }
 }
 
@@ -623,7 +620,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             t => {
                 return Err(MelAnalysisLocatableError {
                     error: MelAnalysisError::Mismatch(
-                        Struct(ast::Struct {
+                        Struct(tvs::Struct {
                             name: "TODO".to_string(),
                             ..Default::default()
                         }),
@@ -651,7 +648,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 member: Identifier {
                     identifier: ast.member.identifier.clone(),
                     aug: Analyzed {
-                        tipe: ast::Type::None,
+                        tipe: tvs::Type::None,
                         constant: None,
                     },
                     location: ast.location.clone(),
@@ -673,13 +670,14 @@ mod type_check_tests {
             Analyzed, MelAnalysisContext, MelAnalysisError, MelAnalysisLocatableError,
             MelTypeChecker,
         },
-        ast::{
-            self, AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier,
-            Type::{self, Boolean, Function, Integer},
-        },
+        ast::{AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier},
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
         grammar::GrammarLocation,
+        tvs::{
+            self,
+            Type::{self, Boolean, Function, Integer},
+        },
     };
     use std::{assert_matches, sync::Arc};
 
@@ -809,7 +807,7 @@ mod type_check_tests {
         assert_matches!(
             result,
             Err(MelAnalysisLocatableError {
-                error: MelAnalysisError::Mismatch(Integer, ast::Type::String),
+                error: MelAnalysisError::Mismatch(Integer, tvs::Type::String),
                 location: GrammarLocation {
                     start: 0,
                     extent: 13
@@ -1617,9 +1615,10 @@ mod optimizer_tests {
         analysis::{
             Analyzed, CompiledConstant, MelAnalysisContext, MelOptimizer, MelTypeChecker, ast::Expr,
         },
-        ast::{AstVisitorDriver, BinaryExpr, Type},
+        ast::{AstVisitorDriver, BinaryExpr},
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
+        tvs::Type,
     };
     use std::assert_matches;
 

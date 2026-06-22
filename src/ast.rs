@@ -17,7 +17,7 @@
 
 use crate::grammar::{GrammarLocation, GrammarNode};
 use brooks_macros::{grammar_location, grammar_name};
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{fmt::Debug, sync::Arc};
 
 #[grammar_name(mel)]
 #[grammar_location]
@@ -197,26 +197,6 @@ pub struct NumberLiteral {
 #[grammar_name(string_literal)]
 pub struct StringLiteral {
     pub literal: String,
-}
-
-/// Types
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct Struct {
-    pub name: String,
-    pub fields: HashMap<String, Type>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq)]
-pub enum Type {
-    Boolean,
-    Integer,
-    String,
-    Params(Vec<Type>),
-    Function(Arc<Type>, Vec<Type>),
-    Struct(Struct),
-    #[default]
-    None,
 }
 
 #[derive(Debug, Clone)]
