@@ -21,6 +21,7 @@ use std::sync::Arc;
 use tree_sitter::{self, Node};
 
 use crate::ast::Expr::BinaryExpr;
+use crate::ast::Expr::MemberAccess;
 use crate::ast::Expr::TernaryExpr;
 use crate::ast::Literal::{Boolean, Number};
 use crate::ast::LogicOperator::{And, Or};
@@ -98,6 +99,18 @@ pub trait SyntaxVisitor<T>: Sized {
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
     fn visit_math_operator(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_member_access_expr(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_member_access_oper(
         &self,
         syntax: Node,
         context: T,
@@ -196,10 +209,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         let callee = match _driver.visit(walker.node(), self, _context.clone())? {
-            MELCompilerContext::Expr(ast::Expr::Identifier(id)) => {
-                Result::<Arc<Identifier<()>>, SyntaxError>::Ok(id)
-            }
-            _ => Result::<Arc<Identifier<()>>, SyntaxError>::Err(SyntaxError::EmptyContext),
+            MELCompilerContext::Expr(callee) => Result::<Expr<()>, SyntaxError>::Ok(callee),
+            _ => Result::<Expr<()>, SyntaxError>::Err(SyntaxError::EmptyContext),
         }?;
 
         walker.goto_next_sibling();
@@ -213,7 +224,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         Ok(MELCompilerContext::Expr(Expr::FunctionCall(Arc::new(
             ast::FunctionCall::<()> {
-                callee: (*callee).clone(),
+                callee: callee.clone(),
                 arguments: (*argument_list).clone(),
                 location: syntax.into(),
                 aug: (),
@@ -599,6 +610,67 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         Err(SyntaxError::BadGrammarElement)
     }
+
+    fn visit_member_access_expr(
+        &self,
+        syntax: Node,
+        context: MELCompilerContext,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let mut walker = syntax.walk();
+
+        walker.goto_first_child();
+
+        let base = match driver.visit(walker.node(), self, context.clone())? {
+            MELCompilerContext::Expr(base) => Result::<Expr<()>, SyntaxError>::Ok(base),
+            _ => Result::<Expr<()>, SyntaxError>::Err(SyntaxError::EmptyContext),
+        }?;
+
+        walker.goto_next_sibling();
+
+        match driver.visit(walker.node(), self, context.clone())? {
+            MELCompilerContext::BinaryOperator(BinaryInfixOperator::MemberAccess(_)) => {
+                Result::<(), SyntaxError>::Ok(())
+            }
+            _ => Result::<(), SyntaxError>::Err(SyntaxError::BadGrammarElement),
+        }?;
+
+        walker.goto_next_sibling();
+
+        let member = match driver.visit(walker.node(), self, context.clone())? {
+            MELCompilerContext::Expr(ast::Expr::Identifier(id)) => {
+                Result::<Arc<Identifier<()>>, SyntaxError>::Ok(id)
+            }
+            _ => Result::<Arc<Identifier<()>>, SyntaxError>::Err(SyntaxError::EmptyContext),
+        }?;
+
+        Ok(MELCompilerContext::Expr(MemberAccess(Arc::new(
+            ast::MemberAccessExpression {
+                base,
+                member: (*member).clone(),
+                oper: ast::MemberAccessOperator::MemberAccess,
+                location: syntax.into(),
+                aug: (),
+            },
+        ))))
+    }
+
+    fn visit_member_access_oper(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let mut walker = syntax.walk();
+        walker.goto_first_child();
+
+        if walker.node().grammar_name() == "member_access" {
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::MemberAccess(ast::MemberAccessOperator::MemberAccess),
+            ));
+        }
+        Err(SyntaxError::BadGrammarElement)
+    }
 }
 
 pub struct SyntaxVisitorDriver {}
@@ -674,6 +746,20 @@ impl SyntaxVisitorDriver {
             hm.insert(
                 name.clone(),
                 U::visit_binary_expr as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            );
+        });
+        ast::MemberAccessExpression::<()>::name()
+            .iter()
+            .for_each(|name| {
+                hm.insert(
+                    name.clone(),
+                    U::visit_member_access_expr as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+                );
+            });
+        ast::MemberAccessOperator::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
+                U::visit_member_access_oper as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             );
         });
         ast::TernaryExpr::<()>::name().iter().for_each(|name| {

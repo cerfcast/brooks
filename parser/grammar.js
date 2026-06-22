@@ -25,6 +25,7 @@ const precedences = {
   ADDITIVE: 5,
   MULTIPLICATIVE: 6,
   UNARY: 7,
+  MEMBER_ACCESS: 8,
 }
 export default grammar({
   name: "mel",
@@ -51,10 +52,10 @@ export default grammar({
     _hidden_expr: $ => choice($._grouped_expr, $._simple_expr),
 
     _grouped_expr: $ => seq("(", $._hidden_expr, ")"),
-    _simple_expr: $ => choice($.assignment_expr, $.function_call_expr, $.binary_expr, $.prefix_expr, $.ternary_expr, $._literal_expr, $.identifier),
+    _simple_expr: $ => choice($.assignment_expr, $.function_call_expr, $.binary_expr, $.prefix_expr, $.ternary_expr, $._literal_expr, $._variable),
 
-    assignment_expr: $ => seq($.identifier, "=", $.literal),
-    function_call_expr: $ => seq($.identifier, $.argument_list),
+    assignment_expr: $ => seq($._variable, "=", $.literal),
+    function_call_expr: $ => seq($._variable, $.argument_list),
 
     binary_expr: $ => choice(
     ...[
@@ -89,6 +90,12 @@ export default grammar({
       )
     ),
 
+    _variable: $=> choice($.identifier, $.member_access_expr), 
+    member_access_expr: $=> prec.left(precedences.MEMBER_ACCESS, seq($._variable, $.member_access, $.identifier)),
+    //                                                                                      ^^
+    //                                                                                      Do not use "hidden" production here -- nested AST
+    //                                                                                      will make type inference easier.
+
     ternary_expr: $ => choice(prec.right(precedences.TERNARY, seq($.expr, $.ternary_question, $.expr, $.ternary_colon, $.expr))),
 
     _literal_expr: $ => $.literal,
@@ -114,6 +121,8 @@ export default grammar({
     or: _ => "or",
 
     string_concat: _ => '.',
+
+    member_access: _ => '^',
 
     eq: _ => "==",
     ne: _ => "!=",

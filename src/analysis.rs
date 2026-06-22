@@ -22,14 +22,14 @@ use crate::{
         MelAnalysisAssertions::{ContextMissingExpr, ContextMissingParams, ContextWrongExprType},
         MelAnalysisError::{
             AssertionFailure, Incalculable, Miscount, Mismatch, OptimizationNotSupported,
-            PreconditionFailure, UnknownIdentifier,
+            PreconditionFailure, UnknownField, UnknownIdentifier,
         },
     },
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
-        BinaryInfixOperator, BooleanLiteral, Expr, FunctionCall, Identifier, NumberLiteral,
-        StringLiteral, TernaryExpr,
-        Type::{self, Function},
+        BinaryInfixOperator, BooleanLiteral, Expr, FunctionCall, Identifier,
+        MemberAccessExpression, NumberLiteral, StringLiteral, TernaryExpr,
+        Type::{self, Function, Struct},
     },
     grammar::GrammarLocation,
 };
@@ -84,6 +84,12 @@ impl<I: Clone + Default> Default for Scopes<I> {
     }
 }
 
+impl ast::Struct {
+    pub fn type_for_field(&self, field_name: &str) -> Option<Type> {
+        self.fields.get(field_name).cloned()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum CompiledConstant {
     Integer(i64),
@@ -106,6 +112,7 @@ impl Expr<Analyzed> {
             Expr::Identifier(identifier) => identifier.aug.tipe.clone(),
             Expr::ArgumentList(argument_list) => argument_list.aug.tipe.clone(),
             Expr::Argument(argument) => argument.aug.tipe.clone(),
+            Expr::MemberAccess(member) => member.aug.tipe.clone(),
             Expr::Literal(_, _, aug) => aug.tipe.clone(),
         }
     }
@@ -118,6 +125,7 @@ impl Expr<Analyzed> {
             Expr::Identifier(identifier) => &identifier.aug,
             Expr::ArgumentList(argument_list) => &argument_list.aug,
             Expr::Argument(argument) => &argument.aug,
+            Expr::MemberAccess(member) => &member.aug,
             Expr::Literal(_, _, aug) => aug,
         };
         analyzed.constant.clone()
@@ -133,6 +141,7 @@ impl<A: Clone + Debug> Display for Expr<A> {
             Expr::Identifier(_) => write!(f, "Identifier"),
             Expr::ArgumentList(_) => write!(f, "ArgumentList"),
             Expr::Argument(_) => write!(f, "Argument"),
+            Expr::MemberAccess(_) => write!(f, "MemberAccess"),
             Expr::Literal(_, _, _) => write!(f, "Literal"),
         }
     }
@@ -144,6 +153,7 @@ pub enum MelAnalysisAssertions {
     ContextMissingExpr(String),
     ContextWrongExprType(String, String, String),
     ContextMissingParams,
+    InvalidOperator(String, String),
 }
 
 impl Display for MelAnalysisAssertions {
@@ -160,6 +170,9 @@ impl Display for MelAnalysisAssertions {
             }
             MelAnalysisAssertions::ContextMissingExpr(s) => {
                 write!(f, "Missing expression in {}", s)
+            }
+            MelAnalysisAssertions::InvalidOperator(o, l) => {
+                write!(f, "Invalid operator {o} in {l}")
             }
         }
     }
@@ -184,6 +197,7 @@ impl Display for MelAnalysisPreconditions {
 pub enum MelAnalysisError {
     Mismatch(Type, Type),
     Miscount(usize, usize),
+    UnknownField(String, String),
     UnknownIdentifier(String),
     AssertionFailure(MelAnalysisAssertions),
     PreconditionFailure(MelAnalysisPreconditions),
@@ -201,6 +215,7 @@ impl Display for MelAnalysisError {
             PreconditionFailure(c) => {
                 write!(f, "Precondition not satisfied during analysis: {:?}", c)
             }
+            UnknownField(strct, member) => write!(f, "No field named {member} in {strct}"),
             Incalculable => write!(f, "Incalculable expression analysis"),
             OptimizationNotSupported(o) => write!(f, "Optimization not supported: {o}"),
         }
@@ -259,34 +274,24 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
-        let callee = self.visit_identifier(&ast.callee, context.clone(), driver)?;
-        let callee = match callee.expr.unwrap() {
-            Expr::Identifier(id) => Ok(id),
-            e => Err(AssertionFailure(ContextWrongExprType(
-                "Identifier".to_string(),
-                e.to_string(),
-                "visit_function_call".to_string(),
-            ))),
-        }
-        .map_err(|e| MelAnalysisLocatableError {
-            error: e,
-            location: ast.location.clone(),
-        })?;
+        let callee = driver.visit(&ast.callee, self, context.clone())?;
 
-        let found_callee =
-            context
-                .scopes
-                .lookup(&ast.callee.identifier)
-                .ok_or(MelAnalysisLocatableError {
-                    error: UnknownIdentifier(ast.callee.identifier.clone()),
-                    location: ast.location.clone(),
-                })?;
+        let callee = if let Some(callee) = callee.expr {
+            callee
+        } else {
+            return Err(MelAnalysisLocatableError {
+                error: AssertionFailure(MelAnalysisAssertions::ContextMissingExpr(
+                    "visit_function_call".to_string(),
+                )),
+                location: ast.location.clone(),
+            });
+        };
 
-        let fn_params = match found_callee {
+        let fn_params = match callee.tipe() {
             Type::Function(return_type, args) => (return_type, args),
-            _ => {
+            t => {
                 return Err(MelAnalysisLocatableError {
-                    error: Mismatch(Function(Arc::new(Type::None), vec![]), found_callee),
+                    error: Mismatch(Function(Arc::new(Type::None), vec![]), t),
                     location: ast.location.clone(),
                 });
             }
@@ -309,7 +314,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 
         Ok(
             context.update_expr(Expr::FunctionCall(Arc::new(FunctionCall {
-                callee: (*callee).clone(),
+                callee: callee.clone(),
                 location: ast.location.clone(),
                 arguments: (*args).clone(),
                 aug: Analyzed {
@@ -476,6 +481,17 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             BinaryInfixOperator::Comparison(_) => Type::Boolean,
             BinaryInfixOperator::Math(_) => Type::Integer,
             BinaryInfixOperator::Concat(_) => Type::String,
+            BinaryInfixOperator::MemberAccess(e) => {
+                return Err(MelAnalysisLocatableError {
+                    error: MelAnalysisError::AssertionFailure(
+                        MelAnalysisAssertions::InvalidOperator(
+                            e.to_string(),
+                            "visit_binary_expr".to_string(),
+                        ),
+                    ),
+                    location: ast.right.location(),
+                });
+            }
         };
 
         Ok(context.update_expr(Expr::BinaryExpr(Arc::new(BinaryExpr {
@@ -585,6 +601,68 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 constant: None,
             },
         }))))
+    }
+
+    fn visit_member_access_expr(
+        &self,
+        ast: &ast::MemberAccessExpression<()>,
+        context: MelAnalysisContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+        let base = driver.visit(&ast.base, self, context.clone())?.expr.ok_or(
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                    "visit_member_access_expr".into(),
+                )),
+                location: ast.base.location(),
+            },
+        )?;
+
+        let struct_type = match base.tipe() {
+            Type::Struct(struct_type) => struct_type,
+            t => {
+                return Err(MelAnalysisLocatableError {
+                    error: MelAnalysisError::Mismatch(
+                        Struct(ast::Struct {
+                            name: "TODO".to_string(),
+                            ..Default::default()
+                        }),
+                        t,
+                    ),
+                    location: ast.base.location(),
+                });
+            }
+        };
+
+        let member_type = struct_type.type_for_field(&ast.member.identifier).ok_or(
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::UnknownField(
+                    struct_type.name,
+                    ast.member.identifier.clone(),
+                ),
+                location: ast.base.location(),
+            },
+        )?;
+
+        Ok(
+            context.update_expr(Expr::MemberAccess(Arc::new(MemberAccessExpression {
+                base,
+                oper: ast.oper.clone(),
+                member: Identifier {
+                    identifier: ast.member.identifier.clone(),
+                    aug: Analyzed {
+                        tipe: ast::Type::None,
+                        constant: None,
+                    },
+                    location: ast.location.clone(),
+                },
+                location: ast.location.clone(),
+                aug: Analyzed {
+                    tipe: member_type,
+                    constant: None,
+                },
+            }))),
+        )
     }
 }
 
@@ -1192,6 +1270,7 @@ impl Display for MelOptimizerLocatableError {
 pub struct MelOptimizer {}
 
 impl MelOptimizer {
+    #[allow(clippy::result_large_err)]
     fn evaluate_binary_expr(
         left: &CompiledConstant,
         left_type: Type,
@@ -1251,6 +1330,12 @@ impl MelOptimizer {
                 };
                 Ok(CompiledConstant::String(left.to_owned() + right))
             }
+            ast::BinaryInfixOperator::MemberAccess(c) => Err(MelAnalysisError::AssertionFailure(
+                MelAnalysisAssertions::InvalidOperator(
+                    c.to_string(),
+                    "evaluate_binary_expr".to_string(),
+                ),
+            )),
         }
     }
 }
@@ -1514,6 +1599,15 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                 },
             }))),
         )
+    }
+
+    fn visit_member_access_expr(
+        &self,
+        _ast: &ast::MemberAccessExpression<()>,
+        context: MelAnalysisContext,
+        _driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+        Ok(context.clone())
     }
 }
 

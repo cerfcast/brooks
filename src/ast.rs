@@ -17,7 +17,7 @@
 
 use crate::grammar::{GrammarLocation, GrammarNode};
 use brooks_macros::{grammar_location, grammar_name};
-use std::{fmt::Debug, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 #[grammar_name(mel)]
 #[grammar_location]
@@ -31,7 +31,7 @@ pub struct Mel<A: Debug + Clone> {
 #[grammar_location]
 #[derive(Debug, Clone)]
 pub struct FunctionCall<A: Debug + Clone> {
-    pub callee: Identifier<A>,
+    pub callee: Expr<A>,
     pub arguments: ArgumentList<A>,
     pub aug: A,
 }
@@ -41,6 +41,22 @@ pub struct FunctionCall<A: Debug + Clone> {
 #[derive(Debug, Clone)]
 pub struct Identifier<A: Debug + Clone> {
     pub identifier: String,
+    pub aug: A,
+}
+
+#[grammar_name(member_access)]
+#[derive(Debug, Clone)]
+pub enum MemberAccessOperator {
+    MemberAccess,
+}
+
+#[grammar_name(member_access_expr)]
+#[grammar_location]
+#[derive(Debug, Clone)]
+pub struct MemberAccessExpression<A: Debug + Clone> {
+    pub base: Expr<A>,
+    pub oper: MemberAccessOperator,
+    pub member: Identifier<A>,
     pub aug: A,
 }
 
@@ -66,6 +82,7 @@ pub enum BinaryInfixOperator {
     Comparison(ComparisonOperator),
     Math(MathOperator),
     Concat(StringConcatOperator),
+    MemberAccess(MemberAccessOperator),
 }
 
 #[grammar_name(eq, ne, lt, lte, gt, gte)]
@@ -137,6 +154,7 @@ pub enum Expr<A: Debug + Clone> {
     ArgumentList(Arc<ArgumentList<A>>),
     Argument(Arc<Argument<A>>),
     Literal(Literal, GrammarLocation, A),
+    MemberAccess(Arc<MemberAccessExpression<A>>),
 }
 
 impl<A: Debug + Clone> Expr<A> {
@@ -148,6 +166,7 @@ impl<A: Debug + Clone> Expr<A> {
             Expr::Identifier(identifier) => identifier.location.clone(),
             Expr::ArgumentList(argument_list) => argument_list.location.clone(),
             Expr::Argument(argument) => argument.location.clone(),
+            Expr::MemberAccess(member_access) => member_access.location.clone(),
             Expr::Literal(_, location, _) => location.clone(),
         }
     }
@@ -180,6 +199,14 @@ pub struct StringLiteral {
     pub literal: String,
 }
 
+/// Types
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Struct {
+    pub name: String,
+    pub fields: HashMap<String, Type>,
+}
+
 #[derive(Default, Debug, Clone, PartialEq)]
 pub enum Type {
     Boolean,
@@ -187,6 +214,7 @@ pub enum Type {
     String,
     Params(Vec<Type>),
     Function(Arc<Type>, Vec<Type>),
+    Struct(Struct),
     #[default]
     None,
 }
@@ -218,6 +246,12 @@ pub trait AstVisitor<T, A: Debug + Clone, E> {
     fn visit_argument(
         &self,
         ast: &Argument<A>,
+        context: T,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<T, E>;
+    fn visit_member_access_expr(
+        &self,
+        ast: &MemberAccessExpression<A>,
         context: T,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<T, E>;
@@ -261,6 +295,9 @@ impl AstVisitorDriver {
                 visitor.visit_function_call(function_call, context, self)
             }
             Expr::BinaryExpr(binary_expr) => visitor.visit_binary_expr(binary_expr, context, self),
+            Expr::MemberAccess(member_access_expr) => {
+                visitor.visit_member_access_expr(member_access_expr, context, self)
+            }
             Expr::TernaryExpr(ternary_expr) => {
                 visitor.visit_ternary_expr(ternary_expr, context, self)
             }

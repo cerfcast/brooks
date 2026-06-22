@@ -379,3 +379,32 @@ Ternary Expression Check (Left Grouping)
   )
  )
 )
+=================================
+Simple Member Access
+=================================
+a^b^c + 5
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (member_access_expr
+     (member_access_expr
+      (identifier)
+      (member_access)
+      (identifier)
+     )
+     (member_access)
+     (identifier)
+    )
+   )
+   (plus)
+   (expr
+    (literal
+     (number_literal)
+    )
+   )
+  )
+ )
+)
+

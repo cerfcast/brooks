@@ -73,4 +73,36 @@ Function Call (Name Starts With Number)
   )
  )
 )
+=================================
+Function Call (Name via Member Access)
+=================================
+a^b^c(5, 6)
+---
+(mel
+ (expr
+  (function_call_expr
+   (member_access_expr
+    (member_access_expr
+     (identifier)
+     (member_access)
+     (identifier)
+    )
+    (member_access)
+    (identifier)
+   )
+   (argument_list
+    (argument
+     (literal
+      (number_literal)
+     )
+    )
+    (argument
+     (literal
+      (number_literal)
+     )
+    )
+	 )
+  )
+ )
+)
 

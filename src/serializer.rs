@@ -32,6 +32,16 @@ impl ToString for ast::BinaryInfixOperator {
             ast::BinaryInfixOperator::Math(m) => m.to_string(),
             ast::BinaryInfixOperator::Concat(_) => "concat".to_string(),
             ast::BinaryInfixOperator::Comparison(c) => c.to_string(),
+            ast::BinaryInfixOperator::MemberAccess(m) => m.to_string(),
+        }
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::MemberAccessOperator {
+    fn to_string(&self) -> String {
+        match self {
+            ast::MemberAccessOperator::MemberAccess => "^".into(),
         }
     }
 }
@@ -109,6 +119,17 @@ impl ToString for ast::StringLiteral {
 }
 
 #[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::Struct {
+    fn to_string(&self) -> String {
+        format!(
+            "Name: {}, Fields: {}",
+            self.name,
+            self.fields.keys().cloned().collect::<Vec<_>>().join(","),
+        )
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for ast::Type {
     fn to_string(&self) -> String {
         match self {
@@ -117,13 +138,21 @@ impl ToString for ast::Type {
             ast::Type::String => "String".into(),
             ast::Type::Params(items) => format!(
                 "Parameters: {}",
-                items.iter().fold("".to_string(), |o, n| o + &n.to_string())
+                items
+                    .iter()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
             ),
             ast::Type::Function(result, args) => format!(
                 "Return Type: {}, Argument Types: {}",
                 result.to_string(),
-                args.iter().fold("".to_string(), |o, n| o + &n.to_string())
+                args.iter()
+                    .map(|a| a.to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
             ),
+            ast::Type::Struct(s) => format!("Struct: {}", s.to_string()),
             ast::Type::None => "None".to_string(),
         }
     }
@@ -178,11 +207,17 @@ impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTex
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
-        let mut context = context.append(
-            ("\t".repeat(context.indent) + "Function Call:\n").to_string()
-                + &("\t".repeat(context.indent + 1) + "Callee: " + &ast.callee.identifier + "\n")
-                    .to_string(),
-        );
+        let mut context =
+            context.append(("\t".repeat(context.indent) + "Function Call:\n").to_string());
+
+        context = context.indent();
+        context = context.append("\t".repeat(context.indent) + "Callee:\n");
+
+        context = driver.visit(&ast.callee, self, context.indent())?;
+        context = context.append("\n".into());
+        context = context.unindent();
+        context = context.unindent();
+
         context = self.visit_argument_list(&ast.arguments, context.indent(), driver)?;
         Ok(context.unindent())
     }
@@ -290,6 +325,29 @@ impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTex
         context = context.unindent();
         Ok(context)
     }
+
+    fn visit_member_access_expr(
+        &self,
+        ast: &ast::MemberAccessExpression<()>,
+        context: AstTextSerializerContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        let mut context =
+            context.append("\t".repeat(context.indent) + "Member Access Expression:\n");
+
+        context = context.indent();
+        context = context.append("\t".repeat(context.indent) + "Base:\n");
+        context = driver.visit(&ast.base, self, context.indent())?;
+        context = context.append("\n".into());
+        context = context.unindent();
+
+        context = context.append("\t".repeat(context.indent) + "Member:\n");
+        context = self.visit_identifier(&ast.member, context.indent(), driver)?;
+        context = context.unindent();
+
+        context = context.unindent();
+        Ok(context)
+    }
 }
 
 #[cfg(test)]
@@ -304,10 +362,12 @@ mod tests {
     fn serialize_function_call() {
         let code = "testing(one(hello),b)";
         let expected = "Function Call:
-\tCallee: testing
+\tCallee:
+\t\tIdentifier: testing
 \tArguments:
 \t\tFunction Call:
-\t\t\tCallee: one
+\t\t\tCallee:
+\t\t\t\tIdentifier: one
 \t\t\tArguments:
 \t\t\t\tIdentifier: hello
 \t\tIdentifier: b";
@@ -724,6 +784,37 @@ mod tests {
             .expect("Could not serialize");
         pretty_assertions::assert_eq!(result.serialized, expected);
     }
+
+    #[test]
+    fn serialize_member_access_expression() {
+        let code = "a^b^c";
+        let expected = "Member Access Expression:
+\tBase:
+\t\tMember Access Expression:
+\t\t\tBase:
+\t\t\t\tIdentifier: a
+\t\t\tMember:
+\t\t\t\tIdentifier: b
+\tMember:
+\t\tIdentifier: c";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
 }
 
 impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for AstTextSerializer {
@@ -733,11 +824,17 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         context: AstTextSerializerContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
-        let mut context = context.append(
-            ("\t".repeat(context.indent) + "Function Call:\n").to_string()
-                + &("\t".repeat(context.indent + 1) + "Callee: " + &ast.callee.identifier + "\n")
-                    .to_string(),
-        );
+        let mut context =
+            context.append(("\t".repeat(context.indent) + "Function Call:\n").to_string());
+
+        context = context.indent();
+        context = context.append("\t".repeat(context.indent) + "Callee:\n");
+
+        context = driver.visit(&ast.callee, self, context.indent())?;
+        context = context.append("\n".into());
+        context = context.unindent();
+        context = context.unindent();
+
         context = self.visit_argument_list(&ast.arguments, context.indent(), driver)?;
 
         context = context.append("\n".into());
@@ -900,15 +997,57 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         context = context.unindent();
         Ok(context)
     }
+
+    fn visit_member_access_expr(
+        &self,
+        ast: &ast::MemberAccessExpression<Analyzed>,
+        context: AstTextSerializerContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
+        let mut context =
+            context.append("\t".repeat(context.indent) + "Member Access Expression:\n");
+
+        context = context.indent();
+        context = context.append("\t".repeat(context.indent) + "Base:\n");
+        context = driver.visit(&ast.base, self, context.indent())?;
+        context = context.append("\n".into());
+        context = context.unindent();
+
+        context = context.append("\t".repeat(context.indent) + "Member:\n");
+        context = self.visit_identifier(&ast.member, context.indent(), driver)?;
+        context = context.append("\n".into());
+        context = context.unindent();
+
+        context = context
+            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe.to_string()));
+        context = context.append("\n".into());
+
+        context = context.append(
+            "\t".repeat(context.indent)
+                + &ast
+                    .aug
+                    .constant
+                    .as_ref()
+                    .map(|c| format!("Constant value: {}", c.to_string()))
+                    .unwrap_or("Not a constant".to_string()),
+        );
+
+        context = context.unindent();
+
+        Ok(context)
+    }
 }
 
 #[cfg(test)]
 mod analyzed_serializer_tests {
-    use std::sync::Arc;
+    use std::{collections::HashMap, sync::Arc};
 
     use crate::{
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
-        ast::Type::{self, Function},
+        ast::{
+            Struct,
+            Type::{self, Function},
+        },
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
         serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},
@@ -967,7 +1106,8 @@ mod analyzed_serializer_tests {
     fn serialize_analyzed_function_call() {
         let code = "use(5)";
         let expected = "Function Call:
-\tCallee: use
+\tCallee:
+\t\tIdentifier: use
 \tArguments:
 \t\tLiteral: 5
 \t\t\tType: Integer
@@ -1171,6 +1311,188 @@ mod analyzed_serializer_tests {
         let visitor = MelOptimizer {};
         let result = driver
             .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&result, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_analyzed_member_access_binary_expr_nested() {
+        let code = "req^incoming^headers . \"testing\"";
+        let expected = "Binary Expression:
+\tLeft:
+\t\tMember Access Expression:
+\t\t\tBase:
+\t\t\t\tMember Access Expression:
+\t\t\t\t\tBase:
+\t\t\t\t\t\tIdentifier: req
+\t\t\t\t\tMember:
+\t\t\t\t\t\tIdentifier: incoming
+\t\t\t\t\tType: Struct: Name: headers, Fields: headers
+\t\t\t\t\tNot a constant
+\t\t\tMember:
+\t\t\t\tIdentifier: headers
+\t\t\tType: String
+\t\t\tNot a constant
+\tOperation: concat
+\tRight:
+\t\tLiteral: testing
+\t\t\tType: String
+\t\t\tNot a constant
+\tType: String
+\tNot a constant";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        let mut headers = Struct {
+            name: "headers".to_string(),
+            fields: HashMap::new(),
+        };
+        headers.fields.insert("headers".to_string(), Type::String);
+
+        let mut reqs = Struct {
+            name: "req".to_string(),
+            fields: HashMap::new(),
+        };
+        reqs.fields
+            .insert("incoming".to_string(), Type::Struct(headers));
+
+        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs)));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&result, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_analyzed_member_access_binary_expr() {
+        let code = "req^incoming and true";
+        let expected = "Binary Expression:
+\tLeft:
+\t\tMember Access Expression:
+\t\t\tBase:
+\t\t\t\tIdentifier: req
+\t\t\tMember:
+\t\t\t\tIdentifier: incoming
+\t\t\tType: Bool
+\t\t\tNot a constant
+\tOperation: and
+\tRight:
+\t\tLiteral: true
+\t\t\tType: Bool
+\t\t\tNot a constant
+\tType: Bool
+\tNot a constant";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        let mut reqs = Struct {
+            name: "req".to_string(),
+            fields: HashMap::new(),
+        };
+
+        reqs.fields.insert("incoming".to_string(), Type::Boolean);
+        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs)));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = AstTextSerializer {};
+        let context = AstTextSerializerContext {
+            serialized: "".to_string(),
+            indent: 0,
+        };
+        let result = driver
+            .visit(&result, &visitor, context)
+            .expect("Could not serialize");
+        pretty_assertions::assert_eq!(result.serialized, expected);
+    }
+
+    #[test]
+    fn serialize_analyzed_member_access_function_call_expr() {
+        let code = "req^callable(5)";
+        let expected = "Function Call:
+\tCallee:
+\t\tMember Access Expression:
+\t\t\tBase:
+\t\t\t\tIdentifier: req
+\t\t\tMember:
+\t\t\t\tIdentifier: callable
+\t\t\tType: Return Type: Bool, Argument Types: Integer
+\t\t\tNot a constant
+\tArguments:
+\t\tLiteral: 5
+\t\t\tType: Integer
+\t\t\tNot a constant
+\tType: Return Type: Bool, Argument Types: Integer";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        let mut reqs = Struct {
+            name: "req".to_string(),
+            fields: HashMap::new(),
+        };
+
+        reqs.fields.insert(
+            "callable".to_string(),
+            Function(Arc::new(Type::Boolean), vec![Type::Integer]),
+        );
+        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs)));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
             .expect("Could not analyze");
 
         let result = result.expr.expect("Could not get the analyzed expression");
