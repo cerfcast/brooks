@@ -1109,7 +1109,7 @@ mod analyzed_serializer_tests {
 \t\tLiteral: 5
 \t\t\tType: Integer
 \t\t\tNot a constant
-\tType: Return Type: Integer, Argument Types: Integer";
+\tType: Integer";
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
@@ -1465,7 +1465,7 @@ mod analyzed_serializer_tests {
 \t\tLiteral: 5
 \t\t\tType: Integer
 \t\t\tNot a constant
-\tType: Return Type: Bool, Argument Types: Integer";
+\tType: Bool";
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
