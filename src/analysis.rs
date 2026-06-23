@@ -477,16 +477,16 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         // If either of the operands is a regex, then there is special handling.
         if left_type == Type::Regex || right_type == Type::Regex {
             // Determine which one is a regex.
-            let other_type = if left_type == Type::Regex {
-                right_type
+            let (other_type, other_location) = if left_type == Type::Regex {
+                (right_type, right.location())
             } else {
-                left_type
+                (left_type, left.location())
             };
             // The other better be a string.
             if other_type != Type::String {
                 return Err(MelAnalysisLocatableError {
                     error: Mismatch(Type::String, other_type),
-                    location: ast.location.clone(),
+                    location: other_location,
                 });
             }
         } else if left_type != right_type {
@@ -848,7 +848,7 @@ mod type_check_tests {
                 error: MelAnalysisError::Mismatch(tvs::Type::String, Integer),
                 location: GrammarLocation {
                     start: 0,
-                    extent: 16
+                    extent: 1
                 }
             }
         )
@@ -876,8 +876,8 @@ mod type_check_tests {
             MelAnalysisLocatableError {
                 error: MelAnalysisError::Mismatch(tvs::Type::String, Boolean),
                 location: GrammarLocation {
-                    start: 0,
-                    extent: 20
+                    start: 15,
+                    extent: 5
                 }
             }
         )
