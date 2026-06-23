@@ -28,13 +28,15 @@ use crate::{
         MelAnalysisAssertions::{ContextMissingExpr, ContextMissingParams, ContextWrongExprType},
         MelAnalysisError::{
             AssertionFailure, Incalculable, InvalidRegex, InvalidType, Miscount, Mismatch,
-            OptimizationNotSupported, PreconditionFailure, UnknownField, UnknownIdentifier,
+            OptimizationNotSupported, PreconditionFailure, RegexSame, UnknownField,
+            UnknownIdentifier,
         },
     },
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
-        BinaryInfixOperator, BooleanLiteral, Expr, FunctionCall, Identifier,
-        MemberAccessExpression, NumberLiteral, RegexLiteral, StringLiteral, TernaryExpr,
+        BinaryInfixOperator, BooleanLiteral, ComparisonOperator::Re, Expr, FunctionCall,
+        Identifier, MemberAccessExpression, NumberLiteral, RegexLiteral, StringLiteral,
+        TernaryExpr,
     },
     grammar::GrammarLocation,
     tvs::{
@@ -199,6 +201,7 @@ impl Display for MelAnalysisPreconditions {
 #[derive(Debug, Clone)]
 pub enum MelAnalysisError {
     Mismatch(Type, Type),
+    RegexSame,
     InvalidType(Vec<Type>, Type),
     Miscount(usize, usize),
     InvalidRegex(String),
@@ -224,6 +227,10 @@ impl Display for MelAnalysisError {
             Incalculable => write!(f, "Incalculable expression analysis"),
             OptimizationNotSupported(o) => write!(f, "Optimization not supported: {o}"),
             InvalidRegex(i) => write!(f, "Regular expression literal not valid: {i}"),
+            RegexSame => write!(
+                f,
+                "The operands to the regular expression match operator must be a string and a regular expression"
+            ),
             InvalidType(valids, actual) => write!(
                 f,
                 "{} is not one of the expected types ({})",
@@ -487,6 +494,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 
         let (valid_types, result_type) = match &ast.op {
             BinaryInfixOperator::Logic(_) => (vec![Type::Boolean], Type::Boolean),
+            BinaryInfixOperator::Comparison(Re) => (vec![Type::Regex, Type::String], Type::Boolean),
             BinaryInfixOperator::Comparison(_) => (
                 vec![Type::Boolean, Type::String, Type::Integer],
                 Type::Boolean,
@@ -506,19 +514,30 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             }
         };
 
-        // If either of the operands is a regex, then there is special handling.
-        if left_type == Type::Regex || right_type == Type::Regex {
+        if !valid_types.contains(&left_type) {
+            return Err(MelAnalysisLocatableError {
+                error: InvalidType(valid_types, left_type),
+                location: left.location(),
+            });
+        }
+        if !valid_types.contains(&right_type) {
+            return Err(MelAnalysisLocatableError {
+                error: InvalidType(valid_types, right_type),
+                location: right.location(),
+            });
+        }
+
+        // If the operator is the regex operator, then there is special handling.
+        if let BinaryInfixOperator::Comparison(Re) = ast.op {
             // Determine which one is a regex.
-            let (other_type, other_location) = if left_type == Type::Regex {
-                (right_type, right.location())
-            } else {
-                (left_type, left.location())
-            };
-            // The other better be a string.
-            return if other_type != Type::String {
+            let regex = (left_type == Type::Regex) ^ (right_type == Type::Regex);
+            let string = (left_type == Type::String) ^ (right_type == Type::String);
+
+            return if !regex || !string {
+                // There are two regular expressions.
                 Err(MelAnalysisLocatableError {
-                    error: Mismatch(Type::String, other_type),
-                    location: other_location,
+                    error: RegexSame,
+                    location: ast.location.clone(),
                 })
             } else {
                 Ok(context.update_expr(Expr::BinaryExpr(Arc::new(BinaryExpr {
@@ -534,18 +553,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             };
         }
 
-        if !valid_types.contains(&left_type) {
-            return Err(MelAnalysisLocatableError {
-                error: InvalidType(valid_types, left_type),
-                location: left.location(),
-            });
-        }
-        if !valid_types.contains(&right_type) {
-            return Err(MelAnalysisLocatableError {
-                error: InvalidType(valid_types, right_type),
-                location: right.location(),
-            });
-        }
+        // Otherwise, the types just need to be equal!
         if left_type != right_type {
             return Err(MelAnalysisLocatableError {
                 error: Mismatch(left_type, right_type),
@@ -884,12 +892,12 @@ mod type_check_tests {
         assert_matches!(
             result,
             MelAnalysisLocatableError {
-                error: MelAnalysisError::Mismatch(tvs::Type::String, Integer),
+                error: MelAnalysisError::InvalidType(i, Integer),
                 location: GrammarLocation {
                     start: 0,
                     extent: 1
                 }
-            }
+            } if i == vec![Type::Regex, Type::String]
         )
     }
 
@@ -913,10 +921,68 @@ mod type_check_tests {
         assert_matches!(
             result,
             MelAnalysisLocatableError {
-                error: MelAnalysisError::Mismatch(tvs::Type::String, Boolean),
+                error: MelAnalysisError::InvalidType(i, Boolean),
                 location: GrammarLocation {
                     start: 15,
                     extent: 5
+                }
+            } if i == vec![Type::Regex, Type::String]
+        )
+    }
+
+    #[test]
+    fn test_type_check_binary_regex_expr_error_two_res() {
+        let expr = "\"/testing/\" ~= \"/[\\W]/\"";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with type error");
+
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::RegexSame,
+                location: GrammarLocation {
+                    start: 0,
+                    extent: 23
+                }
+            }
+        )
+    }
+
+    #[test]
+    fn test_type_check_binary_regex_expr_error_two_strings() {
+        let expr = "\"testing\" ~= \"hello\"";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with type error");
+
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::RegexSame,
+                location: GrammarLocation {
+                    start: 0,
+                    extent: 20
                 }
             }
         )
