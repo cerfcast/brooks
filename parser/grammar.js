@@ -92,9 +92,9 @@ export default grammar({
 
     _variable: $=> choice($.identifier, $.member_access_expr), 
     member_access_expr: $=> prec.left(precedences.MEMBER_ACCESS, seq($._variable, $.member_access, $.identifier)),
-    //                                                                                      ^^
-    //                                                                                      Do not use "hidden" production here -- nested AST
-    //                                                                                      will make type inference easier.
+    //                                                                             ^^
+    //                                                                             Do not use "hidden" production here -- nested AST
+    //                                                                             will make type inference easier.
 
     ternary_expr: $ => choice(prec.right(precedences.TERNARY, seq($.expr, $.ternary_question, $.expr, $.ternary_colon, $.expr))),
 
