@@ -30,6 +30,7 @@ pub enum Type {
     Boolean,
     Integer,
     String,
+    Regex,
     Params(Vec<Type>),
     Function(Arc<Type>, Vec<Type>),
     Struct(Struct),
@@ -55,6 +56,7 @@ impl ToString for Type {
             Type::Boolean => "Bool".into(),
             Type::Integer => "Integer".into(),
             Type::String => "String".into(),
+            Type::Regex => "Regex".into(),
             Type::Params(items) => format!(
                 "Parameters: {}",
                 items

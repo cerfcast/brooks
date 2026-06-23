@@ -28,6 +28,7 @@ use crate::ast::LogicOperator::{And, Or};
 use crate::ast::MathOperator::{Divide, Minus, Modulo, Multiply, Plus};
 use crate::ast::{Argument, BinaryInfixOperator, StringConcatOperator};
 use crate::grammar::GrammarLocation;
+use crate::utils;
 use crate::{
     ast::{self, ArgumentList, Expr, Identifier},
     grammar::GrammarNode,
@@ -158,6 +159,12 @@ pub trait SyntaxVisitor<T>: Sized {
         context: T,
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
+    fn visit_regex_literal(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
     fn visit_mel(
         &self,
         syntax: Node,
@@ -189,13 +196,6 @@ macro_rules! expect_expr {
 
 pub struct MELCompiler {
     source: String,
-}
-
-impl MELCompiler {
-    pub fn strip_quotes(str: &str) -> String {
-        let result = str.strip_prefix("\"").unwrap_or(str);
-        result.strip_suffix("\"").unwrap_or(result).into()
-    }
 }
 
 impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
@@ -566,7 +566,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         Ok(MELCompilerContext::Expr(Expr::Literal(
             ast::Literal::String(ast::StringLiteral {
-                literal: Self::strip_quotes(literal),
+                literal: utils::strip_quotes(literal),
             }),
             syntax.into(),
             (),
@@ -605,6 +605,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         } else if walker.node().grammar_name() == "ne" {
             return Ok(MELCompilerContext::BinaryOperator(
                 BinaryInfixOperator::Comparison(ast::ComparisonOperator::Ne),
+            ));
+        } else if walker.node().grammar_name() == "regex_eq" {
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Comparison(ast::ComparisonOperator::Re),
             ));
         }
 
@@ -670,6 +674,25 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             ));
         }
         Err(SyntaxError::BadGrammarElement)
+    }
+
+    fn visit_regex_literal(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let literal = syntax
+            .utf8_text(self.source.as_bytes())
+            .map_err(|_| SyntaxError::InvalidRange)?;
+
+        Ok(MELCompilerContext::Expr(Expr::Literal(
+            ast::Literal::Regex(ast::RegexLiteral {
+                literal: utils::strip_quotes(literal),
+            }),
+            syntax.into(),
+            (),
+        )))
     }
 }
 
@@ -802,6 +825,12 @@ impl SyntaxVisitorDriver {
             hm.insert(
                 name.clone(),
                 U::visit_string_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            );
+        });
+        ast::RegexLiteral::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
+                U::visit_regex_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             );
         });
 
@@ -974,6 +1003,13 @@ mod tests {
     #[test]
     fn parse_ternary_expr_associativity_check() {
         let code = "true ? a : false ? \"b\" : 10";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_regex_literal() {
+        let code = "\"/[\\W]/i\"";
         let compile_result = compile(code);
         assert!(compile_result.is_ok());
     }

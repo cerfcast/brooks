@@ -33,3 +33,80 @@ Regex Literal (Invalid Syntax)
  (UNEXPECTED 'j')
 )
 
+=================================
+Regex Literal (Exotic 1)
+=================================
+"/a.*?b/i" 
+---
+(mel
+ (expr
+  (literal
+   (regex_literal)
+  ) 
+ )
+)
+
+=================================
+Regex Literal (Exotic 2)
+=================================
+"/a.*b/i" 
+---
+(mel
+ (expr
+  (literal
+   (regex_literal)
+  ) 
+ )
+)
+
+=================================
+Regex Literal (Exotic 3)
+=================================
+"/[[:digit:]]/i" 
+---
+(mel
+ (expr
+  (literal
+   (regex_literal)
+  ) 
+ )
+)
+
+=================================
+Regex Literal (Exotic 4)
+=================================
+"/[\W]/i" 
+---
+(mel
+ (expr
+  (literal
+   (regex_literal)
+  ) 
+ )
+)
+
+=================================
+Regex Literal (Exotic 5)
+=================================
+"/(testing)/i" 
+---
+(mel
+ (expr
+  (literal
+   (regex_literal)
+  ) 
+ )
+)
+
+=================================
+Regex Literal (Exotic 6)
+=================================
+"/\(testing\)/i" 
+---
+(mel
+ (expr
+  (literal
+   (regex_literal)
+  ) 
+ )
+)

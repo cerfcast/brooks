@@ -11,3 +11,4 @@ tree-sitter = "0.26.9"
 tree-sitter-mel = { path = "parser" }
 brooks-macros = { path = "macros" }
 pretty_assertions = "1.4.1"
+regex = "1.12.4"

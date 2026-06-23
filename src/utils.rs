@@ -15,17 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[allow(dead_code)]
-pub mod analysis;
-#[allow(dead_code)]
-pub mod ast;
-#[allow(dead_code)]
-pub mod compiler;
-#[allow(dead_code)]
-pub mod grammar;
-#[allow(dead_code)]
-pub mod serializer;
-#[allow(dead_code)]
-pub mod tvs;
-#[allow(dead_code)]
-pub mod utils;
+pub fn strip_quotes(str: &str) -> String {
+    let result = str.strip_prefix("\"").unwrap_or(str);
+    result.strip_suffix("\"").unwrap_or(result).into()
+}
+
+pub fn sanitize_error_message(str: &str) -> String {
+    str.replace("\n", "")
+}

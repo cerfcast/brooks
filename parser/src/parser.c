@@ -487,9 +487,15 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 6:
       if (lookahead == '/') ADVANCE(5);
-      if (lookahead == ' ' ||
-          ('A' <= lookahead && lookahead <= 'Z') ||
-          ('a' <= lookahead && lookahead <= 'z')) ADVANCE(6);
+      if (lookahead == '#' ||
+          lookahead == '$' ||
+          ('(' <= lookahead && lookahead <= '+') ||
+          lookahead == '.' ||
+          lookahead == ':' ||
+          lookahead == '?' ||
+          ('A' <= lookahead && lookahead <= '^') ||
+          ('a' <= lookahead && lookahead <= 'z') ||
+          lookahead == '|') ADVANCE(6);
       END_STATE();
     case 7:
       if (lookahead == '=') ADVANCE(52);

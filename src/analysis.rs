@@ -15,20 +15,26 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug, fmt::Display, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    sync::Arc,
+};
+
+use regex::RegexBuilder;
 
 use crate::{
     analysis::{
         MelAnalysisAssertions::{ContextMissingExpr, ContextMissingParams, ContextWrongExprType},
         MelAnalysisError::{
-            AssertionFailure, Incalculable, Miscount, Mismatch, OptimizationNotSupported,
-            PreconditionFailure, UnknownField, UnknownIdentifier,
+            AssertionFailure, Incalculable, InvalidRegex, Miscount, Mismatch,
+            OptimizationNotSupported, PreconditionFailure, UnknownField, UnknownIdentifier,
         },
     },
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
         BinaryInfixOperator, BooleanLiteral, Expr, FunctionCall, Identifier,
-        MemberAccessExpression, NumberLiteral, StringLiteral, TernaryExpr,
+        MemberAccessExpression, NumberLiteral, RegexLiteral, StringLiteral, TernaryExpr,
     },
     grammar::GrammarLocation,
     tvs::{
@@ -194,6 +200,7 @@ impl Display for MelAnalysisPreconditions {
 pub enum MelAnalysisError {
     Mismatch(Type, Type),
     Miscount(usize, usize),
+    InvalidRegex(String),
     UnknownField(String, String),
     UnknownIdentifier(String),
     AssertionFailure(MelAnalysisAssertions),
@@ -215,6 +222,7 @@ impl Display for MelAnalysisError {
             UnknownField(strct, member) => write!(f, "No field named {member} in {strct}"),
             Incalculable => write!(f, "Incalculable expression analysis"),
             OptimizationNotSupported(o) => write!(f, "Optimization not supported: {o}"),
+            InvalidRegex(i) => write!(f, "Regular expression literal not valid: {i}"),
         }
     }
 }
@@ -466,7 +474,22 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         let left_type = left.tipe();
         let right_type = right.tipe();
 
-        if left_type != right_type {
+        // If either of the operands is a regex, then there is special handling.
+        if left_type == Type::Regex || right_type == Type::Regex {
+            // Determine which one is a regex.
+            let other_type = if left_type == Type::Regex {
+                right_type
+            } else {
+                left_type
+            };
+            // The other better be a string.
+            if other_type != Type::String {
+                return Err(MelAnalysisLocatableError {
+                    error: Mismatch(Type::String, other_type),
+                    location: ast.location.clone(),
+                });
+            }
+        } else if left_type != right_type {
             return Err(MelAnalysisLocatableError {
                 error: Mismatch(left_type, right_type),
                 location: ast.location.clone(),
@@ -534,6 +557,28 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                     constant: None,
                 },
             ))),
+            (r @ ast::Literal::Regex(RegexLiteral { literal: rl }), location, _) => {
+                // Check whether the regex is valid.
+
+                if RegexBuilder::new(rl).build().is_err() {
+                    return Err(MelAnalysisLocatableError {
+                        // TODO: Make this a better error message.
+                        error: MelAnalysisError::InvalidRegex(format!(
+                            "{rl} cannot be compiled to a regular expression"
+                        )),
+                        location: location.clone(),
+                    });
+                };
+
+                Ok(context.update_expr(Expr::Literal(
+                    r.clone(),
+                    location.clone(),
+                    Analyzed {
+                        tipe: Type::Regex,
+                        constant: None,
+                    },
+                )))
+            }
         }
     }
 
@@ -709,6 +754,131 @@ mod type_check_tests {
             Analyzed {
                 tipe: Type::Integer,
                 constant: None,
+            }
+        )
+    }
+
+    #[test]
+    fn test_type_check_invalid_regex_expr() {
+        let expr = "\"testing\" ~= \"/[tsting/\"";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with syntactically incorrect regular expression");
+
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::InvalidRegex(_),
+                location: GrammarLocation {
+                    start: 13,
+                    extent: 11
+                }
+            }
+        )
+    }
+
+    #[test]
+    fn test_type_check_binary_regex_expr() {
+        let expr = "\"testing\" ~= \"/testing/\"";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(binary_expr) => binary_expr,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: _
+                }
+            }
+        )
+    }
+
+    #[test]
+    fn test_type_check_binary_regex_expr_error() {
+        let expr = "5 ~= \"/testing/\"";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with type error");
+
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::Mismatch(tvs::Type::String, Integer),
+                location: GrammarLocation {
+                    start: 0,
+                    extent: 16
+                }
+            }
+        )
+    }
+
+    #[test]
+    fn test_type_check_binary_regex_expr_error_reverse() {
+        let expr = "\"/testing/\" ~= false";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with type error");
+
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::Mismatch(tvs::Type::String, Boolean),
+                location: GrammarLocation {
+                    start: 0,
+                    extent: 20
+                }
             }
         )
     }
@@ -1491,6 +1661,14 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                         constant: Some(CompiledConstant::String(v.clone())),
                     },
                 ))),
+            (r @ ast::Literal::Regex(_), location, _) => Ok(context.update_expr(Expr::Literal(
+                r.clone(),
+                location.clone(),
+                Analyzed {
+                    tipe: Type::Regex,
+                    constant: None,
+                },
+            ))),
         }
     }
 

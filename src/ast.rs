@@ -85,7 +85,7 @@ pub enum BinaryInfixOperator {
     MemberAccess(MemberAccessOperator),
 }
 
-#[grammar_name(eq, ne, lt, lte, gt, gte)]
+#[grammar_name(eq, ne, lt, lte, gt, gte, regex_eq)]
 #[derive(Debug, Clone)]
 pub enum ComparisonOperator {
     Eq,
@@ -94,6 +94,7 @@ pub enum ComparisonOperator {
     Lte,
     Gt,
     Gte,
+    Re,
 }
 
 #[grammar_name(and, or)]
@@ -178,6 +179,7 @@ pub enum Literal {
     Boolean(BooleanLiteral),
     Number(NumberLiteral),
     String(StringLiteral),
+    Regex(RegexLiteral),
 }
 
 #[grammar_name(boolean_literal)]
@@ -196,6 +198,12 @@ pub struct NumberLiteral {
 #[derive(Debug, Clone)]
 #[grammar_name(string_literal)]
 pub struct StringLiteral {
+    pub literal: String,
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(regex_literal)]
+pub struct RegexLiteral {
     pub literal: String,
 }
 
