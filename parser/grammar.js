@@ -69,6 +69,7 @@ export default grammar({
       [$.eq, precedences.COMPARISON],
       [$.ne, precedences.COMPARISON],
       [$.regex_eq, precedences.COMPARISON],
+      [$.ipmatch, precedences.COMPARISON],
 
       [$.string_concat, precedences.CONCAT],
 
@@ -100,13 +101,18 @@ export default grammar({
 
     _literal_expr: $ => $.literal,
 
-    literal: $ => choice($.string_literal, $.number_literal, $.boolean_literal, $.regex_literal),
+    literal: $ => choice($.string_literal, $.number_literal, $.boolean_literal, $.regex_literal, $.ip_literal),
     identifier: _ => /[_a-zA-Z][_a-zA-Z]*/,
 
     number_literal: _ => /[0-9]+/,
     string_literal: _ => /"[a-z A-Z]*"/,
     boolean_literal: _ => choice("true", "false"),
     regex_literal: _ => /"\/[()*.+a-z$\^#\\:|\[\]\?A-Z]*\/i?"/,
+
+    ip_literal: $ => choice($.ipv4_literal, $.ipv6_literal),
+
+    ipv4_literal: _ => /([0-9]+.){3}[0-9]+/,
+    ipv6_literal: _ => /([A-Fa-f0-9]{4}:){7}[A-Fa-f0-9]{4}/,
 
     // Operators
     plus: _ => '+',
@@ -135,5 +141,7 @@ export default grammar({
     mul: _ => '*',
     div: _ => '/',
     modulo: _ => '%',
+
+    ipmatch: _ => 'ipmatch',
   }
 });

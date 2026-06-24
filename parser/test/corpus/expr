@@ -408,3 +408,202 @@ a^b^c + 5
  )
 )
 
+=================================
+IP Binary Expression
+=================================
+a ipmatch 10.0.1.1
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (identifier)
+   )
+   (ipmatch)
+   (expr
+    (literal
+     (ip_literal
+      (ipv4_literal)
+     )
+    )
+   )
+  )
+ )
+)
+
+=================================
+IP Binary Expression (reversed)
+=================================
+10.0.1.1 ipmatch b
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (literal
+     (ip_literal
+      (ipv4_literal)
+     )
+    )
+   )
+   (ipmatch)
+   (expr
+    (identifier)
+   )
+  )
+ )
+)
+
+=================================
+IP Binary Expression (both sides IPv4 literals)
+=================================
+10.0.1.1 ipmatch 8.8.8.8 
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (literal
+     (ip_literal
+      (ipv4_literal)
+     )
+    )
+   )
+   (ipmatch)
+   (expr
+    (literal
+     (ip_literal
+      (ipv4_literal)
+     )
+    )
+   )
+  )
+ )
+)
+
+=================================
+IP Binary Expression (v6)
+=================================
+a ipmatch 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (identifier)
+   )
+   (ipmatch)
+   (expr
+    (literal
+     (ip_literal
+      (ipv6_literal)
+     )
+    )
+   )
+  )
+ )
+)
+
+=================================
+IP Binary Expression (v6 reversed)
+=================================
+2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch b
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (literal
+     (ip_literal
+      (ipv6_literal)
+     )
+    )
+   )
+   (ipmatch)
+   (expr
+    (identifier)
+   )
+  )
+ )
+)
+
+=================================
+IP Binary Expression (both sides IPv6 literals)
+=================================
+2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (literal
+     (ip_literal
+      (ipv6_literal)
+     )
+    )
+   )
+   (ipmatch)
+   (expr
+    (literal
+     (ip_literal
+      (ipv6_literal)
+     )
+    )
+   )
+  )
+ )
+)
+
+=================================
+IP Binary Expression (both sides IP literals with mixed versions)
+=================================
+2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 8.8.8.192
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (literal
+     (ip_literal
+      (ipv6_literal)
+     )
+    )
+   )
+   (ipmatch)
+   (expr
+    (literal
+     (ip_literal
+      (ipv4_literal)
+     )
+    )
+   )
+  )
+ )
+)
+
+=================================
+IP Binary Expression (both sides IP literals with mixed versions)
+=================================
+8.8.8.192 ipmatch 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (literal
+     (ip_literal
+      (ipv4_literal)
+     )
+    )
+   )
+   (ipmatch)
+   (expr
+    (literal
+     (ip_literal
+      (ipv6_literal)
+     )
+    )
+   )
+  )
+ )
+)

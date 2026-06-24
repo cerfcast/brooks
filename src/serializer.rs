@@ -67,6 +67,7 @@ impl ToString for ast::ComparisonOperator {
             ast::ComparisonOperator::Gte => ">=".into(),
             ast::ComparisonOperator::Ne => "!=".into(),
             ast::ComparisonOperator::Re => "~=".into(),
+            ast::ComparisonOperator::IP => "ipmatch".into(),
         }
     }
 }
@@ -92,6 +93,7 @@ impl ToString for ast::Literal {
             ast::Literal::Number(nl) => nl.to_string(),
             ast::Literal::String(sl) => sl.to_string(),
             ast::Literal::Regex(rl) => rl.to_string(),
+            ast::Literal::IPAddress(ip) => ip.to_string(),
         }
     }
 }
@@ -128,12 +130,20 @@ impl ToString for ast::RegexLiteral {
 }
 
 #[allow(clippy::to_string_trait_impl)]
+impl ToString for ast::IPAddressLiteral {
+    fn to_string(&self) -> String {
+        self.literal.to_string()
+    }
+}
+
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for analysis::CompiledConstant {
     fn to_string(&self) -> String {
         match self {
             analysis::CompiledConstant::Integer(i) => i.to_string(),
             analysis::CompiledConstant::String(s) => s.clone(),
             analysis::CompiledConstant::Boolean(b) => b.to_string(),
+            analysis::CompiledConstant::IPAddress(ip) => ip.to_string(),
         }
     }
 }

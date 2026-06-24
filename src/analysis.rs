@@ -18,6 +18,7 @@
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
+    net::IpAddr,
     sync::Arc,
 };
 
@@ -34,9 +35,10 @@ use crate::{
     },
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
-        BinaryInfixOperator, BooleanLiteral, ComparisonOperator::Re, Expr, FunctionCall,
-        Identifier, MemberAccessExpression, NumberLiteral, RegexLiteral, StringLiteral,
-        TernaryExpr,
+        BinaryInfixOperator, BooleanLiteral,
+        ComparisonOperator::{IP, Re},
+        Expr, FunctionCall, IPAddressLiteral, Identifier, MemberAccessExpression, NumberLiteral,
+        RegexLiteral, StringLiteral, TernaryExpr,
     },
     grammar::GrammarLocation,
     tvs::{
@@ -100,6 +102,7 @@ pub enum CompiledConstant {
     Integer(i64),
     String(String),
     Boolean(bool),
+    IPAddress(IpAddr),
 }
 
 #[derive(Debug, Clone)]
@@ -495,6 +498,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         let (valid_types, result_type) = match &ast.op {
             BinaryInfixOperator::Logic(_) => (vec![Type::Boolean], Type::Boolean),
             BinaryInfixOperator::Comparison(Re) => (vec![Type::Regex, Type::String], Type::Boolean),
+            BinaryInfixOperator::Comparison(IP) => (vec![Type::IPAddress], Type::Boolean),
             BinaryInfixOperator::Comparison(_) => (
                 vec![Type::Boolean, Type::String, Type::Integer],
                 Type::Boolean,
@@ -622,6 +626,16 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                     location.clone(),
                     Analyzed {
                         tipe: Type::Regex,
+                        constant: None,
+                    },
+                )))
+            }
+            (ip @ ast::Literal::IPAddress(_), location, _) => {
+                Ok(context.update_expr(Expr::Literal(
+                    ip.clone(),
+                    location.clone(),
+                    Analyzed {
+                        tipe: Type::IPAddress,
                         constant: None,
                     },
                 )))
@@ -768,7 +782,7 @@ mod type_check_tests {
         grammar::GrammarLocation,
         tvs::{
             self,
-            Type::{self, Boolean, Function, Integer},
+            Type::{self, Boolean, Function, IPAddress, Integer},
         },
     };
     use std::{assert_matches, sync::Arc};
@@ -1614,6 +1628,300 @@ mod type_check_tests {
             } if i == vec![Integer]
         );
     }
+
+    #[test]
+    fn test_type_check_comparison_expr_ipliteral() {
+        let expr = "8.8.8.8 ipmatch 10.1.9.2";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: None,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_type_check_comparison_expr_ipliteral2() {
+        let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 2001:0db8:85a3:0000:0000:8a2e:0370:7334";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: None,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_type_check_comparison_expr_ipliteral3() {
+        let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 8.8.8.8";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: None,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_type_check_comparison_expr_ipliteral4() {
+        let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch a";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert("a", IPAddress));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: None,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_type_check_comparison_expr_ip() {
+        let expr = "a ipmatch b";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert("a", IPAddress));
+
+        context = context.update_scopes(context.scopes.insert("b", IPAddress));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: None,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_type_check_comparison_expr_ipliteral_mismatch() {
+        let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 8";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with type error");
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::InvalidType(i, Integer),
+                location: GrammarLocation {
+                    start: 48,
+                    extent: 1
+                }
+            } if i == vec![IPAddress]
+        );
+    }
+
+    #[test]
+    fn test_type_check_comparison_expr_ipliteral_mismatch2() {
+        let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch a";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert("a", Type::String));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with type error");
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::InvalidType(i, Type::String),
+                location: GrammarLocation {
+                    start: 48,
+                    extent: 1
+                }
+            } if i == vec![IPAddress]
+        );
+    }
+
+    #[test]
+    fn test_type_check_comparison_expr_ip_mismatch() {
+        let expr = "a ipmatch b";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert("a", IPAddress));
+
+        context = context.update_scopes(context.scopes.insert("b", Type::String));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with type error");
+        assert_matches!(
+            result,
+            MelAnalysisLocatableError {
+                error: MelAnalysisError::InvalidType(i, Type::String),
+                location: GrammarLocation {
+                    start: 10,
+                    extent: 1
+                }
+            } if i == vec![IPAddress]
+        );
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1637,9 +1945,14 @@ impl Display for MelOptimizerLocatableError {
     }
 }
 
-pub struct MelOptimizer {}
+pub struct ConstEvaluator {}
 
-impl MelOptimizer {
+impl ConstEvaluator {
+    pub fn const_evaluatable(op: &ast::BinaryInfixOperator) -> bool {
+        matches!(op, ast::BinaryInfixOperator::Comparison(IP))
+            || !matches!(op, ast::BinaryInfixOperator::Comparison(_))
+    }
+
     #[allow(clippy::result_large_err)]
     fn evaluate_binary_expr(
         left: &CompiledConstant,
@@ -1649,6 +1962,19 @@ impl MelOptimizer {
         op: ast::BinaryInfixOperator,
     ) -> Result<CompiledConstant, MelAnalysisError> {
         match op {
+            ast::BinaryInfixOperator::Comparison(IP) => {
+                let left = if let CompiledConstant::IPAddress(l) = left {
+                    l
+                } else {
+                    return Err(MelAnalysisError::Mismatch(Type::IPAddress, left_type));
+                };
+                let right = if let CompiledConstant::IPAddress(r) = right {
+                    r
+                } else {
+                    return Err(MelAnalysisError::Mismatch(Type::IPAddress, right_type));
+                };
+                Ok(CompiledConstant::Boolean(left == right))
+            }
             ast::BinaryInfixOperator::Comparison(_) => Err(
                 MelAnalysisError::OptimizationNotSupported("Comparison operator".into()),
             ),
@@ -1709,6 +2035,7 @@ impl MelOptimizer {
         }
     }
 }
+pub struct MelOptimizer {}
 
 impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimizer {
     fn visit_function_call(
@@ -1795,9 +2122,9 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
 
         let constant = match (left.constant(), right.constant()) {
             (Some(cl), Some(cr)) => {
-                if !matches!(ast.op, BinaryInfixOperator::Comparison(_)) {
+                if ConstEvaluator::const_evaluatable(&ast.op) {
                     Some(
-                        Self::evaluate_binary_expr(
+                        ConstEvaluator::evaluate_binary_expr(
                             &cl,
                             left.tipe(),
                             &cr,
@@ -1871,6 +2198,16 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                     constant: None,
                 },
             ))),
+            (ip @ ast::Literal::IPAddress(IPAddressLiteral { literal: ipl }), location, _) => {
+                Ok(context.update_expr(Expr::Literal(
+                    ip.clone(),
+                    location.clone(),
+                    Analyzed {
+                        tipe: Type::IPAddress,
+                        constant: Some(CompiledConstant::IPAddress(*ipl)),
+                    },
+                )))
+            }
         }
     }
 
@@ -2393,6 +2730,182 @@ mod optimizer_tests {
                 aug: Analyzed {
                     tipe: Type::Boolean,
                     constant: None,
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_optimize_ipmatch_comparison_expr() {
+        let expr = "8.8.8.8 ipmatch 5.5.5.5";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: Some(CompiledConstant::Boolean(false)),
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_optimize_ipmatch_comparison_expr2() {
+        let expr = "5.5.5.5 ipmatch 5.5.5.5";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: Some(CompiledConstant::Boolean(true)),
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_optimize_ipmatch_comparison_expr3() {
+        let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 5.5.5.5";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: Some(CompiledConstant::Boolean(false)),
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_optimize_ipmatch_comparison_expr4() {
+        let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 2001:0db8:85a3:0000:0000:8a2e:0370:7334";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let result = result.expr.expect("Could not get the analyzed expression");
+        let binary_expr = match result {
+            Expr::BinaryExpr(id) => id,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *binary_expr,
+            BinaryExpr::<Analyzed> {
+                left: _,
+                right: _,
+                op: _,
+                location: _,
+                aug: Analyzed {
+                    tipe: Type::Boolean,
+                    constant: Some(CompiledConstant::Boolean(true)),
                 }
             }
         );

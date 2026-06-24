@@ -378,6 +378,27 @@
         },
         {
           "type": "PREC_LEFT",
+          "value": 3,
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "expr"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "ipmatch"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "expr"
+              }
+            ]
+          }
+        },
+        {
+          "type": "PREC_LEFT",
           "value": 4,
           "content": {
             "type": "SEQ",
@@ -616,6 +637,10 @@
         {
           "type": "SYMBOL",
           "name": "regex_literal"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "ip_literal"
         }
       ]
     },
@@ -647,6 +672,27 @@
     "regex_literal": {
       "type": "PATTERN",
       "value": "\"\\/[()*.+a-z$\\^#\\\\:|\\[\\]\\?A-Z]*\\/i?\""
+    },
+    "ip_literal": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "ipv4_literal"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "ipv6_literal"
+        }
+      ]
+    },
+    "ipv4_literal": {
+      "type": "PATTERN",
+      "value": "([0-9]+.){3}[0-9]+"
+    },
+    "ipv6_literal": {
+      "type": "PATTERN",
+      "value": "([A-Fa-f0-9]{4}:){7}[A-Fa-f0-9]{4}"
     },
     "plus": {
       "type": "STRING",
@@ -727,6 +773,10 @@
     "modulo": {
       "type": "STRING",
       "value": "%"
+    },
+    "ipmatch": {
+      "type": "STRING",
+      "value": "ipmatch"
     }
   },
   "extras": [

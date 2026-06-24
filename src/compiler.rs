@@ -17,6 +17,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::net::IpAddr;
 use std::sync::Arc;
 use tree_sitter::{self, Node};
 
@@ -39,7 +40,7 @@ pub enum SyntaxError {
     NoSuchVisitor(String),
     EmptyContext,
     BadGrammarElement,
-    BadLiteral,
+    BadLiteral(String),
     InvalidRange,
     UnexpectedExprType(String, String),
 }
@@ -160,6 +161,12 @@ pub trait SyntaxVisitor<T>: Sized {
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
     fn visit_regex_literal(
+        &self,
+        syntax: Node,
+        context: T,
+        driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<T>;
+    fn visit_ipaddress_literal(
         &self,
         syntax: Node,
         context: T,
@@ -546,7 +553,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .utf8_text(self.source.as_bytes())
             .map_err(|_| SyntaxError::InvalidRange)?;
 
-        let number: usize = literal.parse().map_err(|_| SyntaxError::BadLiteral)?;
+        let number: usize = literal
+            .parse::<usize>()
+            .map_err(|e| SyntaxError::BadLiteral(e.to_string()))?;
         Ok(MELCompilerContext::Expr(Expr::Literal(
             Number(ast::NumberLiteral { literal: number }),
             syntax.into(),
@@ -609,6 +618,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         } else if walker.node().grammar_name() == "regex_eq" {
             return Ok(MELCompilerContext::BinaryOperator(
                 BinaryInfixOperator::Comparison(ast::ComparisonOperator::Re),
+            ));
+        } else if walker.node().grammar_name() == "ipmatch" {
+            return Ok(MELCompilerContext::BinaryOperator(
+                BinaryInfixOperator::Comparison(ast::ComparisonOperator::IP),
             ));
         }
 
@@ -690,6 +703,27 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             ast::Literal::Regex(ast::RegexLiteral {
                 literal: utils::strip_quotes(literal),
             }),
+            syntax.into(),
+            (),
+        )))
+    }
+
+    fn visit_ipaddress_literal(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxVisitorResult<MELCompilerContext> {
+        let literal = syntax
+            .utf8_text(self.source.as_bytes())
+            .map_err(|_| SyntaxError::InvalidRange)?;
+
+        let ip_addr: IpAddr = literal
+            .parse::<IpAddr>()
+            .map_err(|e| SyntaxError::BadLiteral(e.to_string()))?;
+
+        Ok(MELCompilerContext::Expr(Expr::Literal(
+            ast::Literal::IPAddress(ast::IPAddressLiteral { literal: ip_addr }),
             syntax.into(),
             (),
         )))
@@ -831,6 +865,12 @@ impl SyntaxVisitorDriver {
             hm.insert(
                 name.clone(),
                 U::visit_regex_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
+            );
+        });
+        ast::IPAddressLiteral::name().iter().for_each(|name| {
+            hm.insert(
+                name.clone(),
+                U::visit_ipaddress_literal as fn(&U, Node, _, &Self) -> SyntaxVisitorResult<T>,
             );
         });
 
@@ -1010,6 +1050,27 @@ mod tests {
     #[test]
     fn parse_regex_literal() {
         let code = "\"/[\\W]/i\"";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_ip_literal() {
+        let code = "192.168.0.1";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_ipv6_literal() {
+        let code = "2001:0db8:85a3:0000:0000:8a2e:0370:7334";
+        let compile_result = compile(code);
+        assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_ipmatch_binary_expr_ipv6_literal() {
+        let code = "a ipmatch 2001:0db8:85a3:0000:0000:8a2e:0370:7334";
         let compile_result = compile(code);
         assert!(compile_result.is_ok());
     }

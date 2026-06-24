@@ -31,6 +31,7 @@ pub enum Type {
     Integer,
     String,
     Regex,
+    IPAddress,
     Params(Vec<Type>),
     Function(Arc<Type>, Vec<Type>),
     Struct(Struct),
@@ -57,6 +58,7 @@ impl ToString for Type {
             Type::Integer => "Integer".into(),
             Type::String => "String".into(),
             Type::Regex => "Regex".into(),
+            Type::IPAddress => "IPAddress".into(),
             Type::Params(items) => format!(
                 "Parameters: {}",
                 items

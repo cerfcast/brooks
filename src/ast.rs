@@ -17,7 +17,7 @@
 
 use crate::grammar::{GrammarLocation, GrammarNode};
 use brooks_macros::{grammar_location, grammar_name};
-use std::{fmt::Debug, sync::Arc};
+use std::{fmt::Debug, net::IpAddr, sync::Arc};
 
 #[grammar_name(mel)]
 #[grammar_location]
@@ -85,7 +85,7 @@ pub enum BinaryInfixOperator {
     MemberAccess(MemberAccessOperator),
 }
 
-#[grammar_name(eq, ne, lt, lte, gt, gte, regex_eq)]
+#[grammar_name(eq, ne, lt, lte, gt, gte, regex_eq, ipmatch)]
 #[derive(Debug, Clone)]
 pub enum ComparisonOperator {
     Eq,
@@ -95,6 +95,7 @@ pub enum ComparisonOperator {
     Gt,
     Gte,
     Re,
+    IP,
 }
 
 #[grammar_name(and, or)]
@@ -180,6 +181,7 @@ pub enum Literal {
     Number(NumberLiteral),
     String(StringLiteral),
     Regex(RegexLiteral),
+    IPAddress(IPAddressLiteral),
 }
 
 #[grammar_name(boolean_literal)]
@@ -205,6 +207,12 @@ pub struct StringLiteral {
 #[grammar_name(regex_literal)]
 pub struct RegexLiteral {
     pub literal: String,
+}
+
+#[derive(Debug, Clone)]
+#[grammar_name(ip_literal)]
+pub struct IPAddressLiteral {
+    pub literal: IpAddr,
 }
 
 #[derive(Debug, Clone)]

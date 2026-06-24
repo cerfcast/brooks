@@ -110,3 +110,127 @@ Regex Literal (Exotic 6)
   ) 
  )
 )
+
+=================================
+IP v4 Literal
+=================================
+192.168.0.1
+---
+(mel
+ (expr
+  (literal
+   (ip_literal
+    (ipv4_literal)
+   )
+  ) 
+ )
+)
+
+=================================
+IP v4 Literal 2
+=================================
+8.8.8.8
+---
+(mel
+ (expr
+  (literal
+   (ip_literal
+    (ipv4_literal)
+   )
+  ) 
+ )
+)
+
+=================================
+IP v4 Literal (Invalid)
+=================================
+.8.8.8
+---
+(mel
+ (ERROR
+  (string_concat)
+ )
+ (expr
+  (binary_expr
+   (expr
+    (binary_expr
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+     (string_concat)
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+    )
+   )
+   (string_concat)
+   (expr
+    (literal
+     (number_literal)
+    )
+   )
+  )
+ )
+)
+
+=================================
+IP v4 Literal (Invalid 2)
+=================================
+a.8.8.8
+---
+(mel
+ (expr
+  (binary_expr
+   (expr
+    (binary_expr
+     (expr
+      (binary_expr
+       (expr
+        (identifier)
+       )
+       (string_concat)
+       (expr
+        (literal
+         (number_literal)
+        )
+       )
+      )
+     )
+     (string_concat)
+     (expr
+      (literal
+       (number_literal)
+      )
+     )
+    )
+   )
+   (string_concat)
+   (expr
+    (literal
+     (number_literal)
+    )
+   )
+  )
+ )
+)
+
+=================================
+IP v6 Literal
+=================================
+2001:0db8:85a3:0000:0000:8a2e:0370:7334
+---
+(mel
+ (expr
+  (literal
+   (ip_literal
+    (ipv6_literal)
+   )
+  ) 
+ )
+)
+
+
