@@ -111,6 +111,7 @@ export default grammar({
 
     ip_literal: $ => choice($.ipv4_literal, $.ipv6_literal),
 
+    // TODO: Support netmask notation.
     ipv4_literal: _ => /([0-9]+.){3}[0-9]+/,
     ipv6_literal: _ => /([A-Fa-f0-9]{4}:){7}[A-Fa-f0-9]{4}/,
 
