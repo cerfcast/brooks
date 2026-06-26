@@ -755,7 +755,7 @@ mod type_check_tests {
 
     #[test]
     fn test_type_check_invalid_regex_expr() {
-        let expr = "\"testing\" ~= \"/[tsting/\"";
+        let expr = "\"testing\" ~= /[tsting/";
 
         let compile_result = compile(expr);
         let _ =
@@ -764,7 +764,7 @@ mod type_check_tests {
 
     #[test]
     fn test_type_check_binary_regex_expr() {
-        let expr = "\"testing\" ~= \"/testing/\"";
+        let expr = "\"testing\" ~= /testing/";
 
         let compile_result = compile(expr);
         let compiled = compile_result.expect("Compilation error");
@@ -802,7 +802,7 @@ mod type_check_tests {
 
     #[test]
     fn test_type_check_binary_regex_expr_error() {
-        let expr = "5 ~= \"/testing/\"";
+        let expr = "5 ~= /testing/";
 
         let compile_result = compile(expr);
         let compiled = compile_result.expect("Compilation error");
@@ -860,7 +860,7 @@ mod type_check_tests {
 
     #[test]
     fn test_type_check_binary_regex_expr_error_two_res() {
-        let expr = "\"/testing/\" ~= \"/[\\W]/\"";
+        let expr = "/testing/ ~= /[\\W]/";
 
         let compile_result = compile(expr);
         let compiled = compile_result.expect("Compilation error");
@@ -881,7 +881,7 @@ mod type_check_tests {
                 error: MelAnalysisError::Mismatch(Type::String, Type::Regex),
                 location: GrammarLocation {
                     start: 0,
-                    extent: 11
+                    extent: 9
                 }
             }
         )

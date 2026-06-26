@@ -1,7 +1,7 @@
 =================================
 Regex Literal
 =================================
-"/testing/" 
+/testing/
 ---
 (mel
  (expr
@@ -14,7 +14,7 @@ Regex Literal
 =================================
 Regex Literal (case insensitive)
 =================================
-"/testing/i" 
+/testing/i
 ---
 (mel
  (expr
@@ -27,16 +27,23 @@ Regex Literal (case insensitive)
 =================================
 Regex Literal (Invalid Syntax)
 =================================
-"/testing/j" 
+/testing/j
 ---
-(ERROR
- (UNEXPECTED 'j')
+(mel
+ (expr
+  (literal
+   (regex_literal)
+  )
+ )
+ (ERROR
+  (UNEXPECTED 'j')
+ )
 )
 
 =================================
 Regex Literal (Exotic 1)
 =================================
-"/a.*?b/i" 
+/a.*?b/i 
 ---
 (mel
  (expr
@@ -49,7 +56,7 @@ Regex Literal (Exotic 1)
 =================================
 Regex Literal (Exotic 2)
 =================================
-"/a.*b/i" 
+/a.*b/i
 ---
 (mel
  (expr
@@ -62,7 +69,7 @@ Regex Literal (Exotic 2)
 =================================
 Regex Literal (Exotic 3)
 =================================
-"/[[:digit:]]/i" 
+/[[:digit:]]/i
 ---
 (mel
  (expr
@@ -75,7 +82,7 @@ Regex Literal (Exotic 3)
 =================================
 Regex Literal (Exotic 4)
 =================================
-"/[\W]/i" 
+/[\W]/i
 ---
 (mel
  (expr
@@ -88,7 +95,7 @@ Regex Literal (Exotic 4)
 =================================
 Regex Literal (Exotic 5)
 =================================
-"/(testing)/i" 
+/(testing)/i
 ---
 (mel
  (expr
@@ -101,7 +108,7 @@ Regex Literal (Exotic 5)
 =================================
 Regex Literal (Exotic 6)
 =================================
-"/\(testing\)/i" 
+/\(testing\)/i
 ---
 (mel
  (expr
