@@ -30,12 +30,12 @@ use crate::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
         BinaryInfixOperator, BooleanLiteral,
         ComparisonOperator::{self, IP, Re},
-        FunctionCall, IPAddressLiteral, Identifier, NumberLiteral, RegexLiteral, StringLiteral,
-        TernaryExpr,
+        Expr, FunctionCall, IPAddressLiteral, Identifier, NumberLiteral, RegexLiteral,
+        StringLiteral, TernaryExpr,
     },
     grammar::GrammarLocation,
     interp::MelInterpError::UnknownIdentifier,
-    scope,
+    scope::{self, Scopes},
     tvs::{self, Type},
 };
 
@@ -928,6 +928,25 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         }
 
         Ok(context.update_val(Some(member_value.clone())))
+    }
+}
+
+pub type MelInterpResult = Result<TypedValue, MelInterpLocatableError>;
+
+#[allow(clippy::result_large_err)]
+pub fn interpret(expr: &Expr<Analyzed>, scopes: Scopes<TypedValue>) -> MelInterpResult {
+    let driver = AstVisitorDriver {};
+    let visitor = MelInterp {};
+    let mut context = MelInterpContext::default();
+
+    context = context.update_scopes(scopes);
+
+    match driver.visit(expr, &visitor, context)?.val {
+        Some(v) => Ok(v),
+        None => Err(MelInterpLocatableError {
+            error: MelInterpError::Todo,
+            location: expr.location(),
+        }),
     }
 }
 

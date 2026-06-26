@@ -37,8 +37,10 @@ use crate::{
         Expr, FunctionCall, IPAddressLiteral, Identifier, MemberAccessExpression, NumberLiteral,
         StringLiteral, TernaryExpr,
     },
+    compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+    expect_expr,
     grammar::GrammarLocation,
-    scope,
+    scope::{self, Scopes},
     tvs::{
         self,
         Type::{self, Function, Struct},
@@ -151,6 +153,7 @@ impl Display for MelAnalysisPreconditions {
 
 #[derive(Debug, Clone)]
 pub enum MelAnalysisError {
+    CompilerError(CompilerError),
     Mismatch(Type, Type),
     RegexSame,
     InvalidType(Vec<Type>, Type),
@@ -167,6 +170,7 @@ pub enum MelAnalysisError {
 impl Display for MelAnalysisError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::CompilerError(e) => write!(f, "Compiler error: {:?}", e),
             Mismatch(expected, found) => write!(f, "Expected {:?}, found {:?}", expected, found),
             Miscount(expected, found) => write!(f, "Expected {expected} arguments, found {found}"),
             UnknownIdentifier(i) => write!(f, "Unknown identifier {:?}", i),
@@ -2906,4 +2910,46 @@ mod analysis_error_tests {
             })
         );
     }
+}
+
+pub type MelAnalysisResult = Result<Expr<Analyzed>, MelAnalysisLocatableError>;
+#[allow(clippy::result_large_err)]
+pub fn compile_and_analyze(source: &str, scopes: Scopes<Type>) -> MelAnalysisResult {
+    let compile_result = compile(source);
+    let compiled = compile_result.map_err(|e| MelAnalysisLocatableError {
+        error: MelAnalysisError::CompilerError(e),
+        location: GrammarLocation {
+            start: 0,
+            extent: source.len(),
+        },
+    })?;
+
+    let ast = expect_expr!(MELCompilerContext, compiled).ok_or(MelAnalysisLocatableError {
+        error: MelAnalysisError::CompilerError(CompilerError::SyntaxError(EmptyContext)),
+        location: GrammarLocation {
+            start: 0,
+            extent: source.len(),
+        },
+    })?;
+
+    let driver = AstVisitorDriver {};
+    let visitor = MelTypeChecker {};
+    let mut context = MelAnalysisContext::default();
+
+    context = context.update_scopes(scopes);
+    let result = driver.visit(&ast, &visitor, context)?;
+
+    let driver = AstVisitorDriver {};
+    let visitor = MelOptimizer {};
+    let result = driver.visit(&ast, &visitor, result)?;
+
+    let result = result.expr.ok_or(MelAnalysisLocatableError {
+        error: MelAnalysisError::Incalculable,
+        location: GrammarLocation {
+            start: 0,
+            extent: source.len(),
+        },
+    })?;
+
+    Ok(result)
 }
