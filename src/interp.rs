@@ -19,6 +19,7 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     net::IpAddr,
+    sync::Arc,
 };
 
 use regex::Regex;
@@ -51,7 +52,9 @@ pub enum Value {
     Boolean(bool),
     Regex(Regex),
     IPAddress(IpAddr),
+    Function(Arc<dyn BuiltinFunction>),
     Struct(StructValue),
+    ArgumentList(Vec<TypedValue>),
     #[default]
     Uninitialized,
 }
@@ -90,7 +93,7 @@ impl Display for MelInterpAssertion {
 pub enum MelInterpPreconditions {}
 
 impl Display for MelInterpPreconditions {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
 }
@@ -101,6 +104,7 @@ pub enum MelInterpError {
     Assertion(MelInterpAssertion),
     UnknownIdentifier(String),
     UnknownField(String),
+    BuiltinError(BuiltinInterpError),
 }
 
 impl Display for MelInterpError {
@@ -116,6 +120,9 @@ impl Display for MelInterpError {
             }
             MelInterpError::UnknownField(field) => {
                 write!(f, "unknown field: {}", field)
+            }
+            MelInterpError::BuiltinError(bi) => {
+                write!(f, "error executing builtin function: {}", bi)
             }
         }
     }
@@ -133,7 +140,7 @@ impl Display for MelInterpLocatableError {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Clone, Default, Debug)]
 pub struct MelInterpContext {
     pub val: Option<TypedValue>,
     pub scopes: scope::Scopes<TypedValue>,
@@ -154,8 +161,134 @@ impl MelInterpContext {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum BuiltinInterpError {
+    ArgumentMiscount(usize, usize),
+    ArgumentMismatch(usize, Type, Type),
+    RuntimeError(String),
+    ArgumentsInvalid,
+}
+
+impl Display for BuiltinInterpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BuiltinInterpError::ArgumentMiscount(expected, actual) => {
+                write!(f, "Expected {expected} arguments but got {actual}")
+            }
+            BuiltinInterpError::ArgumentMismatch(which, expected, actual) => write!(
+                f,
+                "Expected argument {which} to have type {} but it has {}",
+                expected.to_string(),
+                actual.to_string()
+            ),
+            BuiltinInterpError::ArgumentsInvalid => write!(f, "Invalid arguments"),
+            BuiltinInterpError::RuntimeError(e) => write!(f, "Runtime error: {e}"),
+        }
+    }
+}
+
+type BuiltinInterpResult = Result<TypedValue, BuiltinInterpError>;
+
+#[allow(clippy::result_large_err)]
+pub trait BuiltinFunction: Debug {
+    fn name(&self) -> String;
+    fn parameters(&self) -> tvs::Params;
+    fn return_type(&self) -> Type;
+    fn interpw(&self, args: Value) -> BuiltinInterpResult;
+}
+
+#[derive(Clone, Default, Debug)]
+struct BooleanF {}
+
+#[allow(clippy::result_large_err)]
+impl BooleanF {
+    fn interp(&self, path: &str, element: &i64) -> BuiltinInterpResult {
+        let parts = path.split("/");
+
+        if (*element as usize) < parts.clone().count() {
+            let part =
+                parts
+                    .clone()
+                    .nth((*element) as usize)
+                    .ok_or(BuiltinInterpError::RuntimeError(format!(
+                        "Index {} is out of bounds (max {})",
+                        element,
+                        parts.count()
+                    )))?;
+            Ok(TypedValue {
+                value: Value::String(part.to_string()),
+                tipe: Type::String,
+            })
+        } else {
+            Err(BuiltinInterpError::RuntimeError(format!(
+                "Index {} is out of bounds (max {})",
+                element,
+                parts.count()
+            )))
+        }
+    }
+}
+
+impl BuiltinFunction for BooleanF {
+    fn name(&self) -> String {
+        "path_element".to_string()
+    }
+
+    fn parameters(&self) -> tvs::Params {
+        tvs::Params {
+            args: vec![Type::String, Type::Integer],
+        }
+    }
+
+    fn return_type(&self) -> Type {
+        Type::String
+    }
+
+    fn interpw(&self, args: Value) -> BuiltinInterpResult {
+        let args = match args {
+            Value::ArgumentList(args) => args,
+            _ => return Err(BuiltinInterpError::ArgumentsInvalid),
+        };
+
+        if args.len() != 2 {
+            return Err(BuiltinInterpError::ArgumentMiscount(2, args.len()));
+        }
+
+        let path = match &args[0] {
+            TypedValue {
+                value: Value::String(s),
+                tipe: _,
+            } => s,
+            TypedValue { value: _, tipe: t } => {
+                return Err(BuiltinInterpError::ArgumentMismatch(
+                    0,
+                    Type::String,
+                    t.clone(),
+                ));
+            }
+        };
+
+        let element = match &args[1] {
+            TypedValue {
+                value: Value::Integer(i),
+                tipe: _,
+            } => i,
+            TypedValue { value: _, tipe: t } => {
+                return Err(BuiltinInterpError::ArgumentMismatch(
+                    1,
+                    Type::Integer,
+                    t.clone(),
+                ));
+            }
+        };
+
+        self.interp(path, element)
+    }
+}
+
 pub struct MelInterp {}
 
+#[allow(clippy::result_large_err)]
 impl MelInterp {
     pub fn interp_binary_expr(
         op: &BinaryInfixOperator,
@@ -438,7 +571,61 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
-        todo!()
+        let context = context.update_val(None);
+        let context = driver.visit(&ast.callee, self, context)?;
+
+        let callee_value = context.val.as_ref().ok_or(MelInterpLocatableError {
+            error: MelInterpError::Todo,
+            location: ast.callee.location(),
+        })?;
+
+        let callee_value = match callee_value {
+            TypedValue {
+                value: Value::Function(f),
+                tipe: _,
+            } => f,
+            TypedValue { value: _, tipe: t } => {
+                return Err(MelInterpLocatableError {
+                    error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        ast.callee.tipe(),
+                        t.clone(),
+                    )),
+                    location: ast.callee.location(),
+                });
+            }
+        };
+
+        let context = context.update_val(None);
+        let context = self.visit_argument_list(&ast.arguments, context, driver)?;
+
+        let argument_list_values = context.val.as_ref().ok_or(MelInterpLocatableError {
+            error: MelInterpError::Todo,
+            location: ast.callee.location(),
+        })?;
+
+        let argument_list_values = match argument_list_values {
+            TypedValue {
+                value: f @ Value::ArgumentList(_),
+                tipe: _,
+            } => f,
+            TypedValue { value: _, tipe: t } => {
+                return Err(MelInterpLocatableError {
+                    error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        ast.callee.tipe(),
+                        t.clone(),
+                    )),
+                    location: ast.callee.location(),
+                });
+            }
+        };
+
+        let res = (*callee_value)
+            .interpw(argument_list_values.clone())
+            .map_err(|e| MelInterpLocatableError {
+                error: MelInterpError::BuiltinError(e),
+                location: ast.location.clone(),
+            })?;
+        Ok(context.update_val(Some(res)))
     }
 
     fn visit_identifier(
@@ -464,7 +651,24 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
-        todo!()
+        let context = context.update_val(None);
+
+        let mut arg_values: Vec<TypedValue> = vec![];
+        for arg in &ast.arguments {
+            let context = self.visit_argument(arg, context.clone(), driver)?;
+
+            let arg_value = context.val.as_ref().ok_or(MelInterpLocatableError {
+                error: MelInterpError::Todo,
+                location: arg.location.clone(),
+            })?;
+
+            arg_values.push(arg_value.clone());
+        }
+
+        Ok(context.update_val(Some(TypedValue {
+            value: Value::ArgumentList(arg_values),
+            tipe: ast.aug.tipe.clone(),
+        })))
     }
 
     fn visit_argument(
@@ -473,7 +677,25 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
-        todo!()
+        let context = context.update_val(None);
+        let context = driver.visit(&ast.expr, self, context)?;
+
+        let argument_value = context.val.as_ref().ok_or(MelInterpLocatableError {
+            error: MelInterpError::Todo,
+            location: ast.expr.location(),
+        })?;
+
+        if argument_value.tipe != ast.aug.tipe {
+            return Err(MelInterpLocatableError {
+                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                    ast.aug.tipe.clone(),
+                    argument_value.tipe.clone(),
+                )),
+                location: ast.location.clone(),
+            });
+        }
+
+        Ok(context.update_val(Some(argument_value.clone())))
     }
 
     fn visit_binary_expr(
@@ -672,7 +894,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
 
 #[cfg(test)]
 mod interpreter_tests {
-    use std::{assert_matches, collections::HashMap};
+    use std::{assert_matches, collections::HashMap, sync::Arc};
 
     use crate::{
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
@@ -680,11 +902,14 @@ mod interpreter_tests {
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
         interp::{
-            MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError,
-            MelInterpLocatableError, StructValue, TypedValue,
+            BooleanF, BuiltinFunction, MelInterp, MelInterpAssertion, MelInterpContext,
+            MelInterpError, MelInterpLocatableError, StructValue, TypedValue,
             Value::{self, Struct},
         },
-        tvs::{self, Type},
+        tvs::{
+            self,
+            Type::{self, Function},
+        },
     };
 
     #[test]
@@ -725,6 +950,65 @@ mod interpreter_tests {
                 value: Value::Boolean(false),
                 tipe: Type::Boolean
             })
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call() {
+        let expr = "path_element(\"one/two/three\", 1)";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = BooleanF {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "two"
         );
     }
 
