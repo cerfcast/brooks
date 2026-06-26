@@ -25,6 +25,11 @@ pub struct Struct {
     pub fields: HashMap<String, Type>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Params {
+    pub args: Vec<Type>,
+}
+
 #[derive(Default, Debug, Clone, PartialEq)]
 pub enum Type {
     Boolean,
@@ -32,8 +37,8 @@ pub enum Type {
     String,
     Regex,
     IPAddress,
-    Params(Vec<Type>),
-    Function(Arc<Type>, Vec<Type>),
+    Params(Params),
+    Function(Arc<Type>, Params),
     Struct(Struct),
     #[default]
     None,
@@ -62,6 +67,7 @@ impl ToString for Type {
             Type::Params(items) => format!(
                 "Parameters: {}",
                 items
+                    .args
                     .iter()
                     .map(|c| c.to_string())
                     .collect::<Vec<_>>()
@@ -70,7 +76,8 @@ impl ToString for Type {
             Type::Function(result, args) => format!(
                 "Return Type: {}, Argument Types: {}",
                 result.to_string(),
-                args.iter()
+                args.args
+                    .iter()
                     .map(|a| a.to_string())
                     .collect::<Vec<_>>()
                     .join(","),

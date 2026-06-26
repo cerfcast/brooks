@@ -262,10 +262,13 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         };
 
         let fn_params = match callee.tipe() {
-            Type::Function(return_type, args) => (return_type, args),
+            Type::Function(return_type, tvs::Params { args }) => (return_type, args),
             t => {
                 return Err(MelAnalysisLocatableError {
-                    error: Mismatch(Function(Arc::new(Type::None), vec![]), t),
+                    error: Mismatch(
+                        Function(Arc::new(Type::None), tvs::Params { args: vec![] }),
+                        t,
+                    ),
                     location: ast.location.clone(),
                 });
             }
@@ -1190,7 +1193,12 @@ mod type_check_tests {
 
         context = context.update_scopes(context.scopes.insert(
             "testing",
-            Function(Arc::new(Type::Integer), vec![Type::Integer]),
+            Function(
+                Arc::new(Type::Integer),
+                tvs::Params {
+                    args: vec![Type::Integer],
+                },
+            ),
         ));
 
         let result = driver
@@ -1233,7 +1241,12 @@ mod type_check_tests {
 
         context = context.update_scopes(context.scopes.insert(
             "use",
-            Function(Arc::new(Type::Integer), vec![Type::Integer]),
+            Function(
+                Arc::new(Type::Integer),
+                tvs::Params {
+                    args: vec![Type::Integer],
+                },
+            ),
         ));
 
         let result = driver
@@ -1261,7 +1274,12 @@ mod type_check_tests {
 
         context = context.update_scopes(context.scopes.insert(
             "use",
-            Function(Arc::new(Type::Integer), vec![Type::Integer, Type::String]),
+            Function(
+                Arc::new(Type::Integer),
+                tvs::Params {
+                    args: vec![Type::Integer, Type::String],
+                },
+            ),
         ));
 
         let result = driver
@@ -1292,7 +1310,12 @@ mod type_check_tests {
 
         context = context.update_scopes(context.scopes.insert(
             "use_me",
-            Function(Arc::new(Type::Integer), vec![Type::Integer]),
+            Function(
+                Arc::new(Type::Integer),
+                tvs::Params {
+                    args: vec![Type::Integer],
+                },
+            ),
         ));
 
         let result = driver
@@ -1335,7 +1358,12 @@ mod type_check_tests {
 
         context = context.update_scopes(context.scopes.insert(
             "use_me",
-            Function(Arc::new(Type::Integer), vec![Type::Integer, Type::String]),
+            Function(
+                Arc::new(Type::Integer),
+                tvs::Params {
+                    args: vec![Type::Integer, Type::String],
+                },
+            ),
         ));
 
         let result = driver
@@ -1378,7 +1406,12 @@ mod type_check_tests {
 
         context = context.update_scopes(context.scopes.insert(
             "use_me",
-            Function(Arc::new(Type::Integer), vec![Type::Integer, Type::Integer]),
+            Function(
+                Arc::new(Type::Integer),
+                tvs::Params {
+                    args: vec![Type::Integer, Type::Integer],
+                },
+            ),
         ));
 
         let result = driver
@@ -1413,7 +1446,12 @@ mod type_check_tests {
 
         context = context.update_scopes(context.scopes.insert(
             "use_me",
-            Function(Arc::new(Type::Integer), vec![Type::Integer]),
+            Function(
+                Arc::new(Type::Integer),
+                tvs::Params {
+                    args: vec![Type::Integer],
+                },
+            ),
         ));
 
         let result = driver
@@ -1458,7 +1496,12 @@ mod type_check_tests {
 
         context = context.update_scopes(context.scopes.insert(
             "use_me",
-            Function(Arc::new(Type::Boolean), vec![Type::Integer]),
+            Function(
+                Arc::new(Type::Boolean),
+                tvs::Params {
+                    args: vec![Type::Integer],
+                },
+            ),
         ));
 
         let result = driver

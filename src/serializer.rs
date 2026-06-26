@@ -1050,7 +1050,7 @@ mod analyzed_serializer_tests {
     use std::{collections::HashMap, sync::Arc};
 
     use crate::tvs::{
-        Struct,
+        self, Struct,
         Type::{self, Function},
     };
     use crate::{
@@ -1133,7 +1133,12 @@ mod analyzed_serializer_tests {
 
         context = context.update_scopes(context.scopes.insert(
             "use",
-            Function(Arc::new(Type::Integer), vec![Type::Integer]),
+            Function(
+                Arc::new(Type::Integer),
+                tvs::Params {
+                    args: vec![Type::Integer],
+                },
+            ),
         ));
 
         let result = driver
@@ -1494,7 +1499,12 @@ mod analyzed_serializer_tests {
 
         reqs.fields.insert(
             "callable".to_string(),
-            Function(Arc::new(Type::Boolean), vec![Type::Integer]),
+            Function(
+                Arc::new(Type::Boolean),
+                tvs::Params {
+                    args: vec![Type::Integer],
+                },
+            ),
         );
         context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs)));
 
