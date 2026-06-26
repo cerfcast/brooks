@@ -107,7 +107,7 @@ export default grammar({
     number_literal: _ => /[0-9]+/,
     string_literal: _ => /"[a-z A-Z]*"/,
     boolean_literal: _ => choice("true", "false"),
-    regex_literal: _ => /"\/[()*.+a-z$\^#\\:|\[\]\?A-Z]*\/i?"/,
+    regex_literal: _ => /"\/[\-0-9()*.+a-z$\^#\\:|\[\]\?A-Z]*\/i?"/,
 
     ip_literal: $ => choice($.ipv4_literal, $.ipv6_literal),
 

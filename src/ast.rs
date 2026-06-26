@@ -17,6 +17,7 @@
 
 use crate::grammar::{GrammarLocation, GrammarNode};
 use brooks_macros::{grammar_location, grammar_name};
+use regex::Regex;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};
 
 #[grammar_name(mel)]
@@ -206,7 +207,7 @@ pub struct StringLiteral {
 #[derive(Debug, Clone)]
 #[grammar_name(regex_literal)]
 pub struct RegexLiteral {
-    pub literal: String,
+    pub literal: Regex,
 }
 
 #[derive(Debug, Clone)]

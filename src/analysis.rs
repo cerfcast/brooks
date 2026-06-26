@@ -22,8 +22,6 @@ use std::{
     sync::Arc,
 };
 
-use regex::RegexBuilder;
-
 use crate::{
     analysis::{
         MelAnalysisAssertions::{ContextMissingExpr, ContextMissingParams, ContextWrongExprType},
@@ -533,28 +531,28 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 
         // If the operator is the regex operator, then there is special handling.
         if let BinaryInfixOperator::Comparison(Re) = ast.op {
-            // Determine which one is a regex.
-            let regex = (left_type == Type::Regex) ^ (right_type == Type::Regex);
-            let string = (left_type == Type::String) ^ (right_type == Type::String);
-
-            return if !regex || !string {
-                // There are two regular expressions.
-                Err(MelAnalysisLocatableError {
-                    error: RegexSame,
-                    location: ast.location.clone(),
-                })
-            } else {
-                Ok(context.update_expr(Expr::BinaryExpr(Arc::new(BinaryExpr {
-                    left,
-                    right,
-                    op: ast.op.clone(),
-                    location: ast.location.clone(),
-                    aug: Analyzed {
-                        tipe: result_type,
-                        constant: None,
-                    },
-                }))))
-            };
+            if left_type != Type::String {
+                return Err(MelAnalysisLocatableError {
+                    error: Mismatch(Type::String, left_type),
+                    location: left.location(),
+                });
+            }
+            if right_type != Type::Regex {
+                return Err(MelAnalysisLocatableError {
+                    error: Mismatch(Type::Regex, right_type),
+                    location: right.location(),
+                });
+            }
+            return Ok(context.update_expr(Expr::BinaryExpr(Arc::new(BinaryExpr {
+                left,
+                right,
+                op: ast.op.clone(),
+                location: ast.location.clone(),
+                aug: Analyzed {
+                    tipe: result_type,
+                    constant: None,
+                },
+            }))));
         }
 
         // Otherwise, the types just need to be equal!
@@ -608,28 +606,14 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                     constant: None,
                 },
             ))),
-            (r @ ast::Literal::Regex(RegexLiteral { literal: rl }), location, _) => {
-                // Check whether the regex is valid.
-
-                if RegexBuilder::new(rl).build().is_err() {
-                    return Err(MelAnalysisLocatableError {
-                        // TODO: Make this a better error message.
-                        error: MelAnalysisError::InvalidRegex(format!(
-                            "{rl} cannot be compiled to a regular expression"
-                        )),
-                        location: location.clone(),
-                    });
-                };
-
-                Ok(context.update_expr(Expr::Literal(
-                    r.clone(),
-                    location.clone(),
-                    Analyzed {
-                        tipe: Type::Regex,
-                        constant: None,
-                    },
-                )))
-            }
+            (r @ ast::Literal::Regex(_), location, _) => Ok(context.update_expr(Expr::Literal(
+                r.clone(),
+                location.clone(),
+                Analyzed {
+                    tipe: Type::Regex,
+                    constant: None,
+                },
+            ))),
             (ip @ ast::Literal::IPAddress(_), location, _) => {
                 Ok(context.update_expr(Expr::Literal(
                     ip.clone(),
@@ -824,28 +808,8 @@ mod type_check_tests {
         let expr = "\"testing\" ~= \"/[tsting/\"";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
-
-        let driver = AstVisitorDriver {};
-        let visitor = MelTypeChecker {};
-        let context = MelAnalysisContext::default();
-        let result = driver
-            .visit(&ast, &visitor, context)
-            .expect_err("Could analyze expression with syntactically incorrect regular expression");
-
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::InvalidRegex(_),
-                location: GrammarLocation {
-                    start: 13,
-                    extent: 11
-                }
-            }
-        )
+        let _ =
+            compile_result.expect_err("Could compile expression with invalid regular expression.");
     }
 
     #[test]

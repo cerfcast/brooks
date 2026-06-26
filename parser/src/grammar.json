@@ -671,7 +671,7 @@
     },
     "regex_literal": {
       "type": "PATTERN",
-      "value": "\"\\/[()*.+a-z$\\^#\\\\:|\\[\\]\\?A-Z]*\\/i?\""
+      "value": "\"\\/[\\-0-9()*.+a-z$\\^#\\\\:|\\[\\]\\?A-Z]*\\/i?\""
     },
     "ip_literal": {
       "type": "CHOICE",

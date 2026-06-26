@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use regex::RegexBuilder;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::net::IpAddr;
@@ -699,10 +700,13 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             .utf8_text(self.source.as_bytes())
             .map_err(|_| SyntaxError::InvalidRange)?;
 
+        let regex = match RegexBuilder::new(&utils::strip_quotes(literal)).build() {
+            Ok(regex) => regex,
+            Err(e) => return Err(SyntaxError::BadLiteral(e.to_string())),
+        };
+
         Ok(MELCompilerContext::Expr(Expr::Literal(
-            ast::Literal::Regex(ast::RegexLiteral {
-                literal: utils::strip_quotes(literal),
-            }),
+            ast::Literal::Regex(ast::RegexLiteral { literal: regex }),
             syntax.into(),
             (),
         )))

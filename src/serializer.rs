@@ -399,13 +399,13 @@ mod tests {
 
     #[test]
     fn serialize_binary_regex_expr() {
-        let code = "a ~= \"/[]/\"";
+        let code = "a ~= \"/[0-9]/\"";
         let expected = "Binary Expression:
 \tLeft:
 \t\tIdentifier: a
 \tOperation: ~=
 \tRight:
-\t\tLiteral: /[]/";
+\t\tLiteral: /[0-9]/";
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");

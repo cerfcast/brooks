@@ -524,8 +524,7 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       if (lookahead == '#' ||
           lookahead == '$' ||
           ('(' <= lookahead && lookahead <= '+') ||
-          lookahead == '.' ||
-          lookahead == ':' ||
+          ('-' <= lookahead && lookahead <= ':') ||
           lookahead == '?' ||
           ('A' <= lookahead && lookahead <= '^') ||
           ('a' <= lookahead && lookahead <= 'z') ||
