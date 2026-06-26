@@ -45,6 +45,21 @@ pub struct StructValue {
     pub tpe: tvs::Struct,
 }
 
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for StructValue {
+    fn to_string(&self) -> String {
+        format!(
+            "Type: {}, Field Values: {}",
+            self.tpe.name,
+            self.fields
+                .iter()
+                .map(|(k, v)| { format!("{k}: {v}") })
+                .collect::<Vec<_>>()
+                .join(","),
+        )
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 pub enum Value {
     Integer(i64),
@@ -61,8 +76,32 @@ pub enum Value {
 
 #[derive(Default, Debug, Clone)]
 pub struct TypedValue {
-    value: Value,
-    tipe: Type,
+    pub value: Value,
+    pub tipe: Type,
+}
+
+impl Display for TypedValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.value {
+            Value::Integer(i) => write!(f, "{i}"),
+            Value::String(s) => write!(f, "{s}"),
+            Value::Boolean(b) => write!(f, "{b}"),
+            Value::Regex(regex) => write!(f, "{regex}"),
+            Value::IPAddress(ip_addr) => write!(f, "{ip_addr}"),
+            Value::Function(builtin_function) => write!(f, "Function: {}", builtin_function.name()),
+            Value::Struct(struct_value) => write!(f, "{}", struct_value.to_string()),
+            Value::ArgumentList(typed_values) => write!(
+                f,
+                "Argument List: {}",
+                typed_values
+                    .iter()
+                    .map(|tv| { tv.to_string() })
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+            Value::Uninitialized => write!(f, "Uninitialized"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
