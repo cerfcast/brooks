@@ -1,0 +1,969 @@
+// brooks, Copyright 2026, Will Hawkins
+//
+// This file is part of brooks.
+
+// This file is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    net::IpAddr,
+};
+
+use regex::Regex;
+
+use crate::{
+    analysis::Analyzed,
+    ast::{
+        self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
+        BinaryInfixOperator, BooleanLiteral,
+        ComparisonOperator::{self, IP, Re},
+        FunctionCall, IPAddressLiteral, Identifier, NumberLiteral, RegexLiteral, StringLiteral,
+        TernaryExpr,
+    },
+    grammar::GrammarLocation,
+    interp::MelInterpError::UnknownIdentifier,
+    scope,
+    tvs::{self, Type},
+};
+
+#[derive(Debug, Clone)]
+pub struct StructValue {
+    pub fields: HashMap<String, TypedValue>,
+    pub tpe: tvs::Struct,
+}
+
+#[derive(Default, Debug, Clone)]
+pub enum Value {
+    Integer(i64),
+    String(String),
+    Boolean(bool),
+    Regex(Regex),
+    IPAddress(IpAddr),
+    Struct(StructValue),
+    #[default]
+    Uninitialized,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct TypedValue {
+    value: Value,
+    tipe: Type,
+}
+
+#[derive(Debug, Clone)]
+pub enum MelInterpAssertion {
+    TypeMismatch(Type, Type),
+    UnexpectedOperator(BinaryInfixOperator),
+}
+
+impl Display for MelInterpAssertion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MelInterpAssertion::UnexpectedOperator(oper) => write!(
+                f,
+                "Unexpected binary infix operator during evaluation: {}",
+                oper.to_string()
+            ),
+            MelInterpAssertion::TypeMismatch(expected, actual) => write!(
+                f,
+                "Expected type {}, have type {}",
+                expected.to_string(),
+                actual.to_string()
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum MelInterpPreconditions {}
+
+impl Display for MelInterpPreconditions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum MelInterpError {
+    Todo,
+    Assertion(MelInterpAssertion),
+    UnknownIdentifier(String),
+    UnknownField(String),
+}
+
+impl Display for MelInterpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Mel interpreter error: ")?;
+        match self {
+            MelInterpError::Todo => write!(f, "TODO"),
+            MelInterpError::Assertion(mel_interp_assertion) => {
+                write!(f, "assertion failure: {}", mel_interp_assertion)
+            }
+            MelInterpError::UnknownIdentifier(id) => {
+                write!(f, "unknown identifier: {}", id)
+            }
+            MelInterpError::UnknownField(field) => {
+                write!(f, "unknown field: {}", field)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MelInterpLocatableError {
+    pub error: MelInterpError,
+    pub location: GrammarLocation,
+}
+
+impl Display for MelInterpLocatableError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.error, self.location)
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct MelInterpContext {
+    pub val: Option<TypedValue>,
+    pub scopes: scope::Scopes<TypedValue>,
+}
+
+impl MelInterpContext {
+    pub fn update_val(&self, new: Option<TypedValue>) -> Self {
+        MelInterpContext {
+            val: new,
+            scopes: self.scopes.clone(),
+        }
+    }
+    pub fn update_scopes(&self, new: scope::Scopes<TypedValue>) -> Self {
+        MelInterpContext {
+            val: self.val.clone(),
+            scopes: new,
+        }
+    }
+}
+
+pub struct MelInterp {}
+
+impl MelInterp {
+    pub fn interp_binary_expr(
+        op: &BinaryInfixOperator,
+        left: &TypedValue,
+        right: &TypedValue,
+    ) -> Result<TypedValue, MelInterpError> {
+        match op {
+            ast::BinaryInfixOperator::Logic(logic_operator) => {
+                let left = if let Value::Boolean(l) = left.value {
+                    l
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::Boolean,
+                        left.tipe.clone(),
+                    )));
+                };
+                let right = if let Value::Boolean(r) = right.value {
+                    r
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::Boolean,
+                        right.tipe.clone(),
+                    )));
+                };
+                match logic_operator {
+                    ast::LogicOperator::And => Ok(TypedValue {
+                        value: Value::Boolean(left && right),
+                        tipe: Type::Boolean,
+                    }),
+                    ast::LogicOperator::Or => Ok(TypedValue {
+                        value: Value::Boolean(left || right),
+                        tipe: Type::Boolean,
+                    }),
+                }
+            }
+            ast::BinaryInfixOperator::Math(math_operator) => {
+                let left = if let Value::Integer(l) = left.value {
+                    l
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::Integer,
+                        left.tipe.clone(),
+                    )));
+                };
+                let right = if let Value::Integer(r) = right.value {
+                    r
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::Integer,
+                        right.tipe.clone(),
+                    )));
+                };
+                match math_operator {
+                    ast::MathOperator::Plus => Ok(TypedValue {
+                        value: Value::Integer(left + right),
+                        tipe: Type::Integer,
+                    }),
+                    ast::MathOperator::Minus => Ok(TypedValue {
+                        value: Value::Integer(left - right),
+                        tipe: Type::Integer,
+                    }),
+                    ast::MathOperator::Multiply => Ok(TypedValue {
+                        value: Value::Integer(left * right),
+                        tipe: Type::Integer,
+                    }),
+                    ast::MathOperator::Divide => Ok(TypedValue {
+                        value: Value::Integer(left / right),
+                        tipe: Type::Integer,
+                    }),
+                    ast::MathOperator::Modulo => Ok(TypedValue {
+                        value: Value::Integer(left % right),
+                        tipe: Type::Integer,
+                    }),
+                }
+            }
+            ast::BinaryInfixOperator::Concat(_) => {
+                let left = if let Value::String(l) = &left.value {
+                    l
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::String,
+                        left.tipe.clone(),
+                    )));
+                };
+                let right = if let Value::String(r) = &right.value {
+                    r
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::String,
+                        right.tipe.clone(),
+                    )));
+                };
+                Ok(TypedValue {
+                    value: Value::String(left.clone() + right),
+                    tipe: Type::String,
+                })
+            }
+            ast::BinaryInfixOperator::Comparison(IP) => {
+                let left = if let Value::IPAddress(l) = left.value {
+                    l
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::IPAddress,
+                        left.tipe.clone(),
+                    )));
+                };
+                let right = if let Value::IPAddress(r) = right.value {
+                    r
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::IPAddress,
+                        right.tipe.clone(),
+                    )));
+                };
+                Ok(TypedValue {
+                    value: Value::Boolean(left == right),
+                    tipe: Type::Boolean,
+                })
+            }
+            ast::BinaryInfixOperator::Comparison(Re) => {
+                let left = if let Value::String(l) = &left.value {
+                    l
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::String,
+                        left.tipe.clone(),
+                    )));
+                };
+                let right = if let Value::Regex(r) = &right.value {
+                    r
+                } else {
+                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::Regex,
+                        right.tipe.clone(),
+                    )));
+                };
+                Ok(TypedValue {
+                    value: Value::Boolean(right.is_match(left)),
+                    tipe: Type::String,
+                })
+            }
+            ast::BinaryInfixOperator::Comparison(cop) => {
+                match left.tipe {
+                    Type::Boolean => {
+                        let left = if let Value::Boolean(l) = left.value {
+                            l
+                        } else {
+                            return Err(MelInterpError::Assertion(
+                                MelInterpAssertion::TypeMismatch(Type::Boolean, left.tipe.clone()),
+                            ));
+                        };
+                        let right = if let Value::Boolean(r) = right.value {
+                            r
+                        } else {
+                            return Err(MelInterpError::Assertion(
+                                MelInterpAssertion::TypeMismatch(Type::Boolean, right.tipe.clone()),
+                            ));
+                        };
+
+                        match cop {
+                            ComparisonOperator::Eq => Ok(TypedValue {
+                                value: Value::Boolean(left == right),
+                                tipe: Type::Boolean,
+                            }),
+                            #[allow(clippy::bool_comparison)]
+                            ComparisonOperator::Lt => Ok(TypedValue {
+                                value: Value::Boolean(left < right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Lte => Ok(TypedValue {
+                                value: Value::Boolean(left <= right),
+                                tipe: Type::Boolean,
+                            }),
+                            #[allow(clippy::bool_comparison)]
+                            ComparisonOperator::Gt => Ok(TypedValue {
+                                value: Value::Boolean(left > right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Gte => Ok(TypedValue {
+                                value: Value::Boolean(left >= right),
+                                tipe: Type::Boolean,
+                            }),
+                            _ => todo!(),
+                        }
+                    }
+                    Type::Integer => {
+                        let left = if let Value::Integer(l) = left.value {
+                            l
+                        } else {
+                            return Err(MelInterpError::Assertion(
+                                MelInterpAssertion::TypeMismatch(Type::Integer, left.tipe.clone()),
+                            ));
+                        };
+                        let right = if let Value::Integer(r) = right.value {
+                            r
+                        } else {
+                            return Err(MelInterpError::Assertion(
+                                MelInterpAssertion::TypeMismatch(Type::Integer, right.tipe.clone()),
+                            ));
+                        };
+
+                        match cop {
+                            ComparisonOperator::Eq => Ok(TypedValue {
+                                value: Value::Boolean(left == right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Lt => Ok(TypedValue {
+                                value: Value::Boolean(left < right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Lte => Ok(TypedValue {
+                                value: Value::Boolean(left <= right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Gt => Ok(TypedValue {
+                                value: Value::Boolean(left > right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Gte => Ok(TypedValue {
+                                value: Value::Boolean(left >= right),
+                                tipe: Type::Boolean,
+                            }),
+                            _ => todo!(),
+                        }
+                    }
+                    Type::String => {
+                        let left = if let Value::String(l) = &left.value {
+                            l
+                        } else {
+                            return Err(MelInterpError::Assertion(
+                                MelInterpAssertion::TypeMismatch(Type::String, left.tipe.clone()),
+                            ));
+                        };
+                        let right = if let Value::String(r) = &right.value {
+                            r
+                        } else {
+                            return Err(MelInterpError::Assertion(
+                                MelInterpAssertion::TypeMismatch(Type::String, right.tipe.clone()),
+                            ));
+                        };
+
+                        match cop {
+                            ComparisonOperator::Eq => Ok(TypedValue {
+                                value: Value::Boolean(left == right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Lt => Ok(TypedValue {
+                                value: Value::Boolean(left < right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Lte => Ok(TypedValue {
+                                value: Value::Boolean(left <= right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Gt => Ok(TypedValue {
+                                value: Value::Boolean(left > right),
+                                tipe: Type::Boolean,
+                            }),
+                            ComparisonOperator::Gte => Ok(TypedValue {
+                                value: Value::Boolean(left >= right),
+                                tipe: Type::Boolean,
+                            }),
+                            _ => todo!(),
+                        }
+                    }
+                    _ => todo!(),
+                }
+            }
+            ast::BinaryInfixOperator::MemberAccess(_) => Err(MelInterpError::Assertion(
+                MelInterpAssertion::UnexpectedOperator(op.clone()),
+            )),
+        }
+    }
+}
+
+impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInterp {
+    fn visit_function_call(
+        &self,
+        ast: &FunctionCall<Analyzed>,
+        context: MelInterpContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        todo!()
+    }
+
+    fn visit_identifier(
+        &self,
+        ast: &Identifier<Analyzed>,
+        context: MelInterpContext,
+        _driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        let found_id = context
+            .scopes
+            .lookup(&ast.identifier)
+            .ok_or(MelInterpLocatableError {
+                error: UnknownIdentifier(ast.identifier.clone()),
+                location: ast.location.clone(),
+            })?;
+
+        Ok(context.update_val(Some(found_id)))
+    }
+
+    fn visit_argument_list(
+        &self,
+        ast: &ArgumentList<Analyzed>,
+        context: MelInterpContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        todo!()
+    }
+
+    fn visit_argument(
+        &self,
+        ast: &Argument<Analyzed>,
+        context: MelInterpContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        todo!()
+    }
+
+    fn visit_binary_expr(
+        &self,
+        ast: &BinaryExpr<Analyzed>,
+        context: MelInterpContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        let context = context.update_val(None);
+        let context = driver.visit(&ast.left, self, context)?;
+
+        let left_value = context.val.as_ref().ok_or(MelInterpLocatableError {
+            error: MelInterpError::Todo,
+            location: ast.left.location(),
+        })?;
+
+        let context = context.update_val(None);
+        let context = driver.visit(&ast.right, self, context)?;
+
+        let right_value = context.val.as_ref().ok_or(MelInterpLocatableError {
+            error: MelInterpError::Todo,
+            location: ast.right.location(),
+        })?;
+
+        let result = Self::interp_binary_expr(&ast.op, left_value, right_value).map_err(|e| {
+            MelInterpLocatableError {
+                error: e,
+                location: ast.location.clone(),
+            }
+        })?;
+
+        Ok(context.update_val(Some(result)))
+    }
+
+    fn visit_literal(
+        &self,
+        ast: (&ast::Literal, &GrammarLocation, &Analyzed),
+        context: MelInterpContext,
+        _driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        match ast {
+            (ast::Literal::Boolean(b), _, _) => Ok(context.update_val(Some(TypedValue {
+                value: Value::Boolean(*b == BooleanLiteral::True),
+                tipe: Type::Boolean,
+            }))),
+            (ast::Literal::Number(NumberLiteral { literal: l }), _, _) => {
+                Ok(context.update_val(Some(TypedValue {
+                    value: Value::Integer(*l as i64),
+                    tipe: Type::Integer,
+                })))
+            }
+            (ast::Literal::String(StringLiteral { literal: s }), _, _) => {
+                Ok(context.update_val(Some(TypedValue {
+                    value: Value::String(s.clone()),
+                    tipe: Type::String,
+                })))
+            }
+            (ast::Literal::Regex(RegexLiteral { literal: rl }), _, _) => {
+                Ok(context.update_val(Some(TypedValue {
+                    value: Value::Regex(rl.clone()),
+                    tipe: Type::Regex,
+                })))
+            }
+            (ast::Literal::IPAddress(IPAddressLiteral { literal: rl }), _, _) => Ok(context
+                .update_val(Some(TypedValue {
+                    value: Value::IPAddress(*rl),
+                    tipe: Type::IPAddress,
+                }))),
+        }
+    }
+
+    fn visit_ternary_expr(
+        &self,
+        ast: &TernaryExpr<Analyzed>,
+        context: MelInterpContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        let context = context.update_val(None);
+        let context = driver.visit(&ast.condition, self, context)?;
+
+        let condition_value = context.val.as_ref().ok_or(MelInterpLocatableError {
+            error: MelInterpError::Todo,
+            location: ast.condition.location(),
+        })?;
+
+        let condition_value = match condition_value {
+            TypedValue {
+                value: Value::Boolean(b),
+                tipe: Type::Boolean,
+            } => b,
+            e => {
+                return Err(MelInterpLocatableError {
+                    error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::Boolean,
+                        e.tipe.clone(),
+                    )),
+                    location: ast.location.clone(),
+                });
+            }
+        };
+
+        let context = context.update_val(None);
+
+        let result = if *condition_value {
+            let context = driver.visit(&ast.yes, self, context.clone())?;
+            context.val.ok_or(MelInterpLocatableError {
+                error: MelInterpError::Todo,
+                location: ast.condition.location(),
+            })?
+        } else {
+            let context = driver.visit(&ast.no, self, context.clone())?;
+            context.val.ok_or(MelInterpLocatableError {
+                error: MelInterpError::Todo,
+                location: ast.condition.location(),
+            })?
+        };
+
+        if result.tipe != ast.aug.tipe {
+            return Err(MelInterpLocatableError {
+                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                    ast.aug.tipe.clone(),
+                    result.tipe.clone(),
+                )),
+                location: ast.location.clone(),
+            });
+        }
+
+        Ok(context.update_val(Some(result.clone())))
+    }
+
+    fn visit_member_access_expr(
+        &self,
+        ast: &ast::MemberAccessExpression<Analyzed>,
+        context: MelInterpContext,
+        driver: &AstVisitorDriver,
+    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        let base =
+            driver
+                .visit(&ast.base, self, context.clone())?
+                .val
+                .ok_or(MelInterpLocatableError {
+                    error: MelInterpError::Todo,
+                    location: ast.base.location(),
+                })?;
+
+        let (base_value, base_type) = match base {
+            TypedValue {
+                value: Value::Struct(sv),
+                tipe: Type::Struct(st),
+            } => (sv, st),
+            t => {
+                return Err(MelInterpLocatableError {
+                    error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                        Type::Struct(tvs::Struct {
+                            name: "TODO".to_string(),
+                            ..Default::default()
+                        }),
+                        t.tipe,
+                    )),
+                    location: ast.base.location(),
+                });
+            }
+        };
+
+        let member_type =
+            base_type
+                .fields
+                .get(&ast.member.identifier)
+                .ok_or(MelInterpLocatableError {
+                    error: MelInterpError::UnknownField(ast.member.identifier.clone()),
+                    location: ast.member.location.clone(),
+                })?;
+
+        let member_value =
+            base_value
+                .fields
+                .get(&ast.member.identifier)
+                .ok_or(MelInterpLocatableError {
+                    error: MelInterpError::UnknownField(ast.member.identifier.clone()),
+                    location: ast.member.location.clone(),
+                })?;
+
+        if member_type != &member_value.tipe {
+            return Err(MelInterpLocatableError {
+                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                    member_type.clone(),
+                    member_value.tipe.clone(),
+                )),
+                location: ast.member.location.clone(),
+            });
+        }
+
+        Ok(context.update_val(Some(member_value.clone())))
+    }
+}
+
+#[cfg(test)]
+mod interpreter_tests {
+    use std::{assert_matches, collections::HashMap};
+
+    use crate::{
+        analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
+        ast::AstVisitorDriver,
+        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        expect_expr,
+        interp::{
+            MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError,
+            MelInterpLocatableError, StructValue, TypedValue,
+            Value::{self, Struct},
+        },
+        tvs::{self, Type},
+    };
+
+    #[test]
+    fn test_interp_binary_comparison_expr() {
+        let expr = "5 < 5";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let context = MelInterpContext::default();
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::Boolean(false),
+                tipe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interp_ternary_expression() {
+        let expr = "true ? 5: 4";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let context = MelInterpContext::default();
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::Integer(5),
+                tipe: Type::Integer
+            })
+        );
+    }
+
+    #[test]
+    fn test_interp_identifier() {
+        let expr = "a";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert("a", Type::String));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            "a",
+            TypedValue {
+                value: Value::String("Hello".to_string()),
+                tipe: Type::String,
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "Hello"
+        );
+    }
+
+    #[test]
+    fn test_interp_member_access() {
+        let code = "req^incoming";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        let mut reqs = tvs::Struct {
+            name: "req".to_string(),
+            fields: HashMap::new(),
+        };
+
+        reqs.fields.insert("incoming".to_string(), Type::String);
+        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs.clone())));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        let mut reqsv = StructValue {
+            fields: HashMap::new(),
+            tpe: reqs.clone(),
+        };
+
+        reqsv.fields.insert(
+            "incoming".to_string(),
+            TypedValue {
+                value: Value::String("X-".to_string()),
+                tipe: Type::String,
+            },
+        );
+        context = context.update_scopes(context.scopes.insert(
+            "req",
+            TypedValue {
+                value: Struct(reqsv),
+                tipe: Type::Struct(reqs),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "X-"
+        );
+    }
+
+    #[test]
+    fn test_interp_member_access2() {
+        let code = "req^incoming";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        let mut reqs = tvs::Struct {
+            name: "req".to_string(),
+            fields: HashMap::new(),
+        };
+
+        reqs.fields.insert("incoming".to_string(), Type::Boolean);
+        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs.clone())));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        let mut reqsv = StructValue {
+            fields: HashMap::new(),
+            tpe: reqs.clone(),
+        };
+
+        reqsv.fields.insert(
+            "incoming".to_string(),
+            TypedValue {
+                value: Value::String("X-".to_string()),
+                tipe: Type::String,
+            },
+        );
+        context = context.update_scopes(context.scopes.insert(
+            "req",
+            TypedValue {
+                value: Struct(reqsv),
+                tipe: Type::Struct(reqs),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect_err("Could interpret");
+
+        assert_matches!(
+            result,
+            MelInterpLocatableError {
+                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                    Type::Boolean,
+                    Type::String
+                )),
+                location: _
+            }
+        );
+    }
+}

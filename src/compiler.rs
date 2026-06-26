@@ -182,7 +182,7 @@ pub trait SyntaxVisitor<T>: Sized {
 }
 
 /// A context for compilation used when visiting the parse tree.
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub enum MELCompilerContext {
     Expr(ast::Expr<()>),
     BinaryOperator(ast::BinaryInfixOperator),
@@ -194,9 +194,9 @@ pub enum MELCompilerContext {
 /// Expect that the [`MELCompilerContext`] has an Expr.
 #[macro_export]
 macro_rules! expect_expr {
-    ( $x:expr ) => {{
+    ( $t:ident, $x:expr ) => {{
         match $x {
-            MELCompilerContext::Expr(e) => Some(e),
+            $t::Expr(e) => Some(e),
             _ => None,
         }
     }};

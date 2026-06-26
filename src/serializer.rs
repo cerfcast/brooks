@@ -353,7 +353,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -381,7 +381,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -409,7 +409,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -437,7 +437,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -470,7 +470,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
         let driver = AstVisitorDriver {};
@@ -502,7 +502,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -535,7 +535,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -568,7 +568,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -596,7 +596,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -624,7 +624,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -656,7 +656,7 @@ mod tests {
 \t\tLiteral: true";
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -684,7 +684,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -712,7 +712,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -741,7 +741,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -776,7 +776,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -807,7 +807,7 @@ mod tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -1078,7 +1078,7 @@ mod analyzed_serializer_tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -1123,7 +1123,7 @@ mod analyzed_serializer_tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -1178,7 +1178,7 @@ mod analyzed_serializer_tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -1231,7 +1231,7 @@ mod analyzed_serializer_tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -1302,7 +1302,7 @@ mod analyzed_serializer_tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -1362,7 +1362,7 @@ mod analyzed_serializer_tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -1425,7 +1425,7 @@ mod analyzed_serializer_tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
@@ -1479,7 +1479,7 @@ mod analyzed_serializer_tests {
 
         let compile_result = compile(code);
         let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(compiled)
+        let ast = expect_expr!(MELCompilerContext, compiled)
             .ok_or(CompilerError::SyntaxError(EmptyContext))
             .expect("Missing AST");
 
