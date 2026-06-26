@@ -22,6 +22,7 @@ use std::{
     sync::Arc,
 };
 
+use brooks_macros::builtin_function;
 use regex::Regex;
 
 use crate::{
@@ -236,11 +237,13 @@ pub trait BuiltinFunction: Debug {
     fn interpw(&self, args: Value) -> BuiltinInterpResult;
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Clone, Default, Debug)]
-pub struct PathElementBuiltin {}
+#[builtin_function(Type::String, Type::String, Type::Integer)]
+pub struct Path_ElementBuiltin {}
 
 #[allow(clippy::result_large_err)]
-impl PathElementBuiltin {
+impl Path_ElementBuiltin {
     fn interp(&self, path: &str, element: &i64) -> BuiltinInterpResult {
         let parts = path.split("/");
 
@@ -268,60 +271,17 @@ impl PathElementBuiltin {
     }
 }
 
-impl BuiltinFunction for PathElementBuiltin {
-    fn name(&self) -> String {
-        "path_element".to_string()
-    }
+#[derive(Debug, Clone)]
+#[builtin_function(Type::Boolean, Type::Integer)]
+pub struct BooleanBuiltin {}
 
-    fn parameters(&self) -> tvs::Params {
-        tvs::Params {
-            args: vec![Type::String, Type::Integer],
-        }
-    }
-
-    fn return_type(&self) -> Type {
-        Type::String
-    }
-
-    fn interpw(&self, args: Value) -> BuiltinInterpResult {
-        let args = match args {
-            Value::ArgumentList(args) => args,
-            _ => return Err(BuiltinInterpError::ArgumentsInvalid),
-        };
-
-        if args.len() != 2 {
-            return Err(BuiltinInterpError::ArgumentMiscount(2, args.len()));
-        }
-
-        let path = match &args[0] {
-            TypedValue {
-                value: Value::String(s),
-                tipe: _,
-            } => s,
-            TypedValue { value: _, tipe: t } => {
-                return Err(BuiltinInterpError::ArgumentMismatch(
-                    0,
-                    Type::String,
-                    t.clone(),
-                ));
-            }
-        };
-
-        let element = match &args[1] {
-            TypedValue {
-                value: Value::Integer(i),
-                tipe: _,
-            } => i,
-            TypedValue { value: _, tipe: t } => {
-                return Err(BuiltinInterpError::ArgumentMismatch(
-                    1,
-                    Type::Integer,
-                    t.clone(),
-                ));
-            }
-        };
-
-        self.interp(path, element)
+#[allow(clippy::result_large_err)]
+impl BooleanBuiltin {
+    fn interp(&self, c: &i64) -> BuiltinInterpResult {
+        Ok(TypedValue {
+            value: Value::Boolean(*c != 0),
+            tipe: Type::Boolean,
+        })
     }
 }
 
@@ -960,8 +920,8 @@ mod interpreter_tests {
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
         interp::{
-            BuiltinFunction, MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError,
-            MelInterpLocatableError, PathElementBuiltin, StructValue, TypedValue,
+            BooleanBuiltin, BuiltinFunction, MelInterp, MelInterpAssertion, MelInterpContext,
+            MelInterpError, MelInterpLocatableError, Path_ElementBuiltin, StructValue, TypedValue,
             Value::{self, Struct},
         },
         tvs::{
@@ -1012,7 +972,125 @@ mod interpreter_tests {
     }
 
     #[test]
-    fn test_interp_function_call() {
+    fn test_interp_function_call_boolean() {
+        let expr = "boolean(1)";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = BooleanBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::Boolean(true),
+                tipe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_boolean2() {
+        let expr = "boolean(0)";
+
+        let compile_result = compile(expr);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = BooleanBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::Boolean(false),
+                tipe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_path_elemnt() {
         let expr = "path_element(\"one/two/three\", 1)";
 
         let compile_result = compile(expr);
@@ -1024,7 +1102,7 @@ mod interpreter_tests {
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
 
-        let b = PathElementBuiltin {};
+        let b = Path_ElementBuiltin {};
 
         let mut context = MelAnalysisContext::default();
 

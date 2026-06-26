@@ -1,12 +1,12 @@
 use proc_macro::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::{
     DeriveInput, Field, Ident, PathSegment, TypePath, punctuated::Punctuated, spanned::Spanned,
     token,
 };
 
-use syn::Token;
 use syn::parse::Parser;
+use syn::{Path, Token};
 
 #[proc_macro_attribute]
 pub fn grammar_name(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -76,4 +76,163 @@ pub fn grammar_location(_: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     return generated.into();
+}
+
+/*
+
+impl BuiltinFunction for PathElementBuiltin {
+    fn name(&self) -> String {
+        "path_element".to_string()
+    }
+
+    fn parameters(&self) -> tvs::Params {
+        tvs::Params {
+            args: vec![Type::String, Type::Integer],
+        }
+    }
+
+    fn return_type(&self) -> Type {
+        Type::String
+    }
+
+    fn interpw(&self, args: Value) -> BuiltinInterpResult {
+        let args = match args {
+            Value::ArgumentList(args) => args,
+            _ => return Err(BuiltinInterpError::ArgumentsInvalid),
+        };
+
+        if args.len() != 2 {
+            return Err(BuiltinInterpError::ArgumentMiscount(2, args.len()));
+        }
+
+        let path = match &args[0] {
+            TypedValue {
+                value: Value::String(s),
+                tipe: _,
+            } => s,
+            TypedValue { value: _, tipe: t } => {
+                return Err(BuiltinInterpError::ArgumentMismatch(
+                    0,
+                    Type::String,
+                    t.clone(),
+                ));
+            }
+        };
+
+        let element = match &args[1] {
+            TypedValue {
+                value: Value::Integer(i),
+                tipe: _,
+            } => i,
+            TypedValue { value: _, tipe: t } => {
+                return Err(BuiltinInterpError::ArgumentMismatch(
+                    1,
+                    Type::Integer,
+                    t.clone(),
+                ));
+            }
+        };
+
+        self.interp(path, element)
+    }
+}
+
+*/
+
+#[proc_macro_attribute]
+pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let parser = Punctuated::<Path, Token![,]>::parse_terminated;
+    let path = parser.parse(attr).unwrap();
+
+    let ast: DeriveInput = syn::parse(item).unwrap();
+    let name = &ast.ident;
+
+    let builtin_name = name.to_string().replace("Builtin", "").to_lowercase();
+
+    let mut path = path.iter();
+
+    let return_type = path.nth(0).expect("Missing return type");
+
+    let parameter_types_values: Vec<_> = path
+        .map(|p| {
+            let mut vp = p.clone();
+            vp.segments[0] = PathSegment {
+                ident: Ident::new("Value", p.span()),
+                arguments: syn::PathArguments::None,
+            };
+            (p, vp)
+        })
+        .collect();
+
+    let parameter_types: Vec<_> = parameter_types_values
+        .clone()
+        .into_iter()
+        .map(|(t, _)| t)
+        .collect();
+    let parameter_types_len = parameter_types_values.len();
+
+    let type_check = parameter_types_values
+        .iter()
+        .enumerate()
+        .map(|(i, (t, v))| {
+            let arg_name = format_ident!("arg{i}");
+            quote! {
+                let #arg_name = match &args[#i] {
+                        TypedValue {
+                            value: #v(s),
+                            tipe: _,
+                        } => s,
+                        TypedValue { value: _, tipe: t } => {
+                            return Err(BuiltinInterpError::ArgumentMismatch(
+                                #i,
+                                #t,
+                                t.clone(),
+                            ));
+                        }
+                    };
+            }
+        });
+
+    let interp_arguments: Vec<_> = (0..parameter_types_len)
+        .map(|c| format_ident!("arg{c}"))
+        .collect();
+
+    let (x, y, z) = ast.generics.split_for_impl();
+
+    let generated = quote! {
+        #ast
+        impl #x BuiltinFunction for #name #y #z {
+            fn name(&self) -> String {
+                #builtin_name.to_string()
+            }
+
+            fn parameters(&self) -> tvs::Params {
+                tvs::Params {
+                    args: vec![#(#parameter_types),*]
+                }
+            }
+
+            fn return_type(&self) -> Type {
+                #return_type
+            }
+
+
+            fn interpw(&self, args: Value) -> BuiltinInterpResult {
+                let args = match args {
+                    Value::ArgumentList(args) => args,
+                    _ => return Err(BuiltinInterpError::ArgumentsInvalid),
+                };
+
+                if args.len() != #parameter_types_len {
+                    return Err(BuiltinInterpError::ArgumentMiscount(#parameter_types_len, args.len()));
+                }
+
+                #(#type_check)*
+                self.interp(#(#interp_arguments),*)
+            }
+
+        }
+    };
+
+    generated.into()
 }
