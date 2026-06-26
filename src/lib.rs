@@ -24,7 +24,7 @@ pub mod compiler;
 #[allow(dead_code)]
 pub mod grammar;
 #[allow(dead_code)]
-pub mod interp;
+pub mod interpreter;
 #[allow(dead_code)]
 pub mod scope;
 #[allow(dead_code)]
