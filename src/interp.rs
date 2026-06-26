@@ -198,10 +198,10 @@ pub trait BuiltinFunction: Debug {
 }
 
 #[derive(Clone, Default, Debug)]
-struct BooleanF {}
+pub struct PathElementBuiltin {}
 
 #[allow(clippy::result_large_err)]
-impl BooleanF {
+impl PathElementBuiltin {
     fn interp(&self, path: &str, element: &i64) -> BuiltinInterpResult {
         let parts = path.split("/");
 
@@ -229,7 +229,7 @@ impl BooleanF {
     }
 }
 
-impl BuiltinFunction for BooleanF {
+impl BuiltinFunction for PathElementBuiltin {
     fn name(&self) -> String {
         "path_element".to_string()
     }
@@ -902,8 +902,8 @@ mod interpreter_tests {
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
         interp::{
-            BooleanF, BuiltinFunction, MelInterp, MelInterpAssertion, MelInterpContext,
-            MelInterpError, MelInterpLocatableError, StructValue, TypedValue,
+            BuiltinFunction, MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError,
+            MelInterpLocatableError, PathElementBuiltin, StructValue, TypedValue,
             Value::{self, Struct},
         },
         tvs::{
@@ -966,7 +966,7 @@ mod interpreter_tests {
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
 
-        let b = BooleanF {};
+        let b = PathElementBuiltin {};
 
         let mut context = MelAnalysisContext::default();
 
