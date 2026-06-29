@@ -25,7 +25,7 @@ use std::{
 use regex::Regex;
 
 use crate::{
-    analysis::Analyzed,
+    analysis::{Analyzed, CompiledConstant},
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
         BinaryInfixOperator, BooleanLiteral,
@@ -34,7 +34,11 @@ use crate::{
         TernaryExpr,
     },
     grammar::GrammarLocation,
-    interpreter::{builtins, interpret::MelInterpError::UnknownIdentifier},
+    interpreter::{
+        builtins,
+        interpret::{MelInterpAssertion::SuccessWithoutValue, MelInterpError::UnknownIdentifier},
+    },
+    logging::{LogLevel, LogMsg, LogMsgs},
     scope,
     tvs::{self, Type},
 };
@@ -104,15 +108,43 @@ impl Display for TypedValue {
     }
 }
 
+impl From<&CompiledConstant> for TypedValue {
+    fn from(value: &CompiledConstant) -> Self {
+        match value {
+            CompiledConstant::Integer(i) => TypedValue {
+                value: Value::Integer(*i),
+                tipe: Type::Integer,
+            },
+            CompiledConstant::String(s) => TypedValue {
+                value: Value::String(s.clone()),
+                tipe: Type::String,
+            },
+            CompiledConstant::Boolean(b) => TypedValue {
+                value: Value::Boolean(*b),
+                tipe: Type::Boolean,
+            },
+            CompiledConstant::IPAddress(ip) => TypedValue {
+                value: Value::IPAddress(*ip),
+                tipe: Type::IPAddress,
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum MelInterpAssertion {
     TypeMismatch(Type, Type),
+    SuccessWithoutValue(String, String),
     UnexpectedOperator(BinaryInfixOperator),
 }
 
 impl Display for MelInterpAssertion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            MelInterpAssertion::SuccessWithoutValue(what, whre) => write!(
+                f,
+                "Successful evaluation of subexpression {what} did not yield a value in {whre}"
+            ),
             MelInterpAssertion::UnexpectedOperator(oper) => write!(
                 f,
                 "Unexpected binary infix operator during evaluation: {}",
@@ -139,7 +171,6 @@ impl Display for MelInterpPreconditions {
 
 #[derive(Debug, Clone)]
 pub enum MelInterpError {
-    Todo,
     Assertion(MelInterpAssertion),
     UnknownIdentifier(String),
     UnknownField(String),
@@ -150,7 +181,6 @@ impl Display for MelInterpError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Mel interpreter error: ")?;
         match self {
-            MelInterpError::Todo => write!(f, "TODO"),
             MelInterpError::Assertion(mel_interp_assertion) => {
                 write!(f, "assertion failure: {}", mel_interp_assertion)
             }
@@ -179,10 +209,13 @@ impl Display for MelInterpLocatableError {
     }
 }
 
-#[derive(Clone, Default, Debug)]
+pub type MelInterpResult = Result<TypedValue, MelInterpLocatableError>;
+
+#[derive(Clone, Debug, Default)]
 pub struct MelInterpContext {
     pub val: Option<TypedValue>,
     pub scopes: scope::Scopes<TypedValue>,
+    pub log: LogMsgs,
 }
 
 impl MelInterpContext {
@@ -190,12 +223,22 @@ impl MelInterpContext {
         MelInterpContext {
             val: new,
             scopes: self.scopes.clone(),
+            log: self.log.clone(),
         }
     }
     pub fn update_scopes(&self, new: scope::Scopes<TypedValue>) -> Self {
         MelInterpContext {
             val: self.val.clone(),
             scopes: new,
+            log: self.log.clone(),
+        }
+    }
+
+    pub fn update_log(&self, new: LogMsgs) -> Self {
+        MelInterpContext {
+            val: self.val.clone(),
+            scopes: self.scopes.clone(),
+            log: new,
         }
     }
 }
@@ -478,6 +521,21 @@ impl MelInterp {
     }
 }
 
+#[macro_export]
+macro_rules! use_constant {
+    ($const:expr, $loc:expr, $context:expr) => {
+        if let Some(constant) = &$const {
+            $context = $context.update_log(trace_with_loc!(
+                $context.log,
+                $loc.clone(),
+                "Using constant"
+            ));
+
+            return Ok($context.update_val(Some(constant.into())));
+        }
+    };
+}
+
 impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInterp {
     fn visit_function_call(
         &self,
@@ -485,11 +543,22 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
-        let context = context.update_val(None);
-        let context = driver.visit(&ast.callee, self, context)?;
+        let mut context = context.update_log(trace_with_loc!(
+            context.log,
+            ast.location.clone(),
+            "Evaluating function call expression"
+        ));
+
+        use_constant!(ast.aug.constant, ast.location, context);
+
+        context = context.update_val(None);
+        context = driver.visit(&ast.callee, self, context)?;
 
         let callee_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Todo,
+            error: MelInterpError::Assertion(SuccessWithoutValue(
+                "callee".to_string(),
+                "visit_function_call".to_string(),
+            )),
             location: ast.callee.location(),
         })?;
 
@@ -513,7 +582,10 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         let context = self.visit_argument_list(&ast.arguments, context, driver)?;
 
         let argument_list_values = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Todo,
+            error: MelInterpError::Assertion(SuccessWithoutValue(
+                "arguments".to_string(),
+                "visit_function_call".to_string(),
+            )),
             location: ast.callee.location(),
         })?;
 
@@ -548,6 +620,12 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        let context = context.update_log(trace_with_loc!(
+            context.log,
+            ast.location.clone(),
+            "Evaluating identifier expression"
+        ));
+
         let found_id = context
             .scopes
             .lookup(&ast.identifier)
@@ -565,14 +643,25 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
-        let context = context.update_val(None);
+        let mut context = context.update_log(trace_with_loc!(
+            context.log,
+            ast.location.clone(),
+            "Evaluating argument list expression"
+        ));
+
+        use_constant!(ast.aug.constant, ast.location, context);
+
+        context = context.update_val(None);
 
         let mut arg_values: Vec<TypedValue> = vec![];
         for arg in &ast.arguments {
             let context = self.visit_argument(arg, context.clone(), driver)?;
 
             let arg_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-                error: MelInterpError::Todo,
+                error: MelInterpError::Assertion(SuccessWithoutValue(
+                    "argument".to_string(),
+                    "visit_argument_list".to_string(),
+                )),
                 location: arg.location.clone(),
             })?;
 
@@ -591,11 +680,22 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
-        let context = context.update_val(None);
-        let context = driver.visit(&ast.expr, self, context)?;
+        let mut context = context.update_log(trace_with_loc!(
+            context.log,
+            ast.location.clone(),
+            "Evaluating argument list expression"
+        ));
+
+        use_constant!(ast.aug.constant, ast.location, context);
+
+        context = context.update_val(None);
+        context = driver.visit(&ast.expr, self, context)?;
 
         let argument_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Todo,
+            error: MelInterpError::Assertion(SuccessWithoutValue(
+                "argument".to_string(),
+                "visit_argument".to_string(),
+            )),
             location: ast.expr.location(),
         })?;
 
@@ -618,23 +718,45 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
-        let context = context.update_val(None);
-        let context = driver.visit(&ast.left, self, context)?;
+        let mut context = context.update_log(trace_with_loc!(
+            context.log,
+            ast.location.clone(),
+            "Evaluating binary expression"
+        ));
 
-        let left_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Todo,
-            location: ast.left.location(),
-        })?;
+        use_constant!(ast.aug.constant, ast.location, context);
 
-        let context = context.update_val(None);
-        let context = driver.visit(&ast.right, self, context)?;
+        context = context.update_val(None);
+        context = driver.visit(&ast.left, self, context)?;
 
-        let right_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Todo,
-            location: ast.right.location(),
-        })?;
+        let left_value = context
+            .val
+            .as_ref()
+            .ok_or(MelInterpLocatableError {
+                error: MelInterpError::Assertion(SuccessWithoutValue(
+                    "left operand".to_string(),
+                    "visit_binary_expr".to_string(),
+                )),
+                location: ast.left.location(),
+            })?
+            .clone();
 
-        let result = Self::interp_binary_expr(&ast.op, left_value, right_value).map_err(|e| {
+        context = context.update_val(None);
+        context = driver.visit(&ast.right, self, context)?;
+
+        let right_value = context
+            .val
+            .as_ref()
+            .ok_or(MelInterpLocatableError {
+                error: MelInterpError::Assertion(SuccessWithoutValue(
+                    "right operand".to_string(),
+                    "visit_binary_expr".to_string(),
+                )),
+                location: ast.right.location(),
+            })?
+            .clone();
+
+        let result = Self::interp_binary_expr(&ast.op, &left_value, &right_value).map_err(|e| {
             MelInterpLocatableError {
                 error: e,
                 location: ast.location.clone(),
@@ -650,6 +772,12 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+        let context = context.update_log(trace_with_loc!(
+            context.log,
+            ast.1.clone(),
+            "Evaluating literal expression"
+        ));
+
         match ast {
             (ast::Literal::Boolean(b), _, _) => Ok(context.update_val(Some(TypedValue {
                 value: Value::Boolean(*b == BooleanLiteral::True),
@@ -687,11 +815,22 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
-        let context = context.update_val(None);
-        let context = driver.visit(&ast.condition, self, context)?;
+        let mut context = context.update_log(trace_with_loc!(
+            context.log,
+            ast.location.clone(),
+            "Evaluating ternary expression"
+        ));
+
+        use_constant!(ast.aug.constant, ast.location, context);
+
+        context = context.update_val(None);
+        context = driver.visit(&ast.condition, self, context)?;
 
         let condition_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Todo,
+            error: MelInterpError::Assertion(SuccessWithoutValue(
+                "condition".to_string(),
+                "visit_ternary_expr".to_string(),
+            )),
             location: ast.condition.location(),
         })?;
 
@@ -711,20 +850,34 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             }
         };
 
-        let context = context.update_val(None);
+        let mut context = context.update_val(None);
 
         let result = if *condition_value {
-            let context = driver.visit(&ast.yes, self, context.clone())?;
-            context.val.ok_or(MelInterpLocatableError {
-                error: MelInterpError::Todo,
-                location: ast.condition.location(),
-            })?
+            context = driver.visit(&ast.yes, self, context.clone())?;
+            context
+                .val
+                .as_ref()
+                .ok_or(MelInterpLocatableError {
+                    error: MelInterpError::Assertion(SuccessWithoutValue(
+                        "true branch".to_string(),
+                        "visit_ternary_expr".to_string(),
+                    )),
+                    location: ast.condition.location(),
+                })?
+                .clone()
         } else {
             let context = driver.visit(&ast.no, self, context.clone())?;
-            context.val.ok_or(MelInterpLocatableError {
-                error: MelInterpError::Todo,
-                location: ast.condition.location(),
-            })?
+            context
+                .val
+                .as_ref()
+                .ok_or(MelInterpLocatableError {
+                    error: MelInterpError::Assertion(SuccessWithoutValue(
+                        "false branch".to_string(),
+                        "visit_ternary_expr".to_string(),
+                    )),
+                    location: ast.condition.location(),
+                })?
+                .clone()
         };
 
         if result.tipe != ast.aug.tipe {
@@ -746,14 +899,27 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context: MelInterpContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
-        let base =
-            driver
-                .visit(&ast.base, self, context.clone())?
-                .val
-                .ok_or(MelInterpLocatableError {
-                    error: MelInterpError::Todo,
-                    location: ast.base.location(),
-                })?;
+        let mut context = context.update_log(trace_with_loc!(
+            context.log,
+            ast.location.clone(),
+            "Evaluating member access expression"
+        ));
+
+        use_constant!(ast.aug.constant, ast.location, context);
+
+        context = driver.visit(&ast.base, self, context.clone())?;
+
+        let base = context
+            .val
+            .as_ref()
+            .ok_or(MelInterpLocatableError {
+                error: MelInterpError::Assertion(SuccessWithoutValue(
+                    "base".to_string(),
+                    "visit_member_access_expr".to_string(),
+                )),
+                location: ast.base.location(),
+            })?
+            .clone();
 
         let (base_value, base_type) = match base {
             TypedValue {
@@ -763,16 +929,24 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             t => {
                 return Err(MelInterpLocatableError {
                     error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::Struct(tvs::Struct {
-                            name: "TODO".to_string(),
-                            ..Default::default()
-                        }),
+                        ast.base.tipe(),
                         t.tipe,
                     )),
                     location: ast.base.location(),
                 });
             }
         };
+
+        // Make sure that the evaluated type and the analyzed type are the same.
+        if Type::Struct(base_type.clone()) != ast.base.tipe() {
+            return Err(MelInterpLocatableError {
+                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
+                    ast.base.tipe(),
+                    Type::Struct(base_type),
+                )),
+                location: ast.base.location(),
+            });
+        }
 
         let member_type =
             base_type
@@ -805,5 +979,3 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         Ok(context.update_val(Some(member_value.clone())))
     }
 }
-
-pub type MelInterpResult = Result<TypedValue, MelInterpLocatableError>;

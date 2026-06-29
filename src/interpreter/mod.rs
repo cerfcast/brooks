@@ -23,8 +23,8 @@ use crate::{
     analysis::Analyzed,
     ast::{AstVisitorDriver, Expr},
     interpreter::interpret::{
-        MelInterp, MelInterpContext, MelInterpError, MelInterpLocatableError, MelInterpResult,
-        TypedValue,
+        MelInterp, MelInterpAssertion::SuccessWithoutValue, MelInterpContext, MelInterpError,
+        MelInterpLocatableError, MelInterpResult, TypedValue,
     },
     scope::Scopes,
 };
@@ -40,7 +40,10 @@ pub fn interpret(expr: &Expr<Analyzed>, scopes: Scopes<TypedValue>) -> MelInterp
     match driver.visit(expr, &visitor, context)?.val {
         Some(v) => Ok(v),
         None => Err(MelInterpLocatableError {
-            error: MelInterpError::Todo,
+            error: MelInterpError::Assertion(SuccessWithoutValue(
+                "main".to_string(),
+                "interpret".to_string(),
+            )),
             location: expr.location(),
         }),
     }

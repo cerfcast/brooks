@@ -24,11 +24,13 @@ mod interpreter_tests {
         ast::AstVisitorDriver,
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
-        interpreter::builtins::{BooleanBuiltin, BuiltinFunction, Path_ElementBuiltin},
-        interpreter::interpret::{
-            MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError,
-            MelInterpLocatableError, StructValue, TypedValue,
-            Value::{self, Struct},
+        interpreter::{
+            builtins::{BooleanBuiltin, BuiltinFunction, Path_ElementBuiltin},
+            interpret::{
+                MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError,
+                MelInterpLocatableError, StructValue, TypedValue,
+                Value::{self, Struct},
+            },
         },
         tvs::{
             self,
@@ -490,6 +492,144 @@ mod interpreter_tests {
                 )),
                 location: _
             }
+        );
+    }
+}
+
+#[cfg(test)]
+mod interpreter_logger_tests {
+    use std::collections::HashMap;
+
+    use crate::{
+        analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
+        ast::AstVisitorDriver,
+        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        expect_expr,
+        interpreter::interpret::{
+            MelInterp, MelInterpContext, StructValue, TypedValue,
+            Value::{self, Struct},
+        },
+        logging::{LogLevel::Trace, LogMsgFormatter},
+        tvs::{self, Type},
+    };
+
+    #[test]
+    fn test_trace_logging_binary_expression() {
+        let code = "5 + 4";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_log(context.log.update_level(Trace));
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_eq!(result.log.count(), 2);
+        assert_eq!(
+            result.log.msgs(&LogMsgFormatter {
+                newline: true,
+                show_level: false
+            }),
+            "0 to 5: Evaluating binary expression\n0 to 5: Using constant"
+        );
+    }
+
+    #[test]
+    fn test_trace_logging() {
+        let code = "req^incoming";
+
+        let compile_result = compile(code);
+        let compiled = compile_result.expect("Compilation error");
+        let ast = expect_expr!(MELCompilerContext, compiled)
+            .ok_or(CompilerError::SyntaxError(EmptyContext))
+            .expect("Missing AST");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        let mut reqs = tvs::Struct {
+            name: "req".to_string(),
+            fields: HashMap::new(),
+        };
+
+        reqs.fields.insert("incoming".to_string(), Type::Boolean);
+        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs.clone())));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_log(context.log.update_level(Trace));
+
+        let mut reqsv = StructValue {
+            fields: HashMap::new(),
+            tpe: reqs.clone(),
+        };
+
+        reqsv.fields.insert(
+            "incoming".to_string(),
+            TypedValue {
+                value: Value::Boolean(true),
+                tipe: Type::Boolean,
+            },
+        );
+
+        context = context.update_scopes(context.scopes.insert(
+            "req",
+            TypedValue {
+                value: Struct(reqsv),
+                tipe: Type::Struct(reqs),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could interpret");
+
+        assert_eq!(result.log.count(), 2);
+        assert_eq!(
+            result.log.msgs(&LogMsgFormatter {
+                newline: true,
+                show_level: false
+            }),
+            "0 to 12: Evaluating member access expression\n0 to 3: Evaluating identifier expression"
         );
     }
 }
