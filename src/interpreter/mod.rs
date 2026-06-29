@@ -24,19 +24,18 @@ use crate::{
     ast::{AstVisitorDriver, Expr},
     interpreter::interpret::{
         MelInterp, MelInterpAssertion::SuccessWithoutValue, MelInterpContext, MelInterpError,
-        MelInterpLocatableError, MelInterpResult, TypedValue,
+        MelInterpLocatableError, MelInterpResult,
     },
     logging::LogMsgs,
-    scope::Scopes,
 };
 
 #[allow(clippy::result_large_err)]
-pub fn interpret(expr: &Expr<Analyzed>, scopes: Scopes<TypedValue>) -> (LogMsgs, MelInterpResult) {
+pub fn interpret(
+    expr: &Expr<Analyzed>,
+    mut context: MelInterpContext,
+) -> (LogMsgs, MelInterpResult) {
     let driver = AstVisitorDriver {};
     let visitor = MelInterp {};
-    let mut context = MelInterpContext::default();
-
-    context = context.update_scopes(scopes);
 
     context = match driver.visit(expr, &visitor, context) {
         Ok(o) => o,
