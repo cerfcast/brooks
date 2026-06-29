@@ -17,6 +17,8 @@
 
 use std::fmt::Display;
 
+use serde::Serialize;
+
 /// The trait that makes it possible to add a grammar node to the compiler.
 ///
 /// Use the `grammar_name` macro to derive it automatically.
@@ -25,6 +27,8 @@ pub trait GrammarNode {
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg(feature = "json")]
+#[derive(Serialize)]
 pub struct GrammarLocation {
     pub start: usize,
     pub extent: usize,

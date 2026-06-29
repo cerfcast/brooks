@@ -18,6 +18,9 @@
 use crate::grammar::GrammarLocation;
 use std::fmt::Debug;
 
+#[cfg(feature = "json")]
+use serde::Serialize;
+
 pub trait Formatter<T> {
     fn format(&self, value: &T) -> String;
 }
@@ -39,6 +42,8 @@ impl Formatter<LogMsg> for LogMsgFormatter {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, PartialOrd)]
+#[cfg(feature = "json")]
+#[derive(Serialize)]
 pub enum LogLevel {
     Trace,
     Debug,
@@ -48,6 +53,8 @@ pub enum LogLevel {
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg(feature = "json")]
+#[derive(Serialize)]
 pub struct LogMsg {
     msg: String,
     location: Option<GrammarLocation>,
@@ -77,6 +84,8 @@ impl LogMsg {
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg(feature = "json")]
+#[derive(Serialize)]
 pub struct LogMsgs {
     msgs: Vec<LogMsg>,
     level: LogLevel,

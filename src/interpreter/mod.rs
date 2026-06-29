@@ -26,25 +26,34 @@ use crate::{
         MelInterp, MelInterpAssertion::SuccessWithoutValue, MelInterpContext, MelInterpError,
         MelInterpLocatableError, MelInterpResult, TypedValue,
     },
+    logging::LogMsgs,
     scope::Scopes,
 };
 
 #[allow(clippy::result_large_err)]
-pub fn interpret(expr: &Expr<Analyzed>, scopes: Scopes<TypedValue>) -> MelInterpResult {
+pub fn interpret(expr: &Expr<Analyzed>, scopes: Scopes<TypedValue>) -> (LogMsgs, MelInterpResult) {
     let driver = AstVisitorDriver {};
     let visitor = MelInterp {};
     let mut context = MelInterpContext::default();
 
     context = context.update_scopes(scopes);
 
-    match driver.visit(expr, &visitor, context)?.val {
-        Some(v) => Ok(v),
-        None => Err(MelInterpLocatableError {
-            error: MelInterpError::Assertion(SuccessWithoutValue(
-                "main".to_string(),
-                "interpret".to_string(),
-            )),
-            location: expr.location(),
-        }),
+    context = match driver.visit(expr, &visitor, context) {
+        Ok(o) => o,
+        Err(e) => return (LogMsgs::new(crate::logging::LogLevel::Error), Err(e)),
+    };
+
+    match (&context.log, &context.val) {
+        (log, Some(val)) => (log.clone(), Ok(val.clone())),
+        (log, None) => (
+            log.clone(),
+            Err(MelInterpLocatableError {
+                error: MelInterpError::Assertion(SuccessWithoutValue(
+                    "main".to_string(),
+                    "interpret".to_string(),
+                )),
+                location: expr.location(),
+            }),
+        ),
     }
 }

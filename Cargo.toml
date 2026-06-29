@@ -12,3 +12,9 @@ tree-sitter-mel = { path = "parser" }
 brooks-macros = { path = "macros" }
 pretty_assertions = "1.4.1"
 regex = "1.12.4"
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+serde_json = { version = "1.0.150", optional = true }
+
+[features]
+default = ["json"]
+json = ["dep:serde", "dep:serde_json"]
