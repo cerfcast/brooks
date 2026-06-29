@@ -24,13 +24,11 @@ mod interpreter_tests {
         ast::AstVisitorDriver,
         compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
         expect_expr,
-        interpreter::{
+        interpreter::builtins::{BooleanBuiltin, BuiltinFunction, Path_ElementBuiltin},
+        interpreter::interpret::{
             MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError,
             MelInterpLocatableError, StructValue, TypedValue,
             Value::{self, Struct},
-            builtins::BooleanBuiltin,
-            builtins::BuiltinFunction,
-            builtins::Path_ElementBuiltin,
         },
         tvs::{
             self,

@@ -20,7 +20,7 @@ use std::fmt::{Debug, Display};
 use brooks_macros::builtin_function;
 
 use crate::{
-    interpreter::{TypedValue, Value},
+    interpreter::interpret::{TypedValue, Value},
     tvs::{self, Type},
 };
 
