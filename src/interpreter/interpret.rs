@@ -201,6 +201,7 @@ impl Display for MelInterpError {
 pub struct MelInterpLocatableError {
     pub error: MelInterpError,
     pub location: GrammarLocation,
+    pub context: MelInterpContext,
 }
 
 impl Display for MelInterpLocatableError {
@@ -209,7 +210,7 @@ impl Display for MelInterpLocatableError {
     }
 }
 
-pub type MelInterpResult = Result<TypedValue, MelInterpLocatableError>;
+pub type MelInterpResult = Result<MelInterpContext, MelInterpLocatableError>;
 
 #[derive(Clone, Debug, Default)]
 pub struct MelInterpContext {
@@ -554,13 +555,18 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context = context.update_val(None);
         context = driver.visit(&ast.callee, self, context)?;
 
-        let callee_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Assertion(SuccessWithoutValue(
-                "callee".to_string(),
-                "visit_function_call".to_string(),
-            )),
-            location: ast.callee.location(),
-        })?;
+        let callee_value = context
+            .val
+            .as_ref()
+            .ok_or(MelInterpLocatableError {
+                error: MelInterpError::Assertion(SuccessWithoutValue(
+                    "callee".to_string(),
+                    "visit_function_call".to_string(),
+                )),
+                location: ast.callee.location(),
+                context: context.clone(),
+            })?
+            .clone();
 
         let callee_value = match callee_value {
             TypedValue {
@@ -574,12 +580,13 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                         t.clone(),
                     )),
                     location: ast.callee.location(),
+                    context: context.clone(),
                 });
             }
         };
 
-        let context = context.update_val(None);
-        let context = self.visit_argument_list(&ast.arguments, context, driver)?;
+        context = context.update_val(None);
+        context = self.visit_argument_list(&ast.arguments, context, driver)?;
 
         let argument_list_values = context.val.as_ref().ok_or(MelInterpLocatableError {
             error: MelInterpError::Assertion(SuccessWithoutValue(
@@ -587,6 +594,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                 "visit_function_call".to_string(),
             )),
             location: ast.callee.location(),
+            context: context.clone(),
         })?;
 
         let argument_list_values = match argument_list_values {
@@ -601,6 +609,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                         t.clone(),
                     )),
                     location: ast.callee.location(),
+                    context,
                 });
             }
         };
@@ -610,6 +619,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             .map_err(|e| MelInterpLocatableError {
                 error: MelInterpError::BuiltinError(e),
                 location: ast.location.clone(),
+                context: context.clone(),
             })?;
         Ok(context.update_val(Some(res)))
     }
@@ -629,10 +639,13 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         let found_id = context
             .scopes
             .lookup(&ast.identifier)
+            .as_ref()
             .ok_or(MelInterpLocatableError {
                 error: UnknownIdentifier(ast.identifier.clone()),
                 location: ast.location.clone(),
-            })?;
+                context: context.clone(),
+            })?
+            .clone();
 
         Ok(context.update_val(Some(found_id)))
     }
@@ -663,6 +676,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                     "visit_argument_list".to_string(),
                 )),
                 location: arg.location.clone(),
+                context: context.clone(),
             })?;
 
             arg_values.push(arg_value.clone());
@@ -697,6 +711,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                 "visit_argument".to_string(),
             )),
             location: ast.expr.location(),
+            context: context.clone(),
         })?;
 
         if argument_value.tipe != ast.aug.tipe {
@@ -706,6 +721,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                     argument_value.tipe.clone(),
                 )),
                 location: ast.location.clone(),
+                context: context.clone(),
             });
         }
 
@@ -738,6 +754,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                     "visit_binary_expr".to_string(),
                 )),
                 location: ast.left.location(),
+                context: context.clone(),
             })?
             .clone();
 
@@ -753,6 +770,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                     "visit_binary_expr".to_string(),
                 )),
                 location: ast.right.location(),
+                context: context.clone(),
             })?
             .clone();
 
@@ -760,6 +778,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             MelInterpLocatableError {
                 error: e,
                 location: ast.location.clone(),
+                context: context.clone(),
             }
         })?;
 
@@ -832,6 +851,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                 "visit_ternary_expr".to_string(),
             )),
             location: ast.condition.location(),
+            context: context.clone(),
         })?;
 
         let condition_value = match condition_value {
@@ -846,6 +866,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                         e.tipe.clone(),
                     )),
                     location: ast.location.clone(),
+                    context: context.clone(),
                 });
             }
         };
@@ -863,6 +884,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                         "visit_ternary_expr".to_string(),
                     )),
                     location: ast.condition.location(),
+                    context: context.clone(),
                 })?
                 .clone()
         } else {
@@ -876,6 +898,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                         "visit_ternary_expr".to_string(),
                     )),
                     location: ast.condition.location(),
+                    context: context.clone(),
                 })?
                 .clone()
         };
@@ -887,6 +910,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                     result.tipe.clone(),
                 )),
                 location: ast.location.clone(),
+                context: context.clone(),
             });
         }
 
@@ -918,6 +942,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                     "visit_member_access_expr".to_string(),
                 )),
                 location: ast.base.location(),
+                context: context.clone(),
             })?
             .clone();
 
@@ -933,6 +958,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                         t.tipe,
                     )),
                     location: ast.base.location(),
+                    context: context.clone(),
                 });
             }
         };
@@ -945,6 +971,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                     Type::Struct(base_type),
                 )),
                 location: ast.base.location(),
+                context: context.clone(),
             });
         }
 
@@ -955,6 +982,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                 .ok_or(MelInterpLocatableError {
                     error: MelInterpError::UnknownField(ast.member.identifier.clone()),
                     location: ast.member.location.clone(),
+                    context: context.clone(),
                 })?;
 
         let member_value =
@@ -964,6 +992,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                 .ok_or(MelInterpLocatableError {
                     error: MelInterpError::UnknownField(ast.member.identifier.clone()),
                     location: ast.member.location.clone(),
+                    context: context.clone(),
                 })?;
 
         if member_type != &member_value.tipe {
@@ -973,6 +1002,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                     member_value.tipe.clone(),
                 )),
                 location: ast.member.location.clone(),
+                context: context.clone(),
             });
         }
 

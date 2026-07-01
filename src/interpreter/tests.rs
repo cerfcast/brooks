@@ -490,7 +490,8 @@ mod interpreter_tests {
                     Type::Boolean,
                     Type::String
                 )),
-                location: _
+                location: _,
+                context: _
             }
         );
     }
