@@ -17,42 +17,20 @@
 
 pub mod builtins;
 pub mod interpret;
+
+#[cfg(test)]
 pub mod tests;
 
 use crate::{
     analysis::Analyzed,
     ast::{AstVisitorDriver, Expr},
-    interpreter::interpret::{
-        MelInterp, MelInterpAssertion::SuccessWithoutValue, MelInterpContext, MelInterpError,
-        MelInterpLocatableError, MelInterpResult,
-    },
-    logging::LogMsgs,
+    interpreter::interpret::{MelInterp, MelInterpContext, MelInterpResult},
 };
 
 #[allow(clippy::result_large_err)]
-pub fn interpret(
-    expr: &Expr<Analyzed>,
-    mut context: MelInterpContext,
-) -> (LogMsgs, MelInterpResult) {
+pub fn interpret(expr: &Expr<Analyzed>, context: MelInterpContext) -> MelInterpResult {
     let driver = AstVisitorDriver {};
     let visitor = MelInterp {};
 
-    context = match driver.visit(expr, &visitor, context) {
-        Ok(o) => o,
-        Err(e) => return (LogMsgs::new(crate::logging::LogLevel::Error), Err(e)),
-    };
-
-    match (&context.log, &context.val) {
-        (log, Some(val)) => (log.clone(), Ok(val.clone())),
-        (log, None) => (
-            log.clone(),
-            Err(MelInterpLocatableError {
-                error: MelInterpError::Assertion(SuccessWithoutValue(
-                    "main".to_string(),
-                    "interpret".to_string(),
-                )),
-                location: expr.location(),
-            }),
-        ),
-    }
+    driver.visit(expr, &visitor, context)
 }
