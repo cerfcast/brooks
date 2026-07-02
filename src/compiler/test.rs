@@ -18,6 +18,8 @@
 #[cfg(test)]
 mod tests {
     use crate::compiler::compile;
+    use crate::compiler::compile::{CompilerError, SyntaxError};
+    use std::assert_matches;
 
     #[test]
     fn parse_function_call() {
@@ -171,5 +173,25 @@ mod tests {
         let code = "a ipmatch 2001:0db8:85a3:0000:0000:8a2e:0370:7334";
         let compile_result = compile(code);
         assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_simple_error_unexpected() {
+        let code = "/testing/j";
+        let compile_result = compile(code).expect_err("Could compile code with syntax error");
+
+        assert_matches!(compile_result,
+            CompilerError::SyntaxError(SyntaxError::SyntaxError(_,msg))
+            if msg == "Unexpected token j");
+    }
+
+    #[test]
+    fn parse_simple_error_missing() {
+        let code = "/testing";
+        let compile_result = compile(code).expect_err("Could compile code with syntax error");
+
+        assert_matches!(compile_result,
+            CompilerError::SyntaxError(SyntaxError::SyntaxError(_,msg))
+            if msg == "Missing identifier");
     }
 }

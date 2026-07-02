@@ -44,6 +44,7 @@ pub enum SyntaxError {
     BadLiteral(String),
     InvalidRange,
     UnexpectedExprType(String, String),
+    SyntaxError(GrammarLocation, String),
 }
 pub type SyntaxVisitorResult<T> = Result<T, SyntaxError>;
 
@@ -54,6 +55,7 @@ pub trait SyntaxVisitor<T>: Sized {
         context: T,
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T>;
+    fn visit_error(&self, syntax: Node, context: T, driver: &SyntaxVisitorDriver) -> SyntaxError;
     fn visit_expr(
         &self,
         syntax: Node,
@@ -212,6 +214,30 @@ impl MELCompiler {
             source: source.to_string(),
         }
     }
+
+    pub fn extract_error(&self, en: &Node) -> SyntaxError {
+        let error_tok = en
+            .utf8_text(self.source.as_bytes())
+            .or::<String>(Ok(""))
+            .expect("Could not get error token");
+
+        let repr = en
+            .to_string()
+            .trim_start_matches("(")
+            .trim_end_matches(")")
+            .to_string();
+
+        let msg = if repr.starts_with("UNEXPECTED") {
+            format!("Unexpected token {error_tok}")
+        } else if repr.starts_with("MISSING") {
+            let msg = repr.trim_start_matches("MISSING ");
+            format!("Missing {msg}")
+        } else {
+            repr
+        };
+
+        SyntaxError::SyntaxError(Into::<GrammarLocation>::into(*en), msg)
+    }
 }
 
 impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
@@ -255,9 +281,12 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<MELCompilerContext> {
         // A mel is just a wrapper. Navigate deeper.
-        let mut walker = syntax.walk();
-        walker.goto_first_child();
-        driver.visit(walker.node(), self, context)
+        let mut context = context;
+        for child in syntax.children(&mut syntax.walk()) {
+            context = driver.visit(child, self, context)?;
+        }
+
+        Ok(context)
     }
 
     fn visit_identifier(
@@ -740,6 +769,28 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             (),
         )))
     }
+
+    fn visit_error(
+        &self,
+        syntax: Node,
+        _context: MELCompilerContext,
+        _driver: &SyntaxVisitorDriver,
+    ) -> SyntaxError {
+        // if the node is an error, then the error is really in the child.
+        if syntax.is_error()
+            && let Some(child) = syntax.child(0)
+        {
+            self.extract_error(&child)
+        // if the node is missing, then the error is right here.
+        } else if syntax.is_missing() {
+            self.extract_error(&syntax)
+        } else {
+            SyntaxError::SyntaxError(
+                Into::<GrammarLocation>::into(syntax),
+                "Unknown syntax error (couldn't get token)".to_string(),
+            )
+        }
+    }
 }
 
 pub struct SyntaxVisitorDriver {}
@@ -886,9 +937,14 @@ impl SyntaxVisitorDriver {
             );
         });
 
-        match hm.get(node.grammar_name()) {
-            Some(callable) => (callable)(visitor, node, context, self),
-            None => Err(SyntaxError::NoSuchVisitor(node.grammar_name().into())),
+        // Special case for errors.
+        if node.is_error() || node.is_missing() || node.is_extra() {
+            Err(visitor.visit_error(node, context, self))
+        } else {
+            match hm.get(node.grammar_name()) {
+                Some(callable) => (callable)(visitor, node, context, self),
+                None => Err(SyntaxError::NoSuchVisitor(node.grammar_name().into())),
+            }
         }
     }
 }
