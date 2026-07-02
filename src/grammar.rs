@@ -17,6 +17,7 @@
 
 use std::fmt::Display;
 
+#[cfg(feature = "json")]
 use serde::Serialize;
 
 /// The trait that makes it possible to add a grammar node to the compiler.
