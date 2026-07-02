@@ -17,15 +17,16 @@
 
 use tree_sitter;
 
-use crate::ast::Expr;
-use crate::compiler::compile::CompileResult;
-use crate::compiler::compile::CompilerError;
-use crate::compiler::compile::MELCompiler;
-use crate::compiler::compile::MELCompilerContext;
-use crate::compiler::compile::SyntaxVisitorDriver;
-use crate::grammar::GrammarLocation;
+use crate::common::GrammarLocation;
+use crate::mel::ast::Expr;
+use crate::mel::compiler::compile::CompileResult;
+use crate::mel::compiler::compile::CompilerError;
+use crate::mel::compiler::compile::MELCompiler;
+use crate::mel::compiler::compile::MELCompilerContext;
+use crate::mel::compiler::compile::SyntaxVisitorDriver;
 
 pub mod compile;
+
 #[cfg(test)]
 mod test;
 

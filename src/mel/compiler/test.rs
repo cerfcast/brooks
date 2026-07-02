@@ -17,8 +17,8 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::compiler::compile;
-    use crate::compiler::compile::CompilerError;
+    use crate::mel::compiler::compile;
+    use crate::mel::compiler::compile::CompilerError;
     use std::assert_matches;
 
     #[test]

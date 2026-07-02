@@ -22,19 +22,19 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use tree_sitter::{self, Node};
 
-use crate::ast::Expr::BinaryExpr;
-use crate::ast::Expr::MemberAccess;
-use crate::ast::Expr::TernaryExpr;
-use crate::ast::Literal::{Boolean, Number};
-use crate::ast::LogicOperator::{And, Or};
-use crate::ast::MathOperator::{Divide, Minus, Modulo, Multiply, Plus};
-use crate::ast::{Argument, BinaryInfixOperator, StringConcatOperator};
-use crate::grammar::GrammarLocation;
-use crate::utils;
-use crate::{
+use crate::common::GrammarLocation;
+use crate::mel::ast::Expr::BinaryExpr;
+use crate::mel::ast::Expr::MemberAccess;
+use crate::mel::ast::Expr::TernaryExpr;
+use crate::mel::ast::Literal::{Boolean, Number};
+use crate::mel::ast::LogicOperator::{And, Or};
+use crate::mel::ast::MathOperator::{Divide, Minus, Modulo, Multiply, Plus};
+use crate::mel::ast::{Argument, BinaryInfixOperator, StringConcatOperator};
+use crate::mel::{
     ast::{self, ArgumentList, Expr, Identifier},
     grammar::GrammarNode,
 };
+use crate::utils;
 
 pub type SyntaxVisitorResult<T> = Result<T, CompilerError>;
 

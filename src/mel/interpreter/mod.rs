@@ -21,7 +21,7 @@ pub mod interpret;
 #[cfg(test)]
 pub mod tests;
 
-use crate::{
+use crate::mel::{
     analysis::Analyzed,
     ast::{AstVisitorDriver, Expr},
     interpreter::interpret::{MelInterp, MelInterpContext, MelInterpResult},

@@ -19,7 +19,7 @@
 mod interpreter_tests {
     use std::{assert_matches, collections::HashMap, sync::Arc};
 
-    use crate::{
+    use crate::mel::{
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
         ast::AstVisitorDriver,
         compiler::compile,
@@ -474,19 +474,20 @@ mod interpreter_tests {
 
 #[cfg(test)]
 mod interpreter_logger_tests {
-    use std::collections::HashMap;
-
     use crate::{
-        analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
-        ast::AstVisitorDriver,
-        compiler::compile,
-        interpreter::interpret::{
-            MelInterp, MelInterpContext, StructValue, TypedValue,
-            Value::{self, Struct},
-        },
         logging::{LogLevel::Trace, LogMsgFormatter},
-        tvs::{self, Type},
+        mel::{
+            analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
+            ast::AstVisitorDriver,
+            compiler::compile,
+            interpreter::interpret::{
+                MelInterp, MelInterpContext, StructValue, TypedValue,
+                Value::{self, Struct},
+            },
+            tvs::{self, Type},
+        },
     };
+    use std::collections::HashMap;
 
     #[test]
     fn test_trace_logging_binary_expression() {

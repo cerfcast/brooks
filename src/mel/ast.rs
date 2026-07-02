@@ -15,7 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::grammar::{GrammarLocation, GrammarNode};
+use crate::common::GrammarLocation;
+use crate::mel::grammar::GrammarNode;
 use brooks_macros::{grammar_location, grammar_name};
 use regex::Regex;
 use std::{fmt::Debug, net::IpAddr, sync::Arc};

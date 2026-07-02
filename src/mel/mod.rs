@@ -15,11 +15,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-pub mod logging;
 #[allow(dead_code)]
-pub mod common;
+pub mod analysis;
 #[allow(dead_code)]
-pub mod mel;
+pub mod ast;
 #[allow(dead_code)]
-pub mod utils;
+pub mod compiler;
+#[allow(dead_code)]
+pub mod grammar;
+#[allow(dead_code)]
+pub mod interpreter;
+#[allow(dead_code)]
+pub mod scope;
+#[allow(dead_code)]
+pub mod serializer;
+#[allow(dead_code)]
+pub mod tvs;

@@ -20,13 +20,6 @@ use std::fmt::Display;
 #[cfg(feature = "json")]
 use serde::Serialize;
 
-/// The trait that makes it possible to add a grammar node to the compiler.
-///
-/// Use the `grammar_name` macro to derive it automatically.
-pub trait GrammarNode {
-    fn name() -> Vec<String>;
-}
-
 #[derive(Debug, Clone, Default)]
 #[cfg(feature = "json")]
 #[derive(Serialize)]
@@ -43,8 +36,8 @@ impl Display for GrammarLocation {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::Mel;
-    use crate::grammar::GrammarNode;
+    use crate::mel::ast::Mel;
+    use crate::mel::grammar::GrammarNode;
 
     #[test]
     fn test_grammar_node() {

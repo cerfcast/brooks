@@ -24,7 +24,10 @@ use std::{
 
 use regex::Regex;
 
-use crate::{
+use crate::common::GrammarLocation;
+use crate::logging::{LogLevel, LogMsg, LogMsgs};
+
+use crate::mel::{
     analysis::{Analyzed, CompiledConstant},
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
@@ -33,12 +36,10 @@ use crate::{
         FunctionCall, IPAddressLiteral, Identifier, NumberLiteral, RegexLiteral, StringLiteral,
         TernaryExpr,
     },
-    grammar::GrammarLocation,
     interpreter::{
         builtins,
         interpret::{MelInterpAssertion::SuccessWithoutValue, MelInterpError::UnknownIdentifier},
     },
-    logging::{LogLevel, LogMsg, LogMsgs},
     scope,
     tvs::{self, Type},
 };

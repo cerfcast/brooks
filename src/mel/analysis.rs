@@ -21,7 +21,9 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
+use crate::common::GrammarLocation;
+
+use crate::mel::{
     analysis::{
         MelAnalysisAssertions::{ContextMissingExpr, ContextMissingParams, ContextWrongExprType},
         MelAnalysisError::{
@@ -38,7 +40,6 @@ use crate::{
         StringLiteral, TernaryExpr,
     },
     compiler::compile::CompilerError,
-    grammar::GrammarLocation,
     scope::{self, Scopes},
     tvs::{
         self,
@@ -711,14 +712,14 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 
 #[cfg(test)]
 mod type_check_tests {
-    use crate::{
+    use crate::common::GrammarLocation;
+    use crate::mel::{
         analysis::{
             Analyzed, MelAnalysisContext, MelAnalysisError, MelAnalysisLocatableError,
             MelTypeChecker,
         },
         ast::{AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier},
         compiler::compile,
-        grammar::GrammarLocation,
         tvs::{
             self,
             Type::{self, Boolean, Function, IPAddress, Integer},
@@ -2191,7 +2192,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
 
 #[cfg(test)]
 mod optimizer_tests {
-    use crate::{
+    use crate::mel::{
         analysis::{
             Analyzed, CompiledConstant, MelAnalysisContext, MelOptimizer, MelTypeChecker, ast::Expr,
         },
@@ -2737,7 +2738,7 @@ mod optimizer_tests {
 
 #[cfg(test)]
 mod analysis_error_tests {
-    use crate::{
+    use crate::mel::{
         analysis::{
             MelAnalysisContext, MelAnalysisError, MelAnalysisLocatableError,
             MelAnalysisPreconditions, MelOptimizer,

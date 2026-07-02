@@ -15,11 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-pub mod logging;
-#[allow(dead_code)]
-pub mod common;
-#[allow(dead_code)]
-pub mod mel;
-#[allow(dead_code)]
-pub mod utils;
+/// The trait that makes it possible to add a grammar node to the compiler.
+///
+/// Use the `grammar_name` macro to derive it automatically.
+pub trait GrammarNode {
+    fn name() -> Vec<String>;
+}

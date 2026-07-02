@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::grammar::GrammarLocation;
+use crate::common::GrammarLocation;
 use std::fmt::Debug;
 
 #[cfg(feature = "json")]

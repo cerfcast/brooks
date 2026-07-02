@@ -15,13 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
+use crate::common::GrammarLocation;
+use crate::mel::{
     analysis::{self, Analyzed},
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
         FunctionCall, Identifier,
     },
-    grammar::GrammarLocation,
 };
 
 #[allow(clippy::to_string_trait_impl)]
@@ -331,7 +331,7 @@ impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTex
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use crate::mel::{
         compiler::compile,
         serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},
     };
@@ -1000,11 +1000,11 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 mod analyzed_serializer_tests {
     use std::{collections::HashMap, sync::Arc};
 
-    use crate::tvs::{
+    use crate::mel::tvs::{
         self, Struct,
         Type::{self, Function},
     };
-    use crate::{
+    use crate::mel::{
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
         compiler::compile,
         serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},
