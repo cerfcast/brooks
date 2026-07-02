@@ -332,7 +332,8 @@ impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTex
 #[cfg(test)]
 mod tests {
     use crate::{
-        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        compiler::compile,
+        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
         expect_expr,
         serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},
     };
@@ -1055,7 +1056,8 @@ mod analyzed_serializer_tests {
     };
     use crate::{
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
-        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        compiler::compile,
+        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
         expect_expr,
         serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},
     };

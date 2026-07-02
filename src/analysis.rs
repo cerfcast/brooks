@@ -37,7 +37,8 @@ use crate::{
         Expr, FunctionCall, IPAddressLiteral, Identifier, MemberAccessExpression, NumberLiteral,
         StringLiteral, TernaryExpr,
     },
-    compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+    compiler::compile,
+    compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
     expect_expr,
     grammar::GrammarLocation,
     scope::{self, Scopes},
@@ -718,7 +719,8 @@ mod type_check_tests {
             MelTypeChecker,
         },
         ast::{AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier},
-        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        compiler::compile,
+        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
         expect_expr,
         grammar::GrammarLocation,
         tvs::{
@@ -2294,7 +2296,8 @@ mod optimizer_tests {
             Analyzed, CompiledConstant, MelAnalysisContext, MelOptimizer, MelTypeChecker, ast::Expr,
         },
         ast::{AstVisitorDriver, BinaryExpr},
-        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        compiler::compile,
+        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
         expect_expr,
         tvs::Type,
     };
@@ -2881,7 +2884,8 @@ mod analysis_error_tests {
             MelAnalysisPreconditions, MelOptimizer,
         },
         ast::AstVisitorDriver,
-        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        compiler::compile,
+        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
         expect_expr,
     };
     use std::assert_matches;

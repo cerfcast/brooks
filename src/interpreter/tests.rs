@@ -22,7 +22,8 @@ mod interpreter_tests {
     use crate::{
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
         ast::AstVisitorDriver,
-        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        compiler::compile,
+        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
         expect_expr,
         interpreter::{
             builtins::{BooleanBuiltin, BuiltinFunction, Path_ElementBuiltin},
@@ -504,7 +505,8 @@ mod interpreter_logger_tests {
     use crate::{
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
         ast::AstVisitorDriver,
-        compiler::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext, compile},
+        compiler::compile,
+        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
         expect_expr,
         interpreter::interpret::{
             MelInterp, MelInterpContext, StructValue, TypedValue,
