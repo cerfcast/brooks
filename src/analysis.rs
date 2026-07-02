@@ -37,9 +37,7 @@ use crate::{
         Expr, FunctionCall, IPAddressLiteral, Identifier, MemberAccessExpression, NumberLiteral,
         StringLiteral, TernaryExpr,
     },
-    compiler::compile,
-    compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
-    expect_expr,
+    compiler::compile::CompilerError,
     grammar::GrammarLocation,
     scope::{self, Scopes},
     tvs::{
@@ -2918,40 +2916,23 @@ mod analysis_error_tests {
 
 pub type MelAnalysisResult = Result<Expr<Analyzed>, MelAnalysisLocatableError>;
 #[allow(clippy::result_large_err)]
-pub fn compile_and_analyze(source: &str, scopes: Scopes<Type>) -> MelAnalysisResult {
-    let compile_result = compile(source);
-    let compiled = compile_result.map_err(|e| MelAnalysisLocatableError {
-        error: MelAnalysisError::CompilerError(e),
-        location: GrammarLocation {
-            start: 0,
-            extent: source.len(),
-        },
-    })?;
-
-    let ast = expect_expr!(MELCompilerContext, compiled).ok_or(MelAnalysisLocatableError {
-        error: MelAnalysisError::CompilerError(CompilerError::SyntaxError(EmptyContext)),
-        location: GrammarLocation {
-            start: 0,
-            extent: source.len(),
-        },
-    })?;
-
+pub fn analyze(expr: &Expr<()>, scopes: Scopes<Type>) -> MelAnalysisResult {
     let driver = AstVisitorDriver {};
     let visitor = MelTypeChecker {};
     let mut context = MelAnalysisContext::default();
 
     context = context.update_scopes(scopes);
-    let result = driver.visit(&ast, &visitor, context)?;
+    let result = driver.visit(expr, &visitor, context)?;
 
     let driver = AstVisitorDriver {};
     let visitor = MelOptimizer {};
-    let result = driver.visit(&ast, &visitor, result)?;
+    let result = driver.visit(expr, &visitor, result)?;
 
     let result = result.expr.ok_or(MelAnalysisLocatableError {
         error: MelAnalysisError::Incalculable,
         location: GrammarLocation {
             start: 0,
-            extent: source.len(),
+            extent: 0,
         },
     })?;
 
