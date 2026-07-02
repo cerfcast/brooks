@@ -333,8 +333,6 @@ impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTex
 mod tests {
     use crate::{
         compiler::compile,
-        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
-        expect_expr,
         serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},
     };
 
@@ -353,10 +351,7 @@ mod tests {
 \t\tIdentifier: b";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -381,10 +376,7 @@ mod tests {
 \t\tIdentifier: b";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -409,10 +401,7 @@ mod tests {
 \t\tLiteral: /[0-9]/";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -437,10 +426,7 @@ mod tests {
 \t\tIdentifier: b";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -470,10 +456,7 @@ mod tests {
 \t\tIdentifier: c";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
         let context = AstTextSerializerContext {
@@ -502,10 +485,7 @@ mod tests {
 \t\tIdentifier: c";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -535,10 +515,7 @@ mod tests {
 \t\t\t\tIdentifier: c";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -568,10 +545,7 @@ mod tests {
 \t\t\t\tIdentifier: c";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -596,10 +570,7 @@ mod tests {
 \t\tLiteral: false";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -624,10 +595,7 @@ mod tests {
 \t\tLiteral: false";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -656,10 +624,7 @@ mod tests {
 \tRight:
 \t\tLiteral: true";
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -684,10 +649,7 @@ mod tests {
 \t\tLiteral: 4";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -712,10 +674,7 @@ mod tests {
 \t\tLiteral: one";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -741,10 +700,7 @@ mod tests {
 \t\tLiteral: 5";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -776,10 +732,7 @@ mod tests {
 \t\t\t\tLiteral: 10";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -807,10 +760,7 @@ mod tests {
 \t\tIdentifier: c";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = AstTextSerializer {};
@@ -1057,8 +1007,6 @@ mod analyzed_serializer_tests {
     use crate::{
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
         compiler::compile,
-        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
-        expect_expr,
         serializer::{AstTextSerializer, AstTextSerializerContext, AstVisitorDriver},
     };
 
@@ -1079,10 +1027,7 @@ mod analyzed_serializer_tests {
 \tConstant value: testingone";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1124,10 +1069,7 @@ mod analyzed_serializer_tests {
 \tType: Integer";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1184,10 +1126,7 @@ mod analyzed_serializer_tests {
 \tNot a constant";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1237,10 +1176,7 @@ mod analyzed_serializer_tests {
 \tConstant value: 1";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1308,10 +1244,7 @@ mod analyzed_serializer_tests {
 \tConstant value: 10";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1368,10 +1301,7 @@ mod analyzed_serializer_tests {
 \tNot a constant";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1431,10 +1361,7 @@ mod analyzed_serializer_tests {
 \tNot a constant";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1485,10 +1412,7 @@ mod analyzed_serializer_tests {
 \tType: Bool";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};

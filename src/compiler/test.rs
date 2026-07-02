@@ -18,7 +18,7 @@
 #[cfg(test)]
 mod tests {
     use crate::compiler::compile;
-    use crate::compiler::compile::{CompilerError, SyntaxError};
+    use crate::compiler::compile::CompilerError;
     use std::assert_matches;
 
     #[test]
@@ -158,10 +158,7 @@ mod tests {
     fn parse_regex_literal_empty_character_set() {
         let code = "/[]/";
         let compile_result = compile(code).expect_err("Could compile code with syntax error");
-        assert_matches!(
-            compile_result,
-            CompilerError::SyntaxError(SyntaxError::BadLiteral(_))
-        )
+        assert_matches!(compile_result, CompilerError::BadLiteral(_))
     }
 
     #[test]
@@ -191,7 +188,7 @@ mod tests {
         let compile_result = compile(code).expect_err("Could compile code with syntax error");
 
         assert_matches!(compile_result,
-            CompilerError::SyntaxError(SyntaxError::SyntaxError(_,msg))
+            CompilerError::SyntaxError(_,msg)
             if msg == "Unexpected token j");
     }
 
@@ -201,7 +198,7 @@ mod tests {
         let compile_result = compile(code).expect_err("Could compile code with syntax error");
 
         assert_matches!(compile_result,
-            CompilerError::SyntaxError(SyntaxError::SyntaxError(_,msg))
+            CompilerError::SyntaxError(_,msg)
             if msg == "Missing identifier");
     }
 }

@@ -17,6 +17,7 @@
 
 use tree_sitter;
 
+use crate::ast::Expr;
 use crate::compiler::compile::CompileResult;
 use crate::compiler::compile::CompilerError;
 use crate::compiler::compile::MELCompiler;
@@ -28,34 +29,36 @@ pub mod compile;
 #[cfg(test)]
 mod test;
 
-pub fn compile(source: &str) -> CompileResult<MELCompilerContext> {
+pub fn compile(source: &str) -> CompileResult<Expr<()>> {
     let mut parser = tree_sitter::Parser::new();
     let language = tree_sitter_mel::LANGUAGE;
     parser.set_language(&language.into()).map_err(|e| {
-        CompilerError::SyntaxError(compile::SyntaxError::SyntaxError(
+        CompilerError::SyntaxError(
             GrammarLocation {
                 start: 0,
                 extent: 0,
             },
             e.to_string(),
-        ))
+        )
     })?;
     let result = parser
         .parse(source, None)
         .ok_or(CompilerError::SyntaxError(
-            compile::SyntaxError::SyntaxError(
-                GrammarLocation {
-                    start: 0,
-                    extent: 0,
-                },
-                "Could not parse".to_string(),
-            ),
+            GrammarLocation {
+                start: 0,
+                extent: 0,
+            },
+            "Could not parse".to_string(),
         ))?;
 
     let vd = SyntaxVisitorDriver {};
     let sd = MELCompiler::new(source);
     let cc = MELCompilerContext::default();
 
-    vd.visit(result.root_node(), &sd, cc)
-        .map_err(CompilerError::SyntaxError)
+    let result = vd.visit(result.root_node(), &sd, cc)?;
+
+    match result {
+        MELCompilerContext::Expr(expr) => Ok(expr),
+        _ => Err(CompilerError::EmptyContext),
+    }
 }

@@ -718,8 +718,6 @@ mod type_check_tests {
         },
         ast::{AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier},
         compiler::compile,
-        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
-        expect_expr,
         grammar::GrammarLocation,
         tvs::{
             self,
@@ -733,10 +731,7 @@ mod type_check_tests {
         let expr = "5";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -774,10 +769,7 @@ mod type_check_tests {
         let expr = "\"testing\" ~= /testing/";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -812,10 +804,7 @@ mod type_check_tests {
         let expr = "5 ~= /testing/";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -841,10 +830,7 @@ mod type_check_tests {
         let expr = "\"/testing/\" ~= false";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -870,10 +856,7 @@ mod type_check_tests {
         let expr = "/testing/ ~= /[\\W]/";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -899,10 +882,7 @@ mod type_check_tests {
         let expr = "\"testing\" ~= \"hello\"";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -928,10 +908,7 @@ mod type_check_tests {
         let expr = "5 + 3";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -966,10 +943,7 @@ mod type_check_tests {
         let expr = "5 + (3 * 8)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1004,10 +978,7 @@ mod type_check_tests {
         let expr = "5 + \"testing\"";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1031,10 +1002,7 @@ mod type_check_tests {
         let expr = "a";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1054,10 +1022,7 @@ mod type_check_tests {
         let expr = "5 + a";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1095,10 +1060,7 @@ mod type_check_tests {
         let expr = "false + true";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1121,10 +1083,7 @@ mod type_check_tests {
         let expr = "5 + true";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1147,10 +1106,7 @@ mod type_check_tests {
         let expr = "a";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1186,10 +1142,7 @@ mod type_check_tests {
         let expr = "testing(5)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1234,10 +1187,7 @@ mod type_check_tests {
         let expr = "use_me(5)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1267,10 +1217,7 @@ mod type_check_tests {
         let expr = "use(5)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1303,10 +1250,7 @@ mod type_check_tests {
         let expr = "use_me(5)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1351,10 +1295,7 @@ mod type_check_tests {
         let expr = "use_me(5, \"testing\")";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1399,10 +1340,7 @@ mod type_check_tests {
         let expr = "use_me(5, \"testing\")";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1439,10 +1377,7 @@ mod type_check_tests {
         let expr = "use_me(5) + 10";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1489,10 +1424,7 @@ mod type_check_tests {
         let expr = "5 + (use_me(5) + 10)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1528,10 +1460,7 @@ mod type_check_tests {
         let expr = "5 < 4";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1566,10 +1495,7 @@ mod type_check_tests {
         let expr = "(5 < 4) + 5";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1595,10 +1521,7 @@ mod type_check_tests {
         let expr = "8.8.8.8 ipmatch 10.1.9.2";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1634,10 +1557,7 @@ mod type_check_tests {
         let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 2001:0db8:85a3:0000:0000:8a2e:0370:7334";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1673,10 +1593,7 @@ mod type_check_tests {
         let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 8.8.8.8";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1712,10 +1629,7 @@ mod type_check_tests {
         let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch a";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1753,10 +1667,7 @@ mod type_check_tests {
         let expr = "a ipmatch b";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1796,10 +1707,7 @@ mod type_check_tests {
         let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 8";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1825,10 +1733,7 @@ mod type_check_tests {
         let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch a";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -1856,10 +1761,7 @@ mod type_check_tests {
         let expr = "a ipmatch b";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2295,8 +2197,6 @@ mod optimizer_tests {
         },
         ast::{AstVisitorDriver, BinaryExpr},
         compiler::compile,
-        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
-        expect_expr,
         tvs::Type,
     };
     use std::assert_matches;
@@ -2306,10 +2206,7 @@ mod optimizer_tests {
         let expr = "5 + 3";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2350,10 +2247,7 @@ mod optimizer_tests {
         let expr = "5 + 3 + (8 * 11)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2394,10 +2288,7 @@ mod optimizer_tests {
         let expr = "(8 * 11) / 8";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2438,10 +2329,7 @@ mod optimizer_tests {
         let expr = "(8 * 11) % 2";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2482,10 +2370,7 @@ mod optimizer_tests {
         let expr = "\"testing\" . \"one\"";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2526,10 +2411,7 @@ mod optimizer_tests {
         let expr = "(\"testing\" . \"one\") . \"two\"";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2570,10 +2452,7 @@ mod optimizer_tests {
         let expr = "true or false";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2614,10 +2493,7 @@ mod optimizer_tests {
         let expr = "true and false";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2658,10 +2534,7 @@ mod optimizer_tests {
         let expr = "5 < 4";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2702,10 +2575,7 @@ mod optimizer_tests {
         let expr = "8.8.8.8 ipmatch 5.5.5.5";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2746,10 +2616,7 @@ mod optimizer_tests {
         let expr = "5.5.5.5 ipmatch 5.5.5.5";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2790,10 +2657,7 @@ mod optimizer_tests {
         let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 5.5.5.5";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2834,10 +2698,7 @@ mod optimizer_tests {
         let expr = "2001:0db8:85a3:0000:0000:8a2e:0370:7334 ipmatch 2001:0db8:85a3:0000:0000:8a2e:0370:7334";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -2883,8 +2744,6 @@ mod analysis_error_tests {
         },
         ast::AstVisitorDriver,
         compiler::compile,
-        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
-        expect_expr,
     };
     use std::assert_matches;
 
@@ -2893,10 +2752,7 @@ mod analysis_error_tests {
         let expr = "5 < 4";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let context = MelAnalysisContext::default();
         let driver = AstVisitorDriver {};

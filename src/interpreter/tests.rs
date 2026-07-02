@@ -23,8 +23,6 @@ mod interpreter_tests {
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
         ast::AstVisitorDriver,
         compiler::compile,
-        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
-        expect_expr,
         interpreter::{
             builtins::{BooleanBuiltin, BuiltinFunction, Path_ElementBuiltin},
             interpret::{
@@ -44,10 +42,7 @@ mod interpreter_tests {
         let expr = "5 < 5";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -85,10 +80,7 @@ mod interpreter_tests {
         let expr = "boolean(1)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -144,10 +136,7 @@ mod interpreter_tests {
         let expr = "boolean(0)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -203,10 +192,7 @@ mod interpreter_tests {
         let expr = "path_element(\"one/two/three\", 1)";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -262,10 +248,7 @@ mod interpreter_tests {
         let expr = "true ? 5: 4";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -303,10 +286,7 @@ mod interpreter_tests {
         let expr = "a";
 
         let compile_result = compile(expr);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -356,10 +336,7 @@ mod interpreter_tests {
         let code = "req^incoming";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -427,10 +404,7 @@ mod interpreter_tests {
         let code = "req^incoming";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -506,8 +480,6 @@ mod interpreter_logger_tests {
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
         ast::AstVisitorDriver,
         compiler::compile,
-        compiler::compile::{CompilerError, MELCompilerContext, SyntaxError::EmptyContext},
-        expect_expr,
         interpreter::interpret::{
             MelInterp, MelInterpContext, StructValue, TypedValue,
             Value::{self, Struct},
@@ -521,10 +493,7 @@ mod interpreter_logger_tests {
         let code = "5 + 4";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
@@ -566,10 +535,7 @@ mod interpreter_logger_tests {
         let code = "req^incoming";
 
         let compile_result = compile(code);
-        let compiled = compile_result.expect("Compilation error");
-        let ast = expect_expr!(MELCompilerContext, compiled)
-            .ok_or(CompilerError::SyntaxError(EmptyContext))
-            .expect("Missing AST");
+        let ast = compile_result.expect("Compilation error");
 
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
