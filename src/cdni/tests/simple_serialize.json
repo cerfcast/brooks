@@ -1,0 +1,73 @@
+{
+  "generic-metadata-type": "MI.ProcessingStages",
+  "generic-metadata-value": {
+    "client-request": [
+      {
+        "generic-metadata-type": "MI.StageRules",
+        "generic-metadata-value": {
+          "match": {
+            "generic-metadata-type": "MI.ExpressionMatch",
+            "generic-metadata-value": {
+              "expression": "5 + 4"
+            }
+          },
+          "stage-metadata": {
+            "generic-metadata-type": "MI.StageMetadata",
+            "generic-metadata-value": {}
+          }
+        }
+      }
+    ],
+    "origin-request": [
+      {
+        "generic-metadata-type": "MI.StageRules",
+        "generic-metadata-value": {
+          "match": {
+            "generic-metadata-type": "MI.ExpressionMatch",
+            "generic-metadata-value": {
+              "expression": "5 + 4"
+            }
+          },
+          "stage-metadata": {
+            "generic-metadata-type": "MI.StageMetadata",
+            "generic-metadata-value": {}
+          }
+        }
+      }
+    ],
+    "origin-response": [
+      {
+        "generic-metadata-type": "MI.StageRules",
+        "generic-metadata-value": {
+          "match": {
+            "generic-metadata-type": "MI.ExpressionMatch",
+            "generic-metadata-value": {
+              "expression": "5 + 4"
+            }
+          },
+          "stage-metadata": {
+            "generic-metadata-type": "MI.StageMetadata",
+            "generic-metadata-value": {}
+          }
+        }
+      }
+    ],
+    "client-response": [
+      {
+        "generic-metadata-type": "MI.StageRules",
+        "generic-metadata-value": {
+          "match": {
+            "generic-metadata-type": "MI.ExpressionMatch",
+            "generic-metadata-value": {
+              "expression": "5 + 4"
+            }
+          },
+          "stage-metadata": {
+            "generic-metadata-type": "MI.StageMetadata",
+            "generic-metadata-value": {}
+          }
+        }
+      }
+    ]
+  }
+}
