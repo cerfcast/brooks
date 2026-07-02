@@ -149,9 +149,19 @@ mod tests {
 
     #[test]
     fn parse_regex_literal() {
-        let code = "\"/[\\W]/i\"";
+        let code = "/[\\W]/i";
         let compile_result = compile(code);
         assert!(compile_result.is_ok());
+    }
+
+    #[test]
+    fn parse_regex_literal_empty_character_set() {
+        let code = "/[]/";
+        let compile_result = compile(code).expect_err("Could compile code with syntax error");
+        assert_matches!(
+            compile_result,
+            CompilerError::SyntaxError(SyntaxError::BadLiteral(_))
+        )
     }
 
     #[test]
