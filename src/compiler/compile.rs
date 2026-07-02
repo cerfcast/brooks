@@ -960,7 +960,6 @@ impl From<Node<'_>> for GrammarLocation {
 
 #[derive(Debug, Clone)]
 pub enum CompilerError {
-    ParseError(String),
     SyntaxError(SyntaxError),
 }
 pub type CompileResult<T> = Result<T, CompilerError>;

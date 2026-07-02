@@ -22,6 +22,7 @@ use crate::compiler::compile::CompilerError;
 use crate::compiler::compile::MELCompiler;
 use crate::compiler::compile::MELCompilerContext;
 use crate::compiler::compile::SyntaxVisitorDriver;
+use crate::grammar::GrammarLocation;
 
 pub mod compile;
 #[cfg(test)]
@@ -30,12 +31,26 @@ mod test;
 pub fn compile(source: &str) -> CompileResult<MELCompilerContext> {
     let mut parser = tree_sitter::Parser::new();
     let language = tree_sitter_mel::LANGUAGE;
-    parser
-        .set_language(&language.into())
-        .map_err(|e| CompilerError::ParseError(e.to_string()))?;
+    parser.set_language(&language.into()).map_err(|e| {
+        CompilerError::SyntaxError(compile::SyntaxError::SyntaxError(
+            GrammarLocation {
+                start: 0,
+                extent: 0,
+            },
+            e.to_string(),
+        ))
+    })?;
     let result = parser
         .parse(source, None)
-        .ok_or(CompilerError::ParseError("Could not parse".to_string()))?;
+        .ok_or(CompilerError::SyntaxError(
+            compile::SyntaxError::SyntaxError(
+                GrammarLocation {
+                    start: 0,
+                    extent: 0,
+                },
+                "Could not parse".to_string(),
+            ),
+        ))?;
 
     let vd = SyntaxVisitorDriver {};
     let sd = MELCompiler::new(source);
