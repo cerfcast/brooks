@@ -17,8 +17,8 @@
 
 use crate::cdni::spec::{
     TypedExpressionMatch, TypedGenericMetadata, TypedHeader, TypedHeaderTransform,
-    TypedProcessingStages, TypedRequestTransform, TypedStageMetadata, TypedStageRules,
-    TypedSyntheticResponse,
+    TypedProcessingStages, TypedRequestTransform, TypedResponseTransform, TypedStageMetadata,
+    TypedStageRules, TypedSyntheticResponse,
 };
 
 use std::fmt::Debug;
@@ -41,7 +41,7 @@ pub trait CdniVisitor<A: Debug + Clone + Default, O, E> {
     ) -> CdniVisitorResult<O, E>;
     fn visit_response_transform(
         &self,
-        v: &TypedRequestTransform<A>,
+        v: &TypedResponseTransform<A>,
         c: &O,
     ) -> CdniVisitorResult<O, E>;
     fn visit_generic_metadata(&self, v: &TypedGenericMetadata<A>, c: &O)

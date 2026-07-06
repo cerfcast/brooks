@@ -22,10 +22,10 @@ use serde::Serialize;
 use crate::{
     cdni::{
         spec::{
-            ExpressionMatch, ProcessingStages, StageMetadata, StageRules, TypedExpressionMatch,
-            TypedGenericMetadata, TypedHeader, TypedHeaderTransform, TypedProcessingStages,
-            TypedRequestTransform, TypedResponseTransform, TypedStageMetadata, TypedStageRules,
-            TypedSyntheticResponse,
+            ExpressionMatch, ProcessingStages, RequestTransform, ResponseTransform, StageMetadata,
+            StageRules, TypedExpressionMatch, TypedGenericMetadata, TypedHeader,
+            TypedHeaderTransform, TypedProcessingStages, TypedRequestTransform,
+            TypedResponseTransform, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
         },
         visit::CdniVisitor,
     },
@@ -73,6 +73,14 @@ impl Serialize for CdniVerificationKey {
 #[derive(Debug, Clone, Default)]
 struct CdniVerifier {}
 
+impl CdniVerifier {
+    #[allow(clippy::result_large_err)]
+    pub fn compile_and_analyze_expr(source: &str) -> Result<Expr<Analyzed>, CdniVerificationError> {
+        let expr = compiler::compile(source).map_err(CdniVerificationError::ExpressionCompile)?;
+        analyze(&expr, Scopes::default()).map_err(CdniVerificationError::ExpressionAnalyze)
+    }
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 enum CdniVerifierContextValue {
@@ -83,11 +91,13 @@ enum CdniVerifierContextValue {
     GenericMetadata(TypedGenericMetadata<CdniVerificationKey>),
     RequestTransform(TypedRequestTransform<CdniVerificationKey>),
     ResponseTransform(TypedResponseTransform<CdniVerificationKey>),
+    HeaderTransform(TypedHeaderTransform<CdniVerificationKey>),
 }
 
 #[derive(Debug, Clone, Default)]
 struct CdniVerifierContext {
     value: Option<CdniVerifierContextValue>,
+    expr_type: Option<Type>,
 }
 
 type VerifiedCdni = ProcessingStages<CdniVerificationKey>;
@@ -232,6 +242,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
                 CdniVerificationKey,
                 TypedStageRules
             ),
+            expr_type: None,
         })
     }
 
@@ -244,10 +255,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
         let v = &v.value;
 
-        let expr =
-            compiler::compile(&v.expression).map_err(CdniVerificationError::ExpressionCompile)?;
-        let expr =
-            analyze(&expr, Scopes::default()).map_err(CdniVerificationError::ExpressionAnalyze)?;
+        let expr = Self::compile_and_analyze_expr(&v.expression)?;
 
         if expr.tipe() != Type::Boolean {
             return Err(CdniVerificationError::ExpressionWrongType(
@@ -265,6 +273,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
                 CdniVerificationKey,
                 TypedExpressionMatch
             ),
+            expr_type: None,
         })
     }
 
@@ -315,7 +324,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
             None
         };
 
-        result.response_xform = if let Some(reqt) = &v.request_xform {
+        result.response_xform = if let Some(reqt) = &v.response_xform {
             Some(
                 expect_some_value!(
                     self.visit_response_transform(reqt, &c.clone())?.value,
@@ -334,23 +343,138 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
                 CdniVerificationKey,
                 TypedStageMetadata
             ),
+            expr_type: None,
         })
     }
 
     fn visit_request_transform(
         &self,
-        _v: &TypedRequestTransform<()>,
-        _c: &CdniVerifierContext,
+        v: &TypedRequestTransform<()>,
+        c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
-        todo!()
+        check_generic_md_typename!(v, TypedRequestTransform);
+
+        let v = &v.value;
+
+        let mut result = if let Some(header_xform) = &v.xform {
+            let header = Some(
+                expect_some_value!(
+                    self.visit_header_transform(header_xform, &c.clone())?.value,
+                    CdniVerifierContextValue::HeaderTransform
+                )
+                .clone(),
+            );
+
+            RequestTransform {
+                xform: header,
+                uri: v.uri.clone(),
+                uri_is_expr: v.uri_is_expr,
+                aug: CdniVerificationKey::None,
+            }
+        } else {
+            RequestTransform {
+                xform: None,
+                uri: v.uri.clone(),
+                uri_is_expr: v.uri_is_expr,
+                aug: CdniVerificationKey::None,
+            }
+        };
+
+        result.aug = if let Some(uri) = &v.uri {
+            if let Some(uri_is_expr) = &v.uri_is_expr
+                && *uri_is_expr
+            {
+                let expr = Self::compile_and_analyze_expr(uri)?;
+
+                if expr.tipe() != Type::String {
+                    return Err(CdniVerificationError::ExpressionWrongType(
+                        Type::String,
+                        expr.tipe(),
+                    ));
+                }
+                CdniVerificationKey::Expr(expr)
+            } else {
+                CdniVerificationKey::None
+            }
+        } else {
+            CdniVerificationKey::None
+        };
+
+        Ok(CdniVerifierContext {
+            value: make_context_value!(
+                result,
+                CdniVerifierContextValue::RequestTransform,
+                CdniVerificationKey,
+                TypedRequestTransform
+            ),
+            expr_type: None,
+        })
     }
 
     fn visit_response_transform(
         &self,
-        _v: &TypedRequestTransform<()>,
-        _c: &CdniVerifierContext,
+        v: &TypedResponseTransform<()>,
+        c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
-        todo!()
+        check_generic_md_typename!(v, TypedResponseTransform);
+
+        let v = &v.value;
+
+        let mut result = if let Some(header_xform) = &v.xform {
+            let header = Some(
+                expect_some_value!(
+                    self.visit_header_transform(header_xform, &c.clone())?.value,
+                    CdniVerifierContextValue::HeaderTransform
+                )
+                .clone(),
+            );
+
+            ResponseTransform {
+                xform: header,
+                response_status: v.response_status.clone(),
+                response_status_expr: v.response_status_expr,
+                synthetic: None,
+                aug: CdniVerificationKey::None,
+            }
+        } else {
+            ResponseTransform {
+                xform: None,
+                response_status: v.response_status.clone(),
+                response_status_expr: v.response_status_expr,
+                synthetic: None,
+                aug: CdniVerificationKey::None,
+            }
+        };
+
+        result.aug = if let Some(rs) = &v.response_status {
+            if let Some(rs_is_expr) = &v.response_status_expr
+                && *rs_is_expr
+            {
+                let expr = Self::compile_and_analyze_expr(rs)?;
+
+                if expr.tipe() != Type::Integer {
+                    return Err(CdniVerificationError::ExpressionWrongType(
+                        Type::Integer,
+                        expr.tipe(),
+                    ));
+                }
+                CdniVerificationKey::Expr(expr)
+            } else {
+                CdniVerificationKey::None
+            }
+        } else {
+            CdniVerificationKey::None
+        };
+
+        Ok(CdniVerifierContext {
+            value: make_context_value!(
+                result,
+                CdniVerifierContextValue::ResponseTransform,
+                CdniVerificationKey,
+                TypedResponseTransform
+            ),
+            expr_type: None,
+        })
     }
 
     fn visit_generic_metadata(
@@ -374,6 +498,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
                     aug: CdniVerificationKey::None,
                 },
             )),
+            expr_type: None,
         })
     }
 
@@ -425,34 +550,29 @@ pub fn verify_cdni(
 mod test_verify {
     use std::assert_matches;
 
-    use crate::cdni::{
-        spec::TypedProcessingStages,
-        verify::{
-            CdniVerificationError::{ExpressionWrongType, WrongGenericMetadataTypeName},
-            verify_cdni,
-        },
-    };
+    use crate::cdni::spec::ResponseTransform;
     use crate::mel::tvs::Type;
+    use crate::{
+        cdni::{
+            spec::{
+                RequestTransform, TypedProcessingStages, TypedRequestTransform,
+                TypedResponseTransform,
+            },
+            verify::{
+                CdniVerificationError::{ExpressionWrongType, WrongGenericMetadataTypeName},
+                CdniVerificationKey, verify_cdni,
+            },
+        },
+        mel::ast::Expr::BinaryExpr,
+    };
 
     use std::path::Path;
 
     use crate::cdni::tests::test_helpers::read_test_file;
 
     #[test]
-    fn test_verify_bad_generic_md_typename() {
-        let json = read_test_file(Path::new("./src/cdni/tests/example8-bad-typename.json"));
-        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
-            .expect("Could not parse JSON test file");
-
-        let result = verify_cdni(&stages)
-            .expect_err("Could verify CDNI with bad generic metadata typenames");
-
-        assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI.ProcessingStages" && actual == "MI.ProcessigStages")
-    }
-
-    #[test]
     fn test_verify_simple() {
-        let json = read_test_file(Path::new("./src/cdni/tests/simple_deserialize_verify.json"));
+        let json = read_test_file(Path::new("./src/cdni/tests/simple/deserialize_verify.json"));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
 
@@ -464,9 +584,36 @@ mod test_verify {
     }
 
     #[test]
+    fn test_verify_bad_generic_md_typename() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/generic_metadata/bad-typename.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages)
+            .expect_err("Could verify CDNI with bad generic metadata typenames");
+
+        assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI.ProcessingStages" && actual == "MI.ProcessigStages")
+    }
+
+    #[test]
+    fn test_verify_stage_metadata_with_generic_metadata_bad_type_name() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/generic_metadata/bad-typename2.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages).expect_err("Could verify mistyped CDNI");
+
+        assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI. ..." && actual == "Mi.CachePolicy");
+    }
+
+    #[test]
     fn test_verify_match_wrong_type() {
         let json = read_test_file(Path::new(
-            "./src/cdni/tests/simple_deserialize_verify_wrong_match_type.json",
+            "./src/cdni/tests/stage_rules/wrong_match_type.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -477,15 +624,144 @@ mod test_verify {
     }
 
     #[test]
-    fn test_verify_stage_metadata_with_generic_metadata_bad_type_name() {
+    fn test_verify_request_transform() {
         let json = read_test_file(Path::new(
-            "./src/cdni/tests/simple_deserialize_stage_metadata_with_generic_metadata_bad_type_name.json",
+            "./src/cdni/tests/request_transform/uri_no_expr.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
 
-        let result = verify_cdni(&stages).expect_err("Could verify mistyped CDNI");
+        let result = verify_cdni(&stages).expect("Could not verify correct CDNI");
 
-        assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI. ..." && actual == "Mi.CachePolicy");
+        assert_matches!(
+            result.value.client_req[0]
+                .value
+                .stage_metadata
+                .value
+                .request_xform,
+            Some(TypedRequestTransform {
+                tpe: _,
+                value: RequestTransform {
+                    xform: _,
+                    uri: _,
+                    uri_is_expr: Some(false),
+                    aug: CdniVerificationKey::None
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_verify_request_transform_uri_expr() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/request_transform/uri_expr.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages).expect("Could not verify correct CDNI");
+
+        assert_matches!(
+            result.value.client_req[0]
+                .value
+                .stage_metadata
+                .value
+                .request_xform,
+            Some(TypedRequestTransform {
+                tpe: _,
+                value: RequestTransform {
+                    xform: _,
+                    uri: _,
+                    uri_is_expr: Some(true),
+                    aug: CdniVerificationKey::Expr(BinaryExpr(_))
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_verify_request_transform_uri_expr_wrong_type() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/request_transform/uri_expr_wrong_type.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages)
+            .expect_err("Could verify CDNI with incorrect expression type in URI");
+
+        assert_matches!(result, ExpressionWrongType(Type::String, Type::Integer));
+    }
+
+    #[test]
+    fn test_verify_response_transform() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/response_transform/rs_no_expr.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages).expect("Could not verify correct CDNI");
+
+        assert_matches!(
+            result.value.client_req[0]
+                .value
+                .stage_metadata
+                .value
+                .response_xform,
+            Some(TypedResponseTransform {
+                tpe: _,
+                value: ResponseTransform {
+                    xform: _,
+                    response_status: _,
+                    response_status_expr: None,
+                    synthetic: None,
+                    aug: CdniVerificationKey::None
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_verify_response_transform_rs_expr() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/response_transform/rs_expr.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages).expect("Could not verify correct CDNI");
+
+        assert_matches!(
+            result.value.client_req[0]
+                .value
+                .stage_metadata
+                .value
+                .response_xform,
+            Some(TypedResponseTransform {
+                tpe: _,
+                value: ResponseTransform {
+                    xform: _,
+                    response_status: _,
+                    response_status_expr: Some(true),
+                    synthetic: None,
+                    aug: CdniVerificationKey::Expr(BinaryExpr(_))
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_verify_response_transform_rs_expr_wrong_type() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/response_transform/rs_expr_wrong_type.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages)
+            .expect_err("Could verify CDNI with incorrect expression type in response status");
+
+        assert_matches!(result, ExpressionWrongType(Type::Integer, Type::Boolean));
     }
 }
