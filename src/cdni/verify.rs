@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Verification of CDNI JSON
+
 use serde::Serialize;
 
 use crate::{
@@ -384,6 +386,12 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 }
 
+/// Verify the (semantic) validity of some CDNI JSON
+///
+/// In particular, test whether
+/// 1. the MEL expressions have the proper types, and
+/// 2. the generic metadata type names are correct.
+///
 #[allow(clippy::result_large_err)]
 pub fn verify_cdni(
     stages: &TypedProcessingStages<()>,

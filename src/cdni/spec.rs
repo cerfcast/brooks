@@ -15,7 +15,28 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use brooks_macros::NewTyped;
+//! Serializer/Deserializer of CDNI JSON:
+//!
+//! This is an implementation of the [CDNI ProcessingStages
+//! Metadata](https://datatracker.ietf.org/doc/draft-ietf-cdni-processing-stages-metadata/)
+//! spec.
+//!
+//! ## Implementation Notes:
+//!
+//! 1. There should be a `TypedXXX` for every `XXX`.
+//! 2. The `TypedXXX` should have `tpe` and `value`, where
+//!    `value` has the `XXX` type.
+//! 3. Use `TypedGenericMetadata` on the `TypedXXX` version
+//!    to get `typed_value` and `typed_generic_metadata_name`
+//!    to help the parser verify the JSON.
+//! 4. The name of the type is `MI.XXX` (where `XXX` is from above).
+//! 5. The `XXX` should have a `pub` `aug` whose type is `A: Debug + Clone + Default`
+//!    which will hold any augmentation data generated during
+//!    verification. Annotate it as `serde(skip)`.
+//! 6. Use `serde(rename=...)` to rename fields to match the spec.
+//!
+
+use brooks_macros::TypedGenericMetadata;
 use serde::{Deserialize, Serialize};
 
 use std::fmt::Debug;
