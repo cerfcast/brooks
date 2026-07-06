@@ -1,0 +1,56 @@
+{
+    "generic-metadata-type": "MI.ProcessigStages",
+    "generic-metadata-value": {
+        "client-request": [
+            {
+                "generic-metadata-type": "MI.StageRules",
+                "generic-metadata-value": {
+                    "match": {
+                        "generic-metadata-type": "MI.MatchExpression",
+                        "generic-metadata-value": {
+                            "expression": "resp.status == 304"
+                        }
+                    },
+                    "stage-metadata": {
+                        "generic-metadata-type": "MI.StageMetadata",
+                        "generic-metadata-value": {
+                            "generic-metadata": [
+                                {
+                                    "generic-metadata-type": "Mi.CachePolicy",
+                                    "generic-metadata-value": {
+                                        "href": "https://metadata.ucdn.example/origin_response_cache"
+                                    }
+                                }
+                            ],
+                            "response-transform": {
+                                "generic-metadata-type": "Mi.ResponseTransform",
+                                "generic-metadata-value": {
+                                    "header-transform": {
+                                        "generic-metadata-type": "Mi.HeaderTransform",
+                                        "generic-metadata-value": {
+                                            "add": [
+                                                {
+                                                    "generic-metadata-type": "Mi.Header",
+                                                    "generic-metadata-value": {
+                                                        "name": "X-custom-response-header",
+                                                        "value": "header-value"
+                                                    }
+                                                }
+                                            ],
+                                            "delete": [
+                                                "ETag"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ],
+        "origin-request": [],
+        "origin-response": [],
+        "client-response": []
+    }
+}

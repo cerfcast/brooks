@@ -16,22 +16,42 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::cdni::spec::{
-    ExpressionMatch, GenericMetadata, Header, HeaderTransform, ProcessingStages, RequestTransform,
-    StageMetadata, StageRules, SyntheticResponse,
+    TypedExpressionMatch, TypedGenericMetadata, TypedHeader, TypedHeaderTransform,
+    TypedProcessingStages, TypedRequestTransform, TypedStageMetadata, TypedStageRules,
+    TypedSyntheticResponse,
 };
 
 use std::fmt::Debug;
 
 pub type CdniVisitorResult<T, E> = Result<T, E>;
 pub trait CdniVisitor<A: Debug + Clone + Default, O, E> {
-    fn visit_processing_stages(&self, v: &ProcessingStages<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_stage_rules(&self, v: &StageRules<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_expression_match(&self, v: &ExpressionMatch<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_stage_metadata(&self, v: &StageMetadata<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_request_transform(&self, v: &RequestTransform<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_response_transform(&self, v: &RequestTransform<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_generic_metadata(&self, v: &GenericMetadata<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_header_transform(&self, v: &HeaderTransform<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_header(&self, v: &Header<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_synthetic_response(&self, v: &SyntheticResponse<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_processing_stages(
+        &self,
+        v: &TypedProcessingStages<A>,
+        c: &O,
+    ) -> CdniVisitorResult<O, E>;
+    fn visit_stage_rules(&self, v: &TypedStageRules<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_expression_match(&self, v: &TypedExpressionMatch<A>, c: &O)
+    -> CdniVisitorResult<O, E>;
+    fn visit_stage_metadata(&self, v: &TypedStageMetadata<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_request_transform(
+        &self,
+        v: &TypedRequestTransform<A>,
+        c: &O,
+    ) -> CdniVisitorResult<O, E>;
+    fn visit_response_transform(
+        &self,
+        v: &TypedRequestTransform<A>,
+        c: &O,
+    ) -> CdniVisitorResult<O, E>;
+    fn visit_generic_metadata(&self, v: &TypedGenericMetadata<A>, c: &O)
+    -> CdniVisitorResult<O, E>;
+    fn visit_header_transform(&self, v: &TypedHeaderTransform<A>, c: &O)
+    -> CdniVisitorResult<O, E>;
+    fn visit_header(&self, v: &TypedHeader<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_synthetic_response(
+        &self,
+        v: &TypedSyntheticResponse<A>,
+        c: &O,
+    ) -> CdniVisitorResult<O, E>;
 }

@@ -20,10 +20,10 @@ use serde::Serialize;
 use crate::{
     cdni::{
         spec::{
-            ExpressionMatch, GenericMetadata, Header, HeaderTransform, ProcessingStages,
-            RequestTransform, StageMetadata, StageRules, SyntheticResponse, TypedExpressionMatch,
-            TypedGenericMetadata, TypedProcessingStages, TypedRequestTransform,
-            TypedResponseTransform, TypedStageMetadata, TypedStageRules,
+            ExpressionMatch, ProcessingStages, StageMetadata, StageRules, TypedExpressionMatch,
+            TypedGenericMetadata, TypedHeader, TypedHeaderTransform, TypedProcessingStages,
+            TypedRequestTransform, TypedResponseTransform, TypedStageMetadata, TypedStageRules,
+            TypedSyntheticResponse,
         },
         visit::CdniVisitor,
     },
@@ -43,7 +43,9 @@ pub type CdniVisitorResult<T, E> = Result<T, E>;
 #[derive(Debug, Clone, Default)]
 pub enum CdniVerificationError {
     #[default]
+    NoError,
     WrongType,
+    WrongGenericMetadataTypeName(String, String),
     NoVerifiedValue,
     ExpressionCompile(CompilerError),
     ExpressionAnalyze(MelAnalysisLocatableError),
@@ -114,16 +116,32 @@ macro_rules! make_context_value {
     };
 }
 
+macro_rules! check_generic_md_typename {
+    ($value:expr, $tn:ident) => {
+        if $value.tpe != $tn::<()>::typed_generic_metadata_name() {
+            return Err(CdniVerificationError::WrongGenericMetadataTypeName(
+                $tn::<()>::typed_generic_metadata_name(),
+                $value.tpe.clone(),
+            ));
+        }
+    };
+}
+
 impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifier {
     fn visit_processing_stages(
         &self,
-        v: &ProcessingStages<()>,
+        v: &TypedProcessingStages<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
+        check_generic_md_typename!(v, TypedProcessingStages);
+
         let mut result = ProcessingStages::<CdniVerificationKey>::default();
         let mut rc = c.clone();
+
+        let v = &v.value;
+
         for csr in &v.client_req {
-            rc = self.visit_stage_rules(&csr.value, &rc)?;
+            rc = self.visit_stage_rules(csr, &rc)?;
             if let Some(tsr) =
                 expect_maybe_some_value!(rc.value, CdniVerifierContextValue::StageRules)
             {
@@ -132,7 +150,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
         }
 
         for csr in &v.client_res {
-            rc = self.visit_stage_rules(&csr.value, &rc)?;
+            rc = self.visit_stage_rules(csr, &rc)?;
             if let Some(tsr) =
                 expect_maybe_some_value!(rc.value, CdniVerifierContextValue::StageRules)
             {
@@ -141,7 +159,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
         }
 
         for csr in &v.origin_req {
-            rc = self.visit_stage_rules(&csr.value, &rc)?;
+            rc = self.visit_stage_rules(csr, &rc)?;
             if let Some(tsr) =
                 expect_maybe_some_value!(rc.value, CdniVerifierContextValue::StageRules)
             {
@@ -150,7 +168,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
         }
 
         for csr in &v.origin_res {
-            rc = self.visit_stage_rules(&csr.value, &rc)?;
+            rc = self.visit_stage_rules(csr, &rc)?;
             if let Some(tsr) =
                 expect_maybe_some_value!(rc.value, CdniVerifierContextValue::StageRules)
             {
@@ -170,12 +188,17 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_stage_rules(
         &self,
-        v: &StageRules<()>,
+        v: &TypedStageRules<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
         // Check whether the expression has the right type!
+
+        check_generic_md_typename!(v, TypedStageRules);
+
+        let v = &v.value;
+
         let mut result = if let Some(mtch) = &v.mtch {
-            let expr = self.visit_expression_match(&mtch.value, &c.clone())?;
+            let expr = self.visit_expression_match(mtch, &c.clone())?;
 
             let expr =
                 expect_maybe_some_value!(&expr.value, CdniVerifierContextValue::ExpressionMatch);
@@ -194,7 +217,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
         result.stage_metadata = expect_some_value!(
             &self
-                .visit_stage_metadata(&v.stage_metadata.value, &c.clone())?
+                .visit_stage_metadata(&v.stage_metadata, &c.clone())?
                 .value,
             CdniVerifierContextValue::StageMetadata
         )
@@ -212,9 +235,13 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_expression_match(
         &self,
-        v: &ExpressionMatch<()>,
+        v: &TypedExpressionMatch<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
+        check_generic_md_typename!(v, TypedExpressionMatch);
+
+        let v = &v.value;
+
         let expr =
             compiler::compile(&v.expression).map_err(CdniVerificationError::ExpressionCompile)?;
         let expr =
@@ -241,15 +268,18 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_stage_metadata(
         &self,
-        v: &StageMetadata<()>,
+        v: &TypedStageMetadata<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
+        check_generic_md_typename!(v, TypedStageMetadata);
+
+        let v = &v.value;
+
         let mut result = if let Some(generic) = &v.generic {
             let mut result: Vec<TypedGenericMetadata<CdniVerificationKey>> = vec![];
             for generics in generic {
                 let generic = expect_some_value!(
-                    self.visit_generic_metadata(&generics.value, &c.clone())?
-                        .value,
+                    self.visit_generic_metadata(generics, &c.clone())?.value,
                     CdniVerifierContextValue::GenericMetadata
                 )
                 .clone();
@@ -274,7 +304,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
         result.request_xform = if let Some(reqt) = &v.request_xform {
             Some(
                 expect_some_value!(
-                    self.visit_request_transform(&reqt.value, &c.clone())?.value,
+                    self.visit_request_transform(reqt, &c.clone())?.value,
                     CdniVerifierContextValue::RequestTransform
                 )
                 .clone(),
@@ -286,8 +316,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
         result.response_xform = if let Some(reqt) = &v.request_xform {
             Some(
                 expect_some_value!(
-                    self.visit_response_transform(&reqt.value, &c.clone())?
-                        .value,
+                    self.visit_response_transform(reqt, &c.clone())?.value,
                     CdniVerifierContextValue::ResponseTransform
                 )
                 .clone(),
@@ -308,7 +337,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_request_transform(
         &self,
-        _v: &RequestTransform<()>,
+        _v: &TypedRequestTransform<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
         todo!()
@@ -316,7 +345,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_response_transform(
         &self,
-        _v: &RequestTransform<()>,
+        _v: &TypedRequestTransform<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
         todo!()
@@ -324,7 +353,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_generic_metadata(
         &self,
-        _v: &GenericMetadata<()>,
+        _v: &TypedGenericMetadata<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
         todo!()
@@ -332,7 +361,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_header_transform(
         &self,
-        _v: &HeaderTransform<()>,
+        _v: &TypedHeaderTransform<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
         todo!()
@@ -340,7 +369,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_header(
         &self,
-        _v: &Header<()>,
+        _v: &TypedHeader<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
         todo!()
@@ -348,7 +377,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_synthetic_response(
         &self,
-        _v: &SyntheticResponse<()>,
+        _v: &TypedSyntheticResponse<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
         todo!()
@@ -361,7 +390,7 @@ pub fn verify_cdni(
 ) -> Result<TypedProcessingStages<CdniVerificationKey>, CdniVerificationError> {
     let verifier = CdniVerifier {};
     let context = CdniVerifierContext::default();
-    let value = &stages.value;
+    let value = &stages;
 
     let result = verifier.visit_processing_stages(value, &context)?;
 
@@ -374,13 +403,28 @@ mod test_verify {
 
     use crate::cdni::{
         spec::TypedProcessingStages,
-        verify::{CdniVerificationError::ExpressionWrongType, verify_cdni},
+        verify::{
+            CdniVerificationError::{ExpressionWrongType, WrongGenericMetadataTypeName},
+            verify_cdni,
+        },
     };
     use crate::mel::tvs::Type;
 
     use std::path::Path;
 
     use crate::cdni::tests::test_helpers::read_test_file;
+
+    #[test]
+    fn test_verify_bad_generic_md_typename() {
+        let json = read_test_file(Path::new("./src/cdni/tests/example8-bad-typename.json"));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages)
+            .expect_err("Could verify CDNI with bad generic metadata typenames");
+
+        assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI.ProcessingStages" && actual == "MI.ProcessigStages")
+    }
 
     #[test]
     fn test_verify_simple() {

@@ -237,8 +237,8 @@ pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
     generated.into()
 }
 
-#[proc_macro_derive(NewTyped)]
-pub fn derive_new_typed(item: TokenStream) -> TokenStream {
+#[proc_macro_derive(TypedGenericMetadata)]
+pub fn derive_typed_generic_metadata(item: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(item).unwrap();
     let name = &ast.ident;
     let untyped_name = format_ident!("{}", ast.ident.to_string().trim_start_matches("Typed"));
@@ -248,6 +248,10 @@ pub fn derive_new_typed(item: TokenStream) -> TokenStream {
 
     let r = quote! {
     impl #x #name #y #z {
+        pub fn typed_generic_metadata_name() -> String {
+            #metadata_type.to_string()
+        }
+
         pub fn typed_value<_X: Debug + Clone + Default>(sr: #untyped_name<_X>) -> #name::<_X> {
             #name::<_X> {
                 tpe: #metadata_type.to_string(),
