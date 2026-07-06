@@ -38,7 +38,7 @@ use crate::{
 
 use std::fmt::Debug;
 
-pub type CdniVisitorResult<T, E> = Result<T, E>;
+type CdniVisitorResult<T, E> = Result<T, E>;
 
 #[derive(Debug, Clone, Default)]
 pub enum CdniVerificationError {
@@ -69,11 +69,11 @@ impl Serialize for CdniVerificationKey {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct CdniVerifier {}
+struct CdniVerifier {}
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
-pub enum CdniVerifierContextValue {
+enum CdniVerifierContextValue {
     ProcessingStages(TypedProcessingStages<CdniVerificationKey>),
     StageRules(TypedStageRules<CdniVerificationKey>),
     ExpressionMatch(TypedExpressionMatch<CdniVerificationKey>),
@@ -84,11 +84,11 @@ pub enum CdniVerifierContextValue {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct CdniVerifierContext {
+struct CdniVerifierContext {
     value: Option<CdniVerifierContextValue>,
 }
 
-pub type VerifiedCdni = ProcessingStages<CdniVerificationKey>;
+type VerifiedCdni = ProcessingStages<CdniVerificationKey>;
 
 macro_rules! expect_maybe_some_value {
     ($name:expr, $value:path) => {
