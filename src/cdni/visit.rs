@@ -1,0 +1,37 @@
+// brooks, Copyright 2026, Will Hawkins
+//
+// This file is part of brooks.
+
+// This file is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+use crate::cdni::spec::{
+    ExpressionMatch, GenericMetadata, Header, HeaderTransform, ProcessingStages, RequestTransform,
+    StageMetadata, StageRules, SyntheticResponse,
+};
+
+use std::fmt::Debug;
+
+pub type CdniVisitorResult<T, E> = Result<T, E>;
+pub trait CdniVisitor<A: Debug + Clone + Default, O, E> {
+    fn visit_processing_stages(&self, v: &ProcessingStages<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_stage_rules(&self, v: &StageRules<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_expression_match(&self, v: &ExpressionMatch<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_stage_metadata(&self, v: &StageMetadata<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_request_transform(&self, v: &RequestTransform<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_response_transform(&self, v: &RequestTransform<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_generic_metadata(&self, v: &GenericMetadata<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_header_transform(&self, v: &HeaderTransform<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_header(&self, v: &Header<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_synthetic_response(&self, v: &SyntheticResponse<A>, c: &O) -> CdniVisitorResult<O, E>;
+}

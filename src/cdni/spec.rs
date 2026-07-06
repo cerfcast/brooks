@@ -15,235 +15,221 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use brooks_macros::NewTyped;
 use serde::{Deserialize, Serialize};
 
+use std::fmt::Debug;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyntheticResponse {}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedSyntheticResponse {
+pub struct SyntheticResponse<A: Debug + Clone + Default> {
+    #[serde(skip)]
+    pub aug: A,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, NewTyped)]
+pub struct TypedSyntheticResponse<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: SyntheticResponse,
+    pub value: SyntheticResponse<A>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Header {
-    name: String,
-    value: String,
+pub struct Header<A: Debug + Clone + Default> {
+    pub name: String,
+    pub value: String,
     #[serde(rename = "value-is-expression")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    value_expr: Option<bool>,
+    pub value_expr: Option<bool>,
+
+    #[serde(skip)]
+    pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedHeader {
+#[derive(Debug, Clone, Serialize, Deserialize, NewTyped)]
+pub struct TypedHeader<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: Header,
+    pub value: Header<A>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HeaderTransform {
+pub struct HeaderTransform<A: Debug + Clone + Default> {
     #[serde(skip_serializing_if = "Option::is_none")]
-    delete: Option<Vec<String>>,
+    pub delete: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    add: Option<Vec<TypedHeader>>,
+    pub add: Option<Vec<TypedHeader<A>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    replace: Option<Vec<TypedHeader>>,
+    pub replace: Option<Vec<TypedHeader<A>>>,
+    #[serde(skip)]
+    pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedHeaderTransform {
+#[derive(Debug, Clone, Serialize, Deserialize, NewTyped)]
+pub struct TypedHeaderTransform<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: HeaderTransform,
+    pub value: HeaderTransform<A>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenericMetadata {}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedGenericMetadata {
+pub struct GenericMetadata<A: Debug + Clone + Default> {
+    #[serde(skip_serializing, skip_deserializing)]
+    pub aug: A,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, NewTyped)]
+pub struct TypedGenericMetadata<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: GenericMetadata,
+    pub value: GenericMetadata<A>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RequestTransform {
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RequestTransform<A: Debug + Clone + Default> {
     #[serde(rename = "header-transform")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    xform: Option<TypedHeaderTransform>,
+    pub xform: Option<TypedHeaderTransform<A>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    uri: Option<String>,
+    pub uri: Option<String>,
 
     #[serde(rename = "uri-is-expression")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    uri_is_expr: Option<bool>,
+    pub uri_is_expr: Option<bool>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedRequestTransform {
+#[derive(Debug, Clone, Serialize, Deserialize, NewTyped)]
+pub struct TypedRequestTransform<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: RequestTransform,
+    pub value: RequestTransform<A>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResponseTransform {
+pub struct ResponseTransform<A: Debug + Clone + Default> {
     #[serde(rename = "header-transform")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    xform: Option<TypedHeaderTransform>,
+    pub xform: Option<TypedHeaderTransform<A>>,
 
     #[serde(rename = "response-status")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    response_status: Option<String>,
+    pub response_status: Option<String>,
 
     #[serde(rename = "status-is-expression")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    response_status_expr: Option<bool>,
+    pub response_status_expr: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    synthetic: Option<TypedSyntheticResponse>,
+    pub synthetic: Option<TypedSyntheticResponse<A>>,
+
+    #[serde(skip)]
+    pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedResponseTransform {
+#[derive(Debug, Clone, Serialize, Deserialize, NewTyped)]
+pub struct TypedResponseTransform<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: ResponseTransform,
+    pub value: ResponseTransform<A>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StageMetadata {
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StageMetadata<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    generic: Option<Vec<TypedGenericMetadata>>,
+    pub generic: Option<Vec<TypedGenericMetadata<A>>>,
 
     #[serde(rename = "request-transform")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    request_xform: Option<TypedRequestTransform>,
+    pub request_xform: Option<TypedRequestTransform<A>>,
 
     #[serde(rename = "response-transform")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    response_xform: Option<TypedResponseTransform>,
+    pub response_xform: Option<TypedResponseTransform<A>>,
+
+    #[serde(skip)]
+    pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedStageMetadata {
+#[derive(Debug, Clone, Serialize, Deserialize, Default, NewTyped)]
+pub struct TypedStageMetadata<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: StageMetadata,
+    pub value: StageMetadata<A>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExpressionMatch {
-    expression: String,
+pub struct ExpressionMatch<A: Debug + Clone + Default> {
+    pub expression: String,
+    #[serde(skip)]
+    pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedExpressionMatch {
+#[derive(Debug, Clone, Serialize, Deserialize, NewTyped)]
+pub struct TypedExpressionMatch<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: ExpressionMatch,
+    pub value: ExpressionMatch<A>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StageRules {
+pub struct StageRules<A: Debug + Clone + Default> {
     #[serde(rename = "match")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    mtch: Option<TypedExpressionMatch>,
+    pub mtch: Option<TypedExpressionMatch<A>>,
     #[serde(rename = "stage-metadata")]
-    stage_metadata: TypedStageMetadata,
+    pub stage_metadata: TypedStageMetadata<A>,
+
+    #[serde(skip)]
+    pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedStageRules {
+#[derive(Debug, Clone, Serialize, Deserialize, NewTyped)]
+pub struct TypedStageRules<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: StageRules,
+    pub value: StageRules<A>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessingStages {
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ProcessingStages<A: Debug + Clone + Default> {
     #[serde(rename = "client-request")]
-    client_req: Vec<TypedStageRules>,
+    pub client_req: Vec<TypedStageRules<A>>,
     #[serde(rename = "origin-request")]
-    origin_req: Vec<TypedStageRules>,
+    pub origin_req: Vec<TypedStageRules<A>>,
     #[serde(rename = "origin-response")]
-    origin_res: Vec<TypedStageRules>,
+    pub origin_res: Vec<TypedStageRules<A>>,
     #[serde(rename = "client-response")]
-    client_res: Vec<TypedStageRules>,
+    pub client_res: Vec<TypedStageRules<A>>,
+
+    #[serde(skip)]
+    pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedProcessingStages {
+#[derive(Debug, Clone, Serialize, Deserialize, NewTyped)]
+pub struct TypedProcessingStages<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
-    tpe: String,
+    pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    value: ProcessingStages,
+    pub value: ProcessingStages<A>,
 }
 
 #[cfg(test)]
 mod test_spec {
-    use std::{fs::OpenOptions, io::Read, path::Path};
+    use std::path::Path;
 
-    use crate::cdni::spec::{
-        ExpressionMatch, ProcessingStages, StageMetadata, StageRules, TypedExpressionMatch,
-        TypedProcessingStages, TypedStageMetadata, TypedStageRules,
+    use crate::cdni::{
+        spec::{ProcessingStages, TypedProcessingStages},
+        tests::test_helpers::{expression_match, read_test_file, stage_metadata, stage_rule},
     };
-
-    fn read_test_file(path: &Path) -> String {
-        let mut contents: Vec<u8> = vec![];
-        OpenOptions::new()
-            .read(true)
-            .open(path)
-            .expect("Could not open test file.")
-            .read_to_end(&mut contents)
-            .expect("Could not read string from test file");
-
-        String::from_utf8(contents).expect("Could not convert source to string")
-    }
-
-    fn expression_match(expression: &str) -> TypedExpressionMatch {
-        TypedExpressionMatch {
-            tpe: "MI.ExpressionMatch".to_string(),
-            value: ExpressionMatch {
-                expression: expression.to_string(),
-            },
-        }
-    }
-
-    fn stage_metadata() -> TypedStageMetadata {
-        TypedStageMetadata {
-            tpe: "MI.StageMetadata".to_string(),
-            value: StageMetadata {
-                generic: None,
-                request_xform: None,
-                response_xform: None,
-            },
-        }
-    }
-
-    fn stage_rule(
-        expression: Option<TypedExpressionMatch>,
-        md: TypedStageMetadata,
-    ) -> TypedStageRules {
-        TypedStageRules {
-            tpe: "MI.StageRules".to_string(),
-            value: StageRules {
-                mtch: expression,
-                stage_metadata: md,
-            },
-        }
-    }
 
     #[test]
     fn test_simple_serialize() {
-        let x = TypedProcessingStages {
+        let x = TypedProcessingStages::<()> {
             tpe: "MI.ProcessingStages".to_string(),
-            value: ProcessingStages {
+            value: ProcessingStages::<()> {
                 client_req: vec![stage_rule(
                     Some(expression_match("5 + 4")),
                     stage_metadata(),
@@ -260,6 +246,7 @@ mod test_spec {
                     Some(expression_match("5 + 4")),
                     stage_metadata(),
                 )],
+                aug: (),
             },
         };
         let expected = read_test_file(Path::new("./src/cdni/tests/simple_serialize.json"));
@@ -270,6 +257,6 @@ mod test_spec {
     #[test]
     fn test_deserialize_example8() {
         let json = read_test_file(Path::new("./src/cdni/tests/example8.json"));
-        assert!(serde_json::from_str::<TypedProcessingStages>(&json).is_ok())
+        assert!(serde_json::from_str::<TypedProcessingStages<()>>(&json).is_ok())
     }
 }
