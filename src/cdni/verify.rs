@@ -355,10 +355,26 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_generic_metadata(
         &self,
-        _v: &TypedGenericMetadata<()>,
+        v: &TypedGenericMetadata<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
-        todo!()
+        // We only verify that the type starts with "MI.".
+        if !v.tpe.starts_with("MI.") {
+            return Err(CdniVerificationError::WrongGenericMetadataTypeName(
+                "MI. ...".to_string(),
+                v.tpe.clone(),
+            ));
+        }
+
+        Ok(CdniVerifierContext {
+            value: Some(CdniVerifierContextValue::GenericMetadata(
+                TypedGenericMetadata {
+                    tpe: v.tpe.clone(),
+                    value: v.value.clone(),
+                    aug: CdniVerificationKey::None,
+                },
+            )),
+        })
     }
 
     fn visit_header_transform(
@@ -458,5 +474,18 @@ mod test_verify {
         let result = verify_cdni(&stages).expect_err("Could verify mistyped CDNI");
 
         assert_matches!(result, ExpressionWrongType(Type::Boolean, Type::Integer))
+    }
+
+    #[test]
+    fn test_verify_stage_metadata_with_generic_metadata_bad_type_name() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/simple_deserialize_stage_metadata_with_generic_metadata_bad_type_name.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages).expect_err("Could verify mistyped CDNI");
+
+        assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI. ..." && actual == "Mi.CachePolicy");
     }
 }

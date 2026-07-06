@@ -38,6 +38,7 @@
 
 use brooks_macros::TypedGenericMetadata;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use std::fmt::Debug;
 
@@ -93,16 +94,13 @@ pub struct TypedHeaderTransform<A: Debug + Clone + Default> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenericMetadata<A: Debug + Clone + Default> {
-    #[serde(skip_serializing, skip_deserializing)]
-    pub aug: A,
-}
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
 pub struct TypedGenericMetadata<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    pub value: GenericMetadata<A>,
+    pub value: Value,
+    #[serde(skip)]
+    pub aug: A,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -278,6 +276,26 @@ mod test_spec {
     #[test]
     fn test_deserialize_example8() {
         let json = read_test_file(Path::new("./src/cdni/tests/example8.json"));
-        assert!(serde_json::from_str::<TypedProcessingStages<()>>(&json).is_ok())
+
+        let result = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not deserialize Example 8");
+
+        // There is one client request stage rules ...
+        assert_eq!(result.value.client_req.len(), 1);
+        let client_req = &result.value.client_req[0];
+
+        // ... and it has a match ...
+        assert!(client_req.value.mtch.is_some());
+        // ... and it requests application of a piece of metadata ...
+        assert!(client_req.value.stage_metadata.value.generic.is_some());
+        // ... and, finally, it has a response transform.
+        assert!(
+            client_req
+                .value
+                .stage_metadata
+                .value
+                .response_xform
+                .is_some()
+        );
     }
 }
