@@ -268,14 +268,14 @@ mod test_spec {
                 aug: (),
             },
         };
-        let expected = read_test_file(Path::new("./src/cdni/tests/simple_serialize.json"));
+        let expected = read_test_file(Path::new("./src/cdni/tests/simple/serialize.json"));
         let actual = serde_json::to_string_pretty(&x).expect("Could not serialize");
         pretty_assertions::assert_eq!(expected, actual);
     }
 
     #[test]
     fn test_deserialize_example8() {
-        let json = read_test_file(Path::new("./src/cdni/tests/example8.json"));
+        let json = read_test_file(Path::new("./src/cdni/tests/from-spec/example8.json"));
 
         let result = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not deserialize Example 8");

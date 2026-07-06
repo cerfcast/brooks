@@ -1,0 +1,34 @@
+{
+    "generic-metadata-type": "MI.ProcessingStages",
+    "generic-metadata-value": {
+        "client-request": [
+            {
+                "generic-metadata-type": "MI.StageRules",
+                "generic-metadata-value": {
+                    "match": {
+                        "generic-metadata-type": "MI.ExpressionMatch",
+                        "generic-metadata-value": {
+                            "expression": "true"
+                        }
+                    },
+                    "stage-metadata": {
+                        "generic-metadata-type": "MI.StageMetadata",
+                        "generic-metadata-value": {
+                            "generic-metadata": [],
+                            "request-transform": {
+                                "generic-metadata-type": "MI.RequestTransform",
+                                "generic-metadata-value": {
+                                    "uri": "\"testing\" . \"one\"",
+                                    "uri-is-expression": true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ],
+        "origin-request": [],
+        "origin-response": [],
+        "client-response": []
+    }
+}
