@@ -48,5 +48,5 @@ We would _love_ your contributions! More information on how to contribute will b
 In the meantime, if you want to get started helping immediately, please file an
 [issue](https://github.com/cerfcast/brooks/issues) or contact [Will Hawkins](mailto:whh8b@obs.cr).
 
-Open Source is all about community -- we can't wait to have you join the effort!
+Open Source is all about community -- we can't wait to have you join the effort!!
 
