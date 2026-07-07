@@ -74,7 +74,7 @@ pub struct TypedHeader<A: Debug + Clone + Default> {
     pub value: Header<A>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HeaderTransform<A: Debug + Clone + Default> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub delete: Option<Vec<String>>,

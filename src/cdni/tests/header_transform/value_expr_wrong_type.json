@@ -1,0 +1,48 @@
+{
+    "generic-metadata-type": "MI.ProcessingStages",
+    "generic-metadata-value": {
+        "client-request": [
+            {
+                "generic-metadata-type": "MI.StageRules",
+                "generic-metadata-value": {
+                    "match": {
+                        "generic-metadata-type": "MI.ExpressionMatch",
+                        "generic-metadata-value": {
+                            "expression": "true"
+                        }
+                    },
+                    "stage-metadata": {
+                        "generic-metadata-type": "MI.StageMetadata",
+                        "generic-metadata-value": {
+                            "generic-metadata": [],
+                            "response-transform": {
+                                "generic-metadata-type": "MI.ResponseTransform",
+                                "generic-metadata-value": {
+                                    "response-status": "200",
+                                    "header-transform": {
+                                        "generic-metadata-type": "MI.HeaderTransform",
+                                        "generic-metadata-value": {
+                                            "add": [
+                                                {
+                                                    "generic-metadata-type": "MI.Header",
+                                                    "generic-metadata-value": {
+                                                        "name": "X-custom-response-header",
+                                                        "value": "true",
+                                                        "value-is-expression": true
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ],
+        "origin-request": [],
+        "origin-response": [],
+        "client-response": []
+    }
+}
