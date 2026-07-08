@@ -9,6 +9,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-node@v4
+        with:
+          node-version: 'latest'
       - uses: tree-sitter/setup-action@v2
       # Because our tree-sitter code is in a subdirectory,
       # and working-directory does not apply to uses, we
@@ -23,7 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v4
       - uses: tree-sitter/setup-action@v2
       # Because our tree-sitter code is in a subdirectory,
       # and working-directory does not apply to uses, we
@@ -50,7 +51,6 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-node@v4
       - uses: tree-sitter/setup-action@v2
       # Because our tree-sitter code is in a subdirectory,
       # and working-directory does not apply to uses, we
