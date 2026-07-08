@@ -7,7 +7,7 @@ jobs:
     name: Grammar Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 'latest'
@@ -24,7 +24,7 @@ jobs:
     name: Library Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - uses: tree-sitter/setup-action@v2
       # Because our tree-sitter code is in a subdirectory,
       # and working-directory does not apply to uses, we
@@ -39,7 +39,7 @@ jobs:
     name: Library Format Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - run: cargo fmt
   generate-docs:
     name: Generate Docs
@@ -50,7 +50,7 @@ jobs:
       pages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - uses: tree-sitter/setup-action@v2
       # Because our tree-sitter code is in a subdirectory,
       # and working-directory does not apply to uses, we
