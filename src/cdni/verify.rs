@@ -601,6 +601,10 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 }
 
+fn verifier() -> (CdniVerifier, CdniVerifierContext) {
+    (CdniVerifier {}, CdniVerifierContext::default())
+}
+
 /// Verify the (semantic) validity of some CDNI JSON
 ///
 /// In particular, test whether
@@ -611,17 +615,246 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 pub fn verify_cdni(
     stages: &TypedProcessingStages<()>,
 ) -> Result<TypedProcessingStages<CdniVerificationKey>, CdniVerificationError> {
-    let verifier = CdniVerifier {};
-    let context = CdniVerifierContext::default();
+    let (verifier, context) = verifier();
     let value = &stages;
-
     let result = verifier.visit_processing_stages(value, &context)?;
-
     Ok(expect_some_value!(&result.value, CdniVerifierContextValue::ProcessingStages).clone())
 }
 
 #[cfg(test)]
 mod test_verify {
+    use std::assert_matches;
+
+    use crate::cdni::spec::{HeaderTransform, ResponseTransform, TypedHeaderTransform};
+    use crate::cdni::verify::{CdniVerifierContextValue, verifier};
+    use crate::cdni::visit::CdniVisitor;
+    use crate::mel::tvs::Type;
+    use crate::{
+        cdni::{
+            spec::TypedResponseTransform,
+            verify::{
+                CdniVerificationError::{ExpressionWrongType, WrongGenericMetadataTypeName},
+                CdniVerificationKey, verify_cdni,
+            },
+        },
+        mel::ast::Expr::BinaryExpr,
+    };
+
+    use crate::cdni::tests::test_helpers::{
+        expression_match, generic_metadata, header_transform, processing_stages, request_transform,
+        response_transform, typed_header,
+    };
+
+    #[test]
+    fn test_verify_bad_generic_md_typename() {
+        let mut stages = processing_stages(vec![], vec![], vec![], vec![]);
+        stages.tpe = "MI.ProcessigStages".to_string();
+
+        let result = verify_cdni(&stages).expect_err("Could verify invalid CDNI");
+
+        assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI.ProcessingStages" && actual == "MI.ProcessigStages")
+    }
+
+    #[test]
+    fn test_verify_generic_metadata_with_bad_type_name() {
+        let generic = generic_metadata("Mi.CachePolicy", None);
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_generic_metadata(&generic, &context)
+            .expect_err("Could verify mistyped CDNI");
+
+        assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI. ..." && actual == "Mi.CachePolicy");
+    }
+
+    #[test]
+    fn test_verify_match_wrong_type() {
+        let mtch = expression_match("5 + 4");
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_expression_match(&mtch, &context)
+            .expect_err("Could verify mistyped CDNI");
+
+        assert_matches!(result, ExpressionWrongType(Type::Boolean, Type::Integer))
+    }
+
+    #[test]
+    fn test_verify_request_transform_uri_expr_wrong_type() {
+        let xform = request_transform(None, Some("5+4".to_string()), Some(true));
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_request_transform(&xform, &context)
+            .expect_err("Could verify CDNI with incorrect expression type in URI");
+
+        assert_matches!(result, ExpressionWrongType(Type::String, Type::Integer));
+    }
+
+    #[test]
+    fn test_verify_response_transform() {
+        let xform = response_transform(None, Some("404".to_string()), None, None);
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_response_transform(&xform, &context)
+            .expect("Could not verify correct CDNI")
+            .value
+            .expect("No value in CDNI Verification Context");
+
+        assert_matches!(
+            result,
+            CdniVerifierContextValue::ResponseTransform(TypedResponseTransform {
+                tpe: _,
+                value: ResponseTransform {
+                    xform: _,
+                    response_status: _,
+                    response_status_expr: None,
+                    synthetic: None,
+                    aug: CdniVerificationKey::None
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_verify_response_transform_rs_expr() {
+        let xform = response_transform(None, Some("400+4".to_string()), Some(true), None);
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_response_transform(&xform, &context)
+            .expect("Could not verify correct CDNI")
+            .value
+            .expect("No value in CDNI Verification Context");
+
+        assert_matches!(
+            result,
+            CdniVerifierContextValue::ResponseTransform(TypedResponseTransform {
+                tpe: _,
+                value: ResponseTransform {
+                    xform: _,
+                    response_status: _,
+                    response_status_expr: Some(true),
+                    synthetic: None,
+                    aug: CdniVerificationKey::Expr(BinaryExpr(_))
+                }
+            })
+        );
+    }
+    #[test]
+    fn test_verify_response_transform_rs_expr_wrong_type() {
+        let xform = response_transform(None, Some("false".to_string()), Some(true), None);
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_response_transform(&xform, &context)
+            .expect_err("Could verify CDNI with incorrect expression type in URI");
+
+        assert_matches!(result, ExpressionWrongType(Type::Integer, Type::Boolean));
+    }
+
+    #[test]
+    fn test_verify_header_transform() {
+        let header_to_add = typed_header("add", "value", None);
+        let header_to_replace = typed_header("replace", "value", None);
+        let header_to_delete = vec!["delete1".to_string(), "delete2".to_string()];
+
+        let header_xform = header_transform(
+            Some(header_to_delete),
+            Some(vec![header_to_add]),
+            Some(vec![header_to_replace]),
+        );
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_header_transform(&header_xform, &context)
+            .expect("Could not verify correct CDNI")
+            .value
+            .expect("No value in CDNI Verification Context");
+
+        assert_matches!(
+            &result,
+            CdniVerifierContextValue::HeaderTransform(TypedHeaderTransform {
+                        tpe: _,
+                        value: HeaderTransform {
+                            delete: Some(d),
+                            add: Some(a),
+                            replace: Some(b),
+                            aug: CdniVerificationKey::None
+                        }
+                    }) if d.len() == 2 && a.len() == 1 && b.len() == 1
+        );
+    }
+
+    #[test]
+    fn test_verify_header_transform_value_expr() {
+        let header_to_add = typed_header("add", "\"value\"", Some(true));
+        let header_to_replace = typed_header("replace", "\"testing\" . \"one\"", Some(true));
+
+        let header_xform = header_transform(
+            None,
+            Some(vec![header_to_add]),
+            Some(vec![header_to_replace]),
+        );
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_header_transform(&header_xform, &context)
+            .expect("Could not verify correct CDNI")
+            .value
+            .expect("No value in CDNI Verification Context");
+
+        assert_matches!(
+            &result,
+            CdniVerifierContextValue::HeaderTransform(TypedHeaderTransform {
+                        tpe: _,
+                        value: HeaderTransform {
+                            delete: None,
+                            add: Some(a),
+                            replace: Some(b),
+                            aug: CdniVerificationKey::None
+                        }
+            }) if matches!(a[0].value.aug, CdniVerificationKey::Expr(_)) && matches!(b[0].value.aug, CdniVerificationKey::Expr(_))
+        );
+    }
+
+    #[test]
+    fn test_verify_header_transform_value_expr_wrong_type_add() {
+        let header_to_add = typed_header("add", "5", Some(true));
+        let header_to_replace = typed_header("replace", "\"testing\"", Some(true));
+
+        let header_xform = header_transform(
+            None,
+            Some(vec![header_to_add]),
+            Some(vec![header_to_replace]),
+        );
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_header_transform(&header_xform, &context)
+            .expect_err("Could verify incorrect CDNI");
+
+        assert_matches!(result, ExpressionWrongType(Type::String, Type::Integer));
+    }
+
+    #[test]
+    fn test_verify_header_transform_value_expr_wrong_type_replace() {
+        let header_to_add = typed_header("add", "\"value\"", Some(true));
+        let header_to_replace = typed_header("replace", "true", Some(true));
+
+        let header_xform = header_transform(
+            None,
+            Some(vec![header_to_add]),
+            Some(vec![header_to_replace]),
+        );
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_header_transform(&header_xform, &context)
+            .expect_err("Could verify incorrect CDNI");
+
+        assert_matches!(result, ExpressionWrongType(Type::String, Type::Boolean));
+    }
+}
+
+#[cfg(test)]
+mod test_verify_from_json {
     use std::assert_matches;
 
     use crate::cdni::spec::{HeaderTransform, ResponseTransform, TypedHeaderTransform};

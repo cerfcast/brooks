@@ -19,9 +19,13 @@
 pub mod test_helpers {
     use std::{fs::OpenOptions, io::Read, path::Path};
 
+    use serde_json::Value;
+
     use crate::cdni::spec::{
-        ExpressionMatch, StageMetadata, StageRules, TypedExpressionMatch, TypedStageMetadata,
-        TypedStageRules,
+        ExpressionMatch, Header, HeaderTransform, ProcessingStages, RequestTransform,
+        ResponseTransform, StageMetadata, StageRules, TypedExpressionMatch, TypedGenericMetadata,
+        TypedHeader, TypedHeaderTransform, TypedProcessingStages, TypedRequestTransform,
+        TypedResponseTransform, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
     };
 
     pub fn read_test_file(path: &Path) -> String {
@@ -67,6 +71,94 @@ pub mod test_helpers {
             value: StageRules::<()> {
                 mtch: expression,
                 stage_metadata: md,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn processing_stages(
+        client_req: Vec<TypedStageRules<()>>,
+        client_res: Vec<TypedStageRules<()>>,
+        origin_req: Vec<TypedStageRules<()>>,
+        origin_res: Vec<TypedStageRules<()>>,
+    ) -> TypedProcessingStages<()> {
+        TypedProcessingStages {
+            tpe: "MI.ProcessingStages".to_string(),
+            value: ProcessingStages::<()> {
+                client_req,
+                client_res,
+                origin_req,
+                origin_res,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn generic_metadata(tpe: &str, value: Option<Value>) -> TypedGenericMetadata<()> {
+        TypedGenericMetadata {
+            tpe: tpe.to_string(),
+            value: value.unwrap_or_default(),
+            aug: (),
+        }
+    }
+
+    pub fn typed_header(name: &str, value: &str, value_expr: Option<bool>) -> TypedHeader<()> {
+        TypedHeader::<()> {
+            tpe: TypedHeader::<()>::typed_generic_metadata_name(),
+            value: Header {
+                name: name.to_string(),
+                value: value.to_string(),
+                value_expr,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn header_transform(
+        delete: Option<Vec<String>>,
+        add: Option<Vec<TypedHeader<()>>>,
+        replace: Option<Vec<TypedHeader<()>>>,
+    ) -> TypedHeaderTransform<()> {
+        TypedHeaderTransform::<()> {
+            tpe: TypedHeaderTransform::<()>::typed_generic_metadata_name(),
+            value: HeaderTransform {
+                delete,
+                add,
+                replace,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn response_transform(
+        xform: Option<TypedHeaderTransform<()>>,
+        response_status: Option<String>,
+        response_status_expr: Option<bool>,
+        synthetic: Option<TypedSyntheticResponse<()>>,
+    ) -> TypedResponseTransform<()> {
+        TypedResponseTransform::<()> {
+            tpe: TypedResponseTransform::<()>::typed_generic_metadata_name(),
+            value: ResponseTransform {
+                xform,
+                response_status,
+                response_status_expr,
+                synthetic,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn request_transform(
+        xform: Option<TypedHeaderTransform<()>>,
+        uri: Option<String>,
+        uri_is_expr: Option<bool>,
+    ) -> TypedRequestTransform<()> {
+        TypedRequestTransform::<()> {
+            tpe: TypedRequestTransform::<()>::typed_generic_metadata_name(),
+            value: RequestTransform {
+                xform,
+                uri,
+                uri_is_expr,
                 aug: (),
             },
         }
