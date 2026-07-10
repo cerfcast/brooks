@@ -17,8 +17,6 @@
 
 #[cfg(test)]
 pub mod test_helpers {
-    use std::{fs::OpenOptions, io::Read, path::Path};
-
     use serde_json::Value;
 
     use crate::ps::spec::{
@@ -28,18 +26,6 @@ pub mod test_helpers {
         TypedRequestTransform, TypedResponseTransform, TypedStageMetadata, TypedStageRules,
         TypedSyntheticResponse,
     };
-
-    pub fn read_test_file(path: &Path) -> String {
-        let mut contents: Vec<u8> = vec![];
-        OpenOptions::new()
-            .read(true)
-            .open(path)
-            .expect("Could not open test file.")
-            .read_to_end(&mut contents)
-            .expect("Could not read string from test file");
-
-        String::from_utf8(contents).expect("Could not convert source to string")
-    }
 
     pub fn expression_match(expression: &str) -> TypedExpressionMatch<()> {
         TypedExpressionMatch::<()> {

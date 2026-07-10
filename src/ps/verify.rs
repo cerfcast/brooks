@@ -1125,6 +1125,7 @@ mod test_verify_from_json {
         HeaderTransform, ResponseTransform, SyntheticResponse, TypedHeaderTransform,
         TypedSyntheticResponse,
     };
+    use crate::tests::read_test_file;
     use crate::{
         mel::ast::Expr::BinaryExpr,
         ps::{
@@ -1140,8 +1141,6 @@ mod test_verify_from_json {
     };
 
     use std::path::Path;
-
-    use crate::ps::tests::test_helpers::read_test_file;
 
     #[test]
     fn test_verify_simple() {

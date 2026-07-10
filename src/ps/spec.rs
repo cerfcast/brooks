@@ -257,9 +257,12 @@ pub struct TypedProcessingStages<A: Debug + Clone + Default> {
 mod test_spec {
     use std::path::Path;
 
-    use crate::ps::{
-        spec::{ProcessingStages, TypedProcessingStages},
-        tests::test_helpers::{expression_match, read_test_file, stage_metadata, stage_rule},
+    use crate::{
+        ps::{
+            spec::{ProcessingStages, TypedProcessingStages},
+            tests::test_helpers::{expression_match, stage_metadata, stage_rule},
+        },
+        tests::read_test_file,
     };
 
     #[test]

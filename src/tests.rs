@@ -15,18 +15,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-pub mod logging;
-#[allow(dead_code)]
-pub mod common;
-#[allow(dead_code)]
-pub mod utils;
-
-#[allow(dead_code)]
-pub mod mel;
-
-#[allow(dead_code)]
-pub mod ps;
+#[cfg(test)]
+use std::{fs::OpenOptions, io::Read, path::Path};
 
 #[cfg(test)]
-pub(crate) mod tests;
+pub(crate) fn read_test_file(path: &Path) -> String {
+    let mut contents: Vec<u8> = vec![];
+    OpenOptions::new()
+        .read(true)
+        .open(path)
+        .expect("Could not open test file.")
+        .read_to_end(&mut contents)
+        .expect("Could not read string from test file");
+
+    String::from_utf8(contents).expect("Could not convert source to string")
+}
