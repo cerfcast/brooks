@@ -603,3 +603,60 @@ mod interpreter_logger_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod interpreter_value_tests {
+
+    use std::assert_matches;
+
+    use crate::mel::{
+        interpreter::interpret::{MelInterpError, StructValue, TypedValue, Value},
+        tvs::{Struct, Type},
+    };
+
+    #[test]
+    fn test_typed_struct_field() {
+        let mut st = Struct::new("st");
+
+        st.fields
+            .insert("field1".to_string(), crate::mel::tvs::Type::Integer);
+
+        let mut sv = StructValue::new(st);
+
+        assert_matches!(
+            sv.insert_field(
+                "field1",
+                TypedValue {
+                    value: Value::Integer(5),
+                    tipe: Type::Integer,
+                },
+            ),
+            Ok(_),
+        )
+    }
+
+    #[test]
+    fn test_mistyped_struct_field() {
+        let mut st = Struct::new("st");
+
+        st.fields
+            .insert("field1".to_string(), crate::mel::tvs::Type::Integer);
+
+        let mut sv = StructValue::new(st);
+
+        assert_matches!(
+            sv.insert_field(
+                "field1",
+                TypedValue {
+                    value: Value::Boolean(false),
+                    tipe: Type::Boolean,
+                },
+            ),
+            Err(MelInterpError::MistypedField(
+                _,
+                Type::Integer,
+                Type::Boolean
+            ))
+        )
+    }
+}

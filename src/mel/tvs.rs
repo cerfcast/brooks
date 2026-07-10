@@ -25,6 +25,19 @@ pub struct Struct {
     pub fields: HashMap<String, Type>,
 }
 
+impl Struct {
+    pub fn new(name: &str) -> Struct {
+        Struct {
+            name: name.to_string(),
+            fields: HashMap::new(),
+        }
+    }
+
+    pub fn insert_field(&mut self, name: &str, tipe: Type) {
+        self.fields.insert(name.to_string(), tipe);
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Params {
     pub args: Vec<Type>,

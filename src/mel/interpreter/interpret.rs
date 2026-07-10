@@ -41,13 +41,42 @@ use crate::mel::{
         interpret::{MelInterpAssertion::SuccessWithoutValue, MelInterpError::UnknownIdentifier},
     },
     scope,
-    tvs::{self, Type},
+    tvs::{Struct, Type},
 };
 
 #[derive(Debug, Clone)]
 pub struct StructValue {
     pub fields: HashMap<String, TypedValue>,
-    pub tpe: tvs::Struct,
+    pub tpe: Struct,
+}
+
+impl StructValue {
+    pub fn new(tpe: Struct) -> StructValue {
+        StructValue {
+            fields: HashMap::new(),
+            tpe,
+        }
+    }
+
+    #[allow(clippy::result_large_err)]
+    pub fn insert_field(&mut self, name: &str, value: TypedValue) -> Result<(), MelInterpError> {
+        let ft = self
+            .tpe
+            .fields
+            .get(name)
+            .ok_or(MelInterpError::UnknownField(name.to_string()))?;
+
+        if ft != &value.tipe {
+            return Err(MelInterpError::MistypedField(
+                name.to_string(),
+                ft.clone(),
+                value.tipe,
+            ));
+        }
+
+        self.fields.insert(name.to_string(), value);
+        Ok(())
+    }
 }
 
 #[allow(clippy::to_string_trait_impl)]
@@ -175,6 +204,7 @@ pub enum MelInterpError {
     Assertion(MelInterpAssertion),
     UnknownIdentifier(String),
     UnknownField(String),
+    MistypedField(String, Type, Type),
     BuiltinError(builtins::BuiltinInterpError),
 }
 
@@ -193,6 +223,14 @@ impl Display for MelInterpError {
             }
             MelInterpError::BuiltinError(bi) => {
                 write!(f, "error executing builtin function: {}", bi)
+            }
+            MelInterpError::MistypedField(field, expected, actual) => {
+                write!(
+                    f,
+                    "error adding field to struct: field {field} has wrong type (expected: {}, actual: {})",
+                    expected.to_string(),
+                    actual.to_string()
+                )
             }
         }
     }
