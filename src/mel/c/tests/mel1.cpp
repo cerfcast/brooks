@@ -1,5 +1,6 @@
 #include <functional>
 #include <iostream>
+#include <regex>
 #include <string>
 
 using URI_t = std::hash<std::string>;

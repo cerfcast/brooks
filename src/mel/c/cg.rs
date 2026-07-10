@@ -122,7 +122,6 @@ impl MelCodegenContext {
 
     pub fn next_ssa(&self) -> (String, Self) {
         let (next_handle, next_ssa) = self.ssa_gen.usse();
-
         (
             next_handle,
             MelCodegenContext {
@@ -141,8 +140,8 @@ pub(crate) fn mel_type_to_c_type(tipe: &Type) -> String {
         Type::Boolean => "bool".to_string(),
         Type::Integer => "int".to_string(),
         Type::String => "std::string".to_string(),
+        Type::Regex => "std::regex".to_string(),
         Type::Struct(s) => s.name.clone(),
-        Type::Regex => todo!(),
         Type::IPAddress => todo!(),
         Type::Params(_) => todo!(),
         Type::Function(_, _) => todo!(),
@@ -150,38 +149,53 @@ pub(crate) fn mel_type_to_c_type(tipe: &Type) -> String {
     }
 }
 
-fn mel_logic_operator_to_c_logic_operator(op: &LogicOperator) -> String {
-    match op {
-        LogicOperator::And => "&&".to_string(),
-        LogicOperator::Or => "||".to_string(),
-    }
+fn mel_regex_to_c_regex(re: &str) -> String {
+    re.trim_start_matches("/").trim_end_matches("/").to_string()
 }
 
-fn mel_comparison_operator_to_c_comparison_operator(op: &ComparisonOperator) -> String {
+fn mel_logic_operator_to_c_logic_operator(op: &LogicOperator, left: &str, right: &str) -> String {
+    let op = match op {
+        LogicOperator::And => "&&".to_string(),
+        LogicOperator::Or => "||".to_string(),
+    };
+
+    format!("{left} {op} {right}")
+}
+
+fn mel_comparison_operator_to_c_comparison_operator(
+    op: &ComparisonOperator,
+    left: &str,
+    right: &str,
+) -> String {
     match op {
-        ComparisonOperator::Eq => "==".to_string(),
-        ComparisonOperator::Ne => "!=".to_string(),
-        ComparisonOperator::Lt => "<".to_string(),
-        ComparisonOperator::Lte => "<=".to_string(),
-        ComparisonOperator::Gt => ">".to_string(),
-        ComparisonOperator::Gte => ">=".to_string(),
-        ComparisonOperator::Re => todo!(),
+        ComparisonOperator::Eq => format!("{left} == {right}"),
+        ComparisonOperator::Ne => format!("{left} != {right}"),
+        ComparisonOperator::Lt => format!("{left} < {right}"),
+        ComparisonOperator::Lte => format!("{left} <= {right}"),
+        ComparisonOperator::Gt => format!("{left} > {right}"),
+        ComparisonOperator::Gte => format!("{left} >= {right}"),
+        ComparisonOperator::Re => format!("std::regex_match({left}, {right})"),
         ComparisonOperator::IP => todo!(),
     }
 }
 
-fn mel_math_operator_to_c_math_operator(op: &MathOperator) -> String {
-    match op {
+fn mel_math_operator_to_c_math_operator(op: &MathOperator, left: &str, right: &str) -> String {
+    let op = match op {
         MathOperator::Plus => "+".to_string(),
         MathOperator::Minus => "-".to_string(),
         MathOperator::Multiply => "*".to_string(),
         MathOperator::Divide => "/".to_string(),
         MathOperator::Modulo => "%".to_string(),
-    }
+    };
+    format!("{left} {op} {right}")
 }
 
-fn mel_concat_operator_to_c_concat_operator(_: &StringConcatOperator) -> String {
-    "+".to_string()
+fn mel_concat_operator_to_c_concat_operator(
+    _: &StringConcatOperator,
+    left: &str,
+    right: &str,
+) -> String {
+    format!("{left} + {right}")
 }
 
 macro_rules! decl {
@@ -291,31 +305,35 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         let left_ssa = context.ssa.clone();
 
         context = driver.visit(&ast.right, self, context.clone())?;
-        let right_ssa = &context.ssa.clone();
+        let right_ssa = context.ssa.clone();
 
         let (ssa, mut context) = context.next_ssa();
 
-        let op = match &ast.op {
+        let value = match &ast.op {
             ast::BinaryInfixOperator::Logic(logic_operator) => {
-                mel_logic_operator_to_c_logic_operator(logic_operator)
+                mel_logic_operator_to_c_logic_operator(logic_operator, &left_ssa, &right_ssa)
             }
             ast::BinaryInfixOperator::Comparison(comparison_operator) => {
-                mel_comparison_operator_to_c_comparison_operator(comparison_operator)
+                mel_comparison_operator_to_c_comparison_operator(
+                    comparison_operator,
+                    &left_ssa,
+                    &right_ssa,
+                )
             }
             ast::BinaryInfixOperator::Math(math_operator) => {
-                mel_math_operator_to_c_math_operator(math_operator)
+                mel_math_operator_to_c_math_operator(math_operator, &left_ssa, &right_ssa)
             }
             ast::BinaryInfixOperator::Concat(string_concat_operator) => {
-                mel_concat_operator_to_c_concat_operator(string_concat_operator)
+                mel_concat_operator_to_c_concat_operator(
+                    string_concat_operator,
+                    &left_ssa,
+                    &right_ssa,
+                )
             }
             ast::BinaryInfixOperator::MemberAccess(_) => todo!(),
         };
 
-        let decl = decl!(
-            ast.aug.tipe,
-            ssa,
-            format!("{} {} {}", left_ssa, op, right_ssa)
-        );
+        let decl = decl!(ast.aug.tipe, ssa, value);
 
         context = context.used_ssa(ssa);
 
@@ -351,10 +369,17 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
                 l: ast.1.clone(),
             },
             (ast::Literal::String(StringLiteral { literal: s }), _, _) => LocatableString {
-                s: decl!(Type::String, ssa, s.to_string()),
+                s: decl!(Type::String, ssa, format!("\"{s}\"")),
                 l: ast.1.clone(),
             },
-            (ast::Literal::Regex(RegexLiteral { literal: _ }), _, _) => todo!(),
+            (ast::Literal::Regex(RegexLiteral { literal: re }), _, _) => LocatableString {
+                s: decl!(
+                    Type::Regex,
+                    ssa,
+                    format!("std::regex(\"{}\")", mel_regex_to_c_regex(&re.to_string()))
+                ),
+                l: ast.1.clone(),
+            },
             (ast::Literal::IPAddress(IPAddressLiteral { literal: _ }), _, _) => todo!(),
         };
 

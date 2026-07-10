@@ -13,7 +13,17 @@ struct Request {
     std::string scheme;
 };
 
-INTERPRET_FUNCTION
+bool interpret() {
+	// 0 to 9
+	std::string _var_0 = "testing";
+	// 13 to 21
+	std::regex _var_1 = std::regex("t3st.*");
+	// 0 to 21
+	bool _var_2 = std::regex_match(_var_0, _var_1);
+	// 0 to 21
+	return _var_2;
+}
+
 
 void test() {
 	std::cout << "Test passed.\n";

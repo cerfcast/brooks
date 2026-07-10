@@ -63,6 +63,34 @@ int _var_0 = 5;
     }
 
     #[test]
+    fn test_codegen_literal_regex() {
+        let expected = "// 0 to 5
+std::regex _var_0 = std::regex(\"[a]\");
+";
+
+        let expr = "/[a]/";
+
+        let expr = compile(expr).expect("Could not compile");
+
+        let scopes = Scopes::<Type>::default();
+        let expr = analyze(&expr, &scopes).expect("Could not analyze");
+
+        let context = MelCodegenContext {
+            scopes,
+            code: vec![],
+            log: LogMsgs::new(crate::logging::LogLevel::Trace),
+            ssa_gen: SSA::new("_var"),
+            ssa: String::new(),
+        };
+        let actual: Vec<u8> = vec![];
+        let output = BufWriter::new(actual);
+        let result = codegen(&expr, context, output).expect("");
+        let actual = String::from_utf8_lossy(result.buffer());
+
+        pretty_assertions::assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn test_codegen_identifier() {
         let expected = "// 0 to 13
 int _var_0 = user_variable;
@@ -123,6 +151,37 @@ int _var_2 = _var_0 + _var_1;
     }
 
     #[test]
+    fn test_codegen_binary_expr_regex() {
+        let expected = "// 0 to 9
+std::string _var_0 = \"testing\";
+// 13 to 17
+std::regex _var_1 = std::regex(\".*\");
+// 0 to 17
+bool _var_2 = std::regex_match(_var_0, _var_1);
+";
+        let expr = "\"testing\" ~= /.*/";
+
+        let expr = compile(expr).expect("Could not compile");
+        let scopes = Scopes::<Type>::default();
+        let expr = analyze(&expr, &scopes).expect("Could not analyze");
+
+        let context = MelCodegenContext {
+            scopes,
+            code: vec![],
+            log: LogMsgs::new(crate::logging::LogLevel::Trace),
+            ssa_gen: SSA::new("_var"),
+            ssa: String::new(),
+        };
+
+        let actual: Vec<u8> = vec![];
+        let output = BufWriter::new(actual);
+        let result = codegen(&expr, context, output).expect("");
+        let actual = String::from_utf8_lossy(result.buffer());
+
+        pretty_assertions::assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn test_codegen_function_binary_expr() {
         let expected = "int interpret() {
 // 0 to 1
@@ -161,6 +220,62 @@ return _var_2;
     fn test_codegen_project_binary_expr() {
         let expected = read_test_file(Path::new("src/mel/c/tests/mel1.cpp"));
         let expr = "5 + 4";
+
+        let expr = compile(expr).expect("Could not compile");
+        let scopes = Scopes::<Type>::default();
+        let expr = analyze(&expr, &scopes).expect("Could not analyze");
+
+        let context = MelCodegenContext {
+            scopes,
+            code: vec![],
+            log: LogMsgs::new(crate::logging::LogLevel::Trace),
+            ssa_gen: SSA::new("_var"),
+            ssa: String::new(),
+        };
+
+        let t = tempfile::tempdir().expect("Could not create a temporary directory");
+        let m = Path::new("./cpp");
+        codegen_project(&expr, context, "interpret", vec![], t.path(), m).expect("");
+
+        let mut output_path = t.path().to_path_buf();
+        output_path.push("mel.cpp");
+        let actual = read_test_file(&output_path);
+
+        pretty_assertions::assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_codegen_project_binary_expr_regex_match() {
+        let expected = read_test_file(Path::new("src/mel/c/tests/mel2.cpp"));
+        let expr = "\"testing\" ~= /.*/";
+
+        let expr = compile(expr).expect("Could not compile");
+        let scopes = Scopes::<Type>::default();
+        let expr = analyze(&expr, &scopes).expect("Could not analyze");
+
+        let context = MelCodegenContext {
+            scopes,
+            code: vec![],
+            log: LogMsgs::new(crate::logging::LogLevel::Trace),
+            ssa_gen: SSA::new("_var"),
+            ssa: String::new(),
+        };
+
+        let t = tempfile::tempdir().expect("Could not create a temporary directory");
+        let m = Path::new("./cpp");
+        codegen_project(&expr, context, "interpret", vec![], t.path(), m).expect("");
+
+        let mut output_path = t.path().to_path_buf();
+        output_path.push("mel.cpp");
+        let actual = read_test_file(&output_path);
+
+        pretty_assertions::assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_codegen_project_binary_expr_regex_no_match() {
+        let expected = read_test_file(Path::new("src/mel/c/tests/mel3.cpp"));
+        let expr = "\"testing\" ~= /t3st.*/";
 
         let expr = compile(expr).expect("Could not compile");
         let scopes = Scopes::<Type>::default();
