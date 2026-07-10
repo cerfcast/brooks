@@ -20,6 +20,8 @@ pub mod analysis;
 #[allow(dead_code)]
 pub mod ast;
 #[allow(dead_code)]
+pub mod c;
+#[allow(dead_code)]
 pub mod compiler;
 #[allow(dead_code)]
 pub mod grammar;

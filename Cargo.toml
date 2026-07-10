@@ -15,6 +15,7 @@ regex = "1.12.4"
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 serde_json = { version = "1.0.150", optional = true }
 http = "1.4.2"
+tempfile = "3.27.0"
 
 [features]
 default = ["json"]
