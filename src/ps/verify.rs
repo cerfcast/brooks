@@ -744,7 +744,8 @@ mod test_verify {
         let mut stages = processing_stages(vec![], vec![], vec![], vec![]);
         stages.tpe = "MI.ProcessigStages".to_string();
 
-        let result = verify_cdni(&stages).expect_err("Could verify invalid CDNI");
+        let result = verify_cdni(&stages)
+            .expect_err("Could verify CDNI generic metadata with invalid metadata type name");
 
         assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI.ProcessingStages" && actual == "MI.ProcessigStages")
     }
@@ -756,7 +757,7 @@ mod test_verify {
         let (verifier, context) = verifier();
         let result = verifier
             .visit_generic_metadata(&generic, &context)
-            .expect_err("Could verify mistyped CDNI");
+            .expect_err("Could verify CDNI generic metadata with invalid metadata type name");
 
         assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI. ..." && actual == "Mi.CachePolicy");
     }
@@ -767,7 +768,7 @@ mod test_verify {
         let (verifier, context) = verifier();
         let result = verifier
             .visit_expression_match(&mtch, &context)
-            .expect_err("Could verify mistyped CDNI");
+            .expect_err("Could verify CDNI expression match with incorrect MEL type");
 
         assert_matches!(result, ExpressionWrongType(Type::Boolean, Type::Integer))
     }
@@ -778,7 +779,7 @@ mod test_verify {
         let (verifier, context) = verifier();
         let result = verifier
             .visit_request_transform(&xform, &context)
-            .expect_err("Could verify CDNI with incorrect expression type in URI");
+            .expect_err("Could verify CDNI with incorrect MEL type of expression to calculate URI");
 
         assert_matches!(result, ExpressionWrongType(Type::String, Type::Integer));
     }
@@ -838,7 +839,7 @@ mod test_verify {
         let (verifier, context) = verifier();
         let result = verifier
             .visit_response_transform(&xform, &context)
-            .expect_err("Could verify CDNI with incorrect expression type in URI");
+            .expect_err("Could verify CDNI response transform with incorrect MEL type of expression to calculate response status");
 
         assert_matches!(result, ExpressionWrongType(Type::Integer, Type::Boolean));
     }
@@ -922,7 +923,7 @@ mod test_verify {
         let (verifier, context) = verifier();
         let result = verifier
             .visit_header_transform(&header_xform, &context)
-            .expect_err("Could verify incorrect CDNI");
+            .expect_err("Could verify CDNI typed header with incorrect MEL type of expression to calculate header value");
 
         assert_matches!(result, ExpressionWrongType(Type::String, Type::Integer));
     }
@@ -941,7 +942,7 @@ mod test_verify {
         let (verifier, context) = verifier();
         let result = verifier
             .visit_header_transform(&header_xform, &context)
-            .expect_err("Could verify incorrect CDNI");
+            .expect_err("Could verify CDNI typed header with incorrect MEL type of expression to calculate header value");
 
         assert_matches!(result, ExpressionWrongType(Type::String, Type::Boolean));
     }
@@ -1164,7 +1165,7 @@ mod test_verify_from_json {
             .expect("Could not parse JSON test file");
 
         let result = verify_cdni(&stages)
-            .expect_err("Could verify CDNI with bad generic metadata typenames");
+            .expect_err("Could verify CDNI generic metadata with invalid metadata type name");
 
         assert_matches!(result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI.ProcessingStages" && actual == "MI.ProcessigStages")
     }
@@ -1190,7 +1191,8 @@ mod test_verify_from_json {
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
 
-        let result = verify_cdni(&stages).expect_err("Could verify mistyped CDNI");
+        let result = verify_cdni(&stages)
+            .expect_err("Could verify CDNI expression match with incorrect MEL type");
 
         assert_matches!(result, ExpressionWrongType(Type::Boolean, Type::Integer))
     }
@@ -1258,7 +1260,7 @@ mod test_verify_from_json {
             .expect("Could not parse JSON test file");
 
         let result = verify_cdni(&stages)
-            .expect_err("Could verify CDNI with incorrect expression type in URI");
+            .expect_err("Could verify CDNI with incorrect MEL type of expression to calculate URI");
 
         assert_matches!(result, ExpressionWrongType(Type::String, Type::Integer));
     }
@@ -1328,7 +1330,7 @@ mod test_verify_from_json {
             .expect("Could not parse JSON test file");
 
         let result = verify_cdni(&stages)
-            .expect_err("Could verify CDNI with incorrect expression type in response status");
+            .expect_err("Could verify CDNI response transform with incorrect MEL type of expression to calculate response status");
 
         assert_matches!(result, ExpressionWrongType(Type::Integer, Type::Boolean));
     }
@@ -1406,7 +1408,7 @@ mod test_verify_from_json {
     }
 
     #[test]
-    fn test_verify_header_transform_value_expr_wrong_type() {
+    fn test_verify_header_transform_value_expr_wrong_type_add() {
         let json = read_test_file(Path::new(
             "./src/ps/tests/header_transform/value_expr_wrong_type.json",
         ));
@@ -1414,7 +1416,7 @@ mod test_verify_from_json {
             .expect("Could not parse JSON test file");
 
         let result = verify_cdni(&stages)
-            .expect_err("Could verify CDNI with incorrect expression type in response status");
+            .expect_err("Could verify CDNI typed header with incorrect MEL type of expression to calculate header value");
 
         assert_matches!(result, ExpressionWrongType(Type::String, Type::Boolean));
     }
@@ -1427,9 +1429,8 @@ mod test_verify_from_json {
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
 
-        let result = verify_cdni(&stages)
-            .expect_err("Could verify CDNI with incorrect expression type in response status");
-
+        let result =
+            verify_cdni(&stages).expect_err("Could verify CDNI with invalid metadata type name");
         assert_matches!(result, ExpressionWrongType(Type::String, Type::Boolean));
     }
 
