@@ -266,10 +266,10 @@ impl MelInterpContext {
             log: self.log.clone(),
         }
     }
-    pub fn update_scopes(&self, new: scope::Scopes<TypedValue>) -> Self {
+    pub fn update_scopes(&self, new: &scope::Scopes<TypedValue>) -> Self {
         MelInterpContext {
             val: self.val.clone(),
-            scopes: new,
+            scopes: new.clone(),
             log: self.log.clone(),
         }
     }

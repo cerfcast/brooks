@@ -1075,7 +1075,7 @@ mod analyzed_serializer_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "use",
             Function(
                 Arc::new(Type::Integer),
@@ -1320,7 +1320,7 @@ mod analyzed_serializer_tests {
         reqs.fields
             .insert("incoming".to_string(), Type::Struct(headers));
 
-        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs)));
+        context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs)));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -1373,7 +1373,7 @@ mod analyzed_serializer_tests {
         };
 
         reqs.fields.insert("incoming".to_string(), Type::Boolean);
-        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs)));
+        context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs)));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -1432,7 +1432,7 @@ mod analyzed_serializer_tests {
                 },
             ),
         );
-        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs)));
+        context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs)));
 
         let result = driver
             .visit(&ast, &visitor, context)

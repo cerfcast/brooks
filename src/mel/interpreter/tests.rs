@@ -89,7 +89,7 @@ mod interpreter_tests {
 
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             &b.name(),
             Function(Arc::new(b.return_type()), b.parameters()),
         ));
@@ -110,7 +110,7 @@ mod interpreter_tests {
         let visitor = MelInterp {};
         let mut context = MelInterpContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -145,7 +145,7 @@ mod interpreter_tests {
 
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             &b.name(),
             Function(Arc::new(b.return_type()), b.parameters()),
         ));
@@ -166,7 +166,7 @@ mod interpreter_tests {
         let visitor = MelInterp {};
         let mut context = MelInterpContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -201,7 +201,7 @@ mod interpreter_tests {
 
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             &b.name(),
             Function(Arc::new(b.return_type()), b.parameters()),
         ));
@@ -222,7 +222,7 @@ mod interpreter_tests {
         let visitor = MelInterp {};
         let mut context = MelInterpContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -292,7 +292,7 @@ mod interpreter_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert("a", Type::String));
+        context = context.update_scopes(&context.scopes.insert("a", Type::String));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -310,7 +310,7 @@ mod interpreter_tests {
         let visitor = MelInterp {};
         let mut context = MelInterpContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "a",
             TypedValue {
                 value: Value::String("Hello".to_string()),
@@ -348,7 +348,7 @@ mod interpreter_tests {
         };
 
         reqs.fields.insert("incoming".to_string(), Type::String);
-        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs.clone())));
+        context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs.clone())));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -378,7 +378,7 @@ mod interpreter_tests {
                 tipe: Type::String,
             },
         );
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "req",
             TypedValue {
                 value: Struct(reqsv),
@@ -416,7 +416,7 @@ mod interpreter_tests {
         };
 
         reqs.fields.insert("incoming".to_string(), Type::Boolean);
-        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs.clone())));
+        context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs.clone())));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -446,7 +446,7 @@ mod interpreter_tests {
                 tipe: Type::String,
             },
         );
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "req",
             TypedValue {
                 value: Struct(reqsv),
@@ -548,7 +548,7 @@ mod interpreter_logger_tests {
         };
 
         reqs.fields.insert("incoming".to_string(), Type::Boolean);
-        context = context.update_scopes(context.scopes.insert("req", Type::Struct(reqs.clone())));
+        context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs.clone())));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -581,7 +581,7 @@ mod interpreter_logger_tests {
             },
         );
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "req",
             TypedValue {
                 value: Struct(reqsv),

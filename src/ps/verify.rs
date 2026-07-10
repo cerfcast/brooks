@@ -79,7 +79,7 @@ impl CdniVerifier {
     #[allow(clippy::result_large_err)]
     pub fn compile_and_analyze_expr(source: &str) -> Result<Expr<Analyzed>, CdniVerificationError> {
         let expr = compiler::compile(source).map_err(CdniVerificationError::ExpressionCompile)?;
-        analyze(&expr, Scopes::default()).map_err(CdniVerificationError::ExpressionAnalyze)
+        analyze(&expr, &Scopes::default()).map_err(CdniVerificationError::ExpressionAnalyze)
     }
 }
 

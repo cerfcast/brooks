@@ -227,11 +227,11 @@ impl MelAnalysisContext {
             scopes: self.scopes.clone(),
         }
     }
-    pub fn update_scopes(&self, new: scope::Scopes<Type>) -> Self {
+    pub fn update_scopes(&self, new: &scope::Scopes<Type>) -> Self {
         MelAnalysisContext {
             expr: self.expr.clone(),
             params: self.params.clone(),
-            scopes: new,
+            scopes: new.clone(),
         }
     }
     pub fn update_params(&self, new: Vec<Type>) -> Self {
@@ -1029,7 +1029,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert("a", Integer));
+        context = context.update_scopes(&context.scopes.insert("a", Integer));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -1067,7 +1067,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert("a", Integer));
+        context = context.update_scopes(&context.scopes.insert("a", Integer));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -1090,7 +1090,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert("a", Integer));
+        context = context.update_scopes(&context.scopes.insert("a", Integer));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -1113,7 +1113,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert("a", Integer));
+        context = context.update_scopes(&context.scopes.insert("a", Integer));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -1149,7 +1149,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "testing",
             Function(
                 Arc::new(Type::Integer),
@@ -1194,7 +1194,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "use",
             Function(
                 Arc::new(Type::Integer),
@@ -1224,7 +1224,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "use",
             Function(
                 Arc::new(Type::Integer),
@@ -1257,7 +1257,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
                 Arc::new(Type::Integer),
@@ -1302,7 +1302,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
                 Arc::new(Type::Integer),
@@ -1347,7 +1347,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
                 Arc::new(Type::Integer),
@@ -1384,7 +1384,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
                 Arc::new(Type::Integer),
@@ -1431,7 +1431,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert(
+        context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
                 Arc::new(Type::Boolean),
@@ -1636,7 +1636,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert("a", IPAddress));
+        context = context.update_scopes(&context.scopes.insert("a", IPAddress));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -1674,9 +1674,9 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert("a", IPAddress));
+        context = context.update_scopes(&context.scopes.insert("a", IPAddress));
 
-        context = context.update_scopes(context.scopes.insert("b", IPAddress));
+        context = context.update_scopes(&context.scopes.insert("b", IPAddress));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -1740,7 +1740,7 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert("a", Type::String));
+        context = context.update_scopes(&context.scopes.insert("a", Type::String));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -1768,9 +1768,9 @@ mod type_check_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        context = context.update_scopes(context.scopes.insert("a", IPAddress));
+        context = context.update_scopes(&context.scopes.insert("a", IPAddress));
 
-        context = context.update_scopes(context.scopes.insert("b", Type::String));
+        context = context.update_scopes(&context.scopes.insert("b", Type::String));
 
         let result = driver
             .visit(&ast, &visitor, context)
@@ -2773,7 +2773,7 @@ mod analysis_error_tests {
 
 pub type MelAnalysisResult = Result<Expr<Analyzed>, MelAnalysisLocatableError>;
 #[allow(clippy::result_large_err)]
-pub fn analyze(expr: &Expr<()>, scopes: Scopes<Type>) -> MelAnalysisResult {
+pub fn analyze(expr: &Expr<()>, scopes: &Scopes<Type>) -> MelAnalysisResult {
     let driver = AstVisitorDriver {};
     let visitor = MelTypeChecker {};
     let mut context = MelAnalysisContext::default();
