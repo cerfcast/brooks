@@ -26,4 +26,4 @@ pub mod utils;
 pub mod mel;
 
 #[allow(dead_code)]
-pub mod cdni;
+pub mod ps;

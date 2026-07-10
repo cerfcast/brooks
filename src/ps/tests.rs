@@ -21,7 +21,7 @@ pub mod test_helpers {
 
     use serde_json::Value;
 
-    use crate::cdni::spec::{
+    use crate::ps::spec::{
         ExpressionMatch, Header, HeaderTransform, ProcessingStages, RequestTransform,
         ResponseTransform, StageMetadata, StageRules, TypedExpressionMatch, TypedGenericMetadata,
         TypedHeader, TypedHeaderTransform, TypedProcessingStages, TypedRequestTransform,

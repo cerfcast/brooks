@@ -239,7 +239,7 @@ pub struct TypedProcessingStages<A: Debug + Clone + Default> {
 mod test_spec {
     use std::path::Path;
 
-    use crate::cdni::{
+    use crate::ps::{
         spec::{ProcessingStages, TypedProcessingStages},
         tests::test_helpers::{expression_match, read_test_file, stage_metadata, stage_rule},
     };
@@ -268,14 +268,14 @@ mod test_spec {
                 aug: (),
             },
         };
-        let expected = read_test_file(Path::new("./src/cdni/tests/simple/serialize.json"));
+        let expected = read_test_file(Path::new("./src/ps/tests/simple/serialize.json"));
         let actual = serde_json::to_string_pretty(&x).expect("Could not serialize");
         pretty_assertions::assert_eq!(expected, actual);
     }
 
     #[test]
     fn test_deserialize_example8() {
-        let json = read_test_file(Path::new("./src/cdni/tests/from-spec/example8.json"));
+        let json = read_test_file(Path::new("./src/ps/tests/from-spec/example8.json"));
 
         let result = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not deserialize Example 8");
