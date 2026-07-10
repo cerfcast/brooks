@@ -44,9 +44,27 @@ use std::fmt::Debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyntheticResponse<A: Debug + Clone + Default> {
+    pub headers: Option<Vec<TypedHeader<A>>>,
+
+    #[serde(rename = "response-status")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_status: Option<String>,
+
+    #[serde(rename = "status-is-expression")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_status_expr: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+
+    #[serde(rename = "body-is-expression")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub body_expr: Option<bool>,
+
     #[serde(skip)]
     pub aug: A,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
 pub struct TypedSyntheticResponse<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]

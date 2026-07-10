@@ -23,9 +23,10 @@ pub mod test_helpers {
 
     use crate::ps::spec::{
         ExpressionMatch, Header, HeaderTransform, ProcessingStages, RequestTransform,
-        ResponseTransform, StageMetadata, StageRules, TypedExpressionMatch, TypedGenericMetadata,
-        TypedHeader, TypedHeaderTransform, TypedProcessingStages, TypedRequestTransform,
-        TypedResponseTransform, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
+        ResponseTransform, StageMetadata, StageRules, SyntheticResponse, TypedExpressionMatch,
+        TypedGenericMetadata, TypedHeader, TypedHeaderTransform, TypedProcessingStages,
+        TypedRequestTransform, TypedResponseTransform, TypedStageMetadata, TypedStageRules,
+        TypedSyntheticResponse,
     };
 
     pub fn read_test_file(path: &Path) -> String {
@@ -159,6 +160,26 @@ pub mod test_helpers {
                 xform,
                 uri,
                 uri_is_expr,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn synthetic_response(
+        headers: Option<Vec<TypedHeader<()>>>,
+        response_status: Option<String>,
+        response_status_expr: Option<bool>,
+        body: Option<String>,
+        body_expr: Option<bool>,
+    ) -> TypedSyntheticResponse<()> {
+        TypedSyntheticResponse::<()> {
+            tpe: TypedSyntheticResponse::<()>::typed_generic_metadata_name(),
+            value: SyntheticResponse {
+                headers,
+                response_status,
+                response_status_expr,
+                body,
+                body_expr,
                 aug: (),
             },
         }

@@ -30,7 +30,7 @@ use crate::{
     ps::{
         spec::{
             ExpressionMatch, Header, HeaderTransform, ProcessingStages, RequestTransform,
-            ResponseTransform, StageMetadata, StageRules, TypedExpressionMatch,
+            ResponseTransform, StageMetadata, StageRules, SyntheticResponse, TypedExpressionMatch,
             TypedGenericMetadata, TypedHeader, TypedHeaderTransform, TypedProcessingStages,
             TypedRequestTransform, TypedResponseTransform, TypedStageMetadata, TypedStageRules,
             TypedSyntheticResponse,
@@ -58,6 +58,7 @@ pub enum CdniVerificationError {
 #[derive(Debug, Clone, Default)]
 pub enum CdniVerificationKey {
     Expr(Expr<Analyzed>),
+    ExprPair(Option<Expr<Analyzed>>, Option<Expr<Analyzed>>),
     #[default]
     None,
 }
@@ -94,6 +95,7 @@ enum CdniVerifierContextValue {
     ResponseTransform(TypedResponseTransform<CdniVerificationKey>),
     HeaderTransform(TypedHeaderTransform<CdniVerificationKey>),
     Header(TypedHeader<CdniVerificationKey>),
+    SyntheticResponse(TypedSyntheticResponse<CdniVerificationKey>),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -443,6 +445,18 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
             }
         };
 
+        result.synthetic = if let Some(synthetic) = &v.synthetic {
+            Some(
+                expect_some_value!(
+                    self.visit_synthetic_response(synthetic, &c.clone())?.value,
+                    CdniVerifierContextValue::SyntheticResponse
+                )
+                .clone(),
+            )
+        } else {
+            None
+        };
+
         result.aug = if let Some(rs) = &v.response_status {
             if let Some(rs_is_expr) = &v.response_status_expr
                 && *rs_is_expr
@@ -594,10 +608,87 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
 
     fn visit_synthetic_response(
         &self,
-        _v: &TypedSyntheticResponse<()>,
+        v: &TypedSyntheticResponse<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
-        todo!()
+        check_generic_md_typename!(v, TypedSyntheticResponse);
+        let v = &v.value;
+
+        let mut result = SyntheticResponse {
+            headers: None,
+            response_status: v.response_status.clone(),
+            response_status_expr: v.response_status_expr,
+            body: v.body.clone(),
+            body_expr: v.body_expr,
+            aug: CdniVerificationKey::None,
+        };
+
+        result.headers = if let Some(headers) = &v.headers {
+            let mut verified_headers: Vec<TypedHeader<CdniVerificationKey>> = vec![];
+            for header in headers {
+                verified_headers.push(
+                    expect_some_value!(
+                        self.visit_header(header, &_c.clone())?.value,
+                        CdniVerifierContextValue::Header
+                    )
+                    .clone(),
+                );
+            }
+            Some(verified_headers)
+        } else {
+            None
+        };
+
+        let response_status_expr = if let Some(rs) = &v.response_status {
+            if let Some(rs_is_expr) = &v.response_status_expr
+                && *rs_is_expr
+            {
+                let expr = Self::compile_and_analyze_expr(rs)?;
+
+                if expr.tipe() != Type::Integer {
+                    return Err(CdniVerificationError::ExpressionWrongType(
+                        Type::Integer,
+                        expr.tipe(),
+                    ));
+                }
+                Some(expr)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let body_expr = if let Some(body) = &v.body {
+            if let Some(body_is_expr) = &v.body_expr
+                && *body_is_expr
+            {
+                let expr = Self::compile_and_analyze_expr(body)?;
+
+                if expr.tipe() != Type::String {
+                    return Err(CdniVerificationError::ExpressionWrongType(
+                        Type::String,
+                        expr.tipe(),
+                    ));
+                }
+                Some(expr)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        result.aug = CdniVerificationKey::ExprPair(response_status_expr, body_expr);
+
+        Ok(CdniVerifierContext {
+            value: make_context_value!(
+                result,
+                CdniVerifierContextValue::SyntheticResponse,
+                CdniVerificationKey,
+                TypedSyntheticResponse
+            ),
+        })
     }
 }
 
@@ -626,7 +717,10 @@ mod test_verify {
     use std::assert_matches;
 
     use crate::mel::tvs::Type;
-    use crate::ps::spec::{HeaderTransform, ResponseTransform, TypedHeaderTransform};
+    use crate::ps::spec::{
+        HeaderTransform, ResponseTransform, SyntheticResponse, TypedHeaderTransform,
+        TypedSyntheticResponse,
+    };
     use crate::ps::verify::{CdniVerifierContextValue, verifier};
     use crate::ps::visit::CdniVisitor;
     use crate::{
@@ -642,7 +736,7 @@ mod test_verify {
 
     use crate::ps::tests::test_helpers::{
         expression_match, generic_metadata, header_transform, processing_stages, request_transform,
-        response_transform, typed_header,
+        response_transform, synthetic_response, typed_header,
     };
 
     #[test]
@@ -851,6 +945,174 @@ mod test_verify {
 
         assert_matches!(result, ExpressionWrongType(Type::String, Type::Boolean));
     }
+
+    #[test]
+    fn test_verify_synthetic_response() {
+        let header_to_add = typed_header("add", "value", None);
+        let header_to_replace = typed_header("replace", "value", None);
+        let headers = Some(vec![header_to_add, header_to_replace]);
+
+        let srt = synthetic_response(headers, None, None, None, None);
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_synthetic_response(&srt, &context)
+            .expect("Could not verify correct CDNI")
+            .value
+            .expect("No value in CDNI Verification Context");
+
+        assert_matches!(
+            &result,
+            CdniVerifierContextValue::SyntheticResponse(TypedSyntheticResponse {
+                tpe: _,
+                value: SyntheticResponse {
+                    headers: _,
+                    response_status: _,
+                    response_status_expr: _,
+                    body: _,
+                    body_expr: _,
+                    aug: CdniVerificationKey::ExprPair(None, None)
+                }
+            })
+        )
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_response_expr() {
+        let header_to_add = typed_header("add", "value", None);
+        let header_to_replace = typed_header("replace", "value", None);
+        let headers = Some(vec![header_to_add, header_to_replace]);
+
+        let srt = synthetic_response(headers, Some("400 + 4".to_string()), Some(true), None, None);
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_synthetic_response(&srt, &context)
+            .expect("Could not verify correct CDNI")
+            .value
+            .expect("No value in CDNI Verification Context");
+
+        assert_matches!(
+            &result,
+            CdniVerifierContextValue::SyntheticResponse(TypedSyntheticResponse {
+                tpe: _,
+                value: SyntheticResponse {
+                    headers: _,
+                    response_status: _,
+                    response_status_expr: _,
+                    body: _,
+                    body_expr: _,
+                    aug: CdniVerificationKey::ExprPair(Some(_), None)
+                }
+            })
+        )
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_body_expr() {
+        let header_to_add = typed_header("add", "value", None);
+        let header_to_replace = typed_header("replace", "value", None);
+        let headers = Some(vec![header_to_add, header_to_replace]);
+
+        let srt = synthetic_response(
+            headers,
+            None,
+            None,
+            Some("\"testing\"".to_string()),
+            Some(true),
+        );
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_synthetic_response(&srt, &context)
+            .expect("Could not verify correct CDNI")
+            .value
+            .expect("No value in CDNI Verification Context");
+
+        assert_matches!(
+            &result,
+            CdniVerifierContextValue::SyntheticResponse(TypedSyntheticResponse {
+                tpe: _,
+                value: SyntheticResponse {
+                    headers: _,
+                    response_status: _,
+                    response_status_expr: _,
+                    body: _,
+                    body_expr: _,
+                    aug: CdniVerificationKey::ExprPair(None, Some(_))
+                }
+            })
+        )
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_body_and_response_expr() {
+        let header_to_add = typed_header("add", "value", None);
+        let header_to_replace = typed_header("replace", "value", None);
+        let headers = Some(vec![header_to_add, header_to_replace]);
+
+        let srt = synthetic_response(
+            headers,
+            Some("400 + 4".to_string()),
+            Some(true),
+            Some("\"testing\"".to_string()),
+            Some(true),
+        );
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_synthetic_response(&srt, &context)
+            .expect("Could not verify correct CDNI")
+            .value
+            .expect("No value in CDNI Verification Context");
+
+        assert_matches!(
+            &result,
+            CdniVerifierContextValue::SyntheticResponse(TypedSyntheticResponse {
+                tpe: _,
+                value: SyntheticResponse {
+                    headers: _,
+                    response_status: _,
+                    response_status_expr: _,
+                    body: _,
+                    body_expr: _,
+                    aug: CdniVerificationKey::ExprPair(Some(_), Some(_))
+                }
+            })
+        )
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_wrong_response_expr_type() {
+        let header_to_add = typed_header("add", "value", None);
+        let header_to_replace = typed_header("replace", "value", None);
+        let headers = Some(vec![header_to_add, header_to_replace]);
+
+        let srt = synthetic_response(headers, Some("true".to_string()), Some(true), None, None);
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_synthetic_response(&srt, &context)
+            .expect_err("Could verify CDNI synthetic response with incorrect MEL type of expression to calculate response");
+
+        assert_matches!(result, ExpressionWrongType(Type::Integer, Type::Boolean));
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_wrong_body_expr_type() {
+        let header_to_add = typed_header("add", "value", None);
+        let header_to_replace = typed_header("replace", "value", None);
+        let headers = Some(vec![header_to_add, header_to_replace]);
+
+        let srt = synthetic_response(headers, None, None, Some("true".to_string()), Some(true));
+
+        let (verifier, context) = verifier();
+        let result = verifier
+            .visit_synthetic_response(&srt, &context)
+            .expect_err("Could verify CDNI synthetic response with incorrect MEL type of expression to calculate body");
+
+        assert_matches!(result, ExpressionWrongType(Type::String, Type::Boolean));
+    }
 }
 
 #[cfg(test)]
@@ -858,7 +1120,10 @@ mod test_verify_from_json {
     use std::assert_matches;
 
     use crate::mel::tvs::Type;
-    use crate::ps::spec::{HeaderTransform, ResponseTransform, TypedHeaderTransform};
+    use crate::ps::spec::{
+        HeaderTransform, ResponseTransform, SyntheticResponse, TypedHeaderTransform,
+        TypedSyntheticResponse,
+    };
     use crate::{
         mel::ast::Expr::BinaryExpr,
         ps::{
@@ -1164,6 +1429,188 @@ mod test_verify_from_json {
 
         let result = verify_cdni(&stages)
             .expect_err("Could verify CDNI with incorrect expression type in response status");
+
+        assert_matches!(result, ExpressionWrongType(Type::String, Type::Boolean));
+    }
+
+    #[test]
+    fn test_verify_synthetic_response() {
+        let json = read_test_file(Path::new("./src/ps/tests/synthetic_response/no_expr.json"));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages).expect("Could not verify correct CDNI");
+
+        assert_matches!(
+            &result.value.client_req[0]
+                .value
+                .stage_metadata
+                .value
+                .response_xform,
+            Some(TypedResponseTransform {
+                tpe: _,
+                value: ResponseTransform {
+                    xform: None,
+                    response_status: _,
+                    response_status_expr: _,
+                    synthetic: Some(TypedSyntheticResponse {
+                        tpe: _,
+                        value: SyntheticResponse {
+                            headers: _,
+                            response_status: _,
+                            response_status_expr: _,
+                            body: _,
+                            body_expr: _,
+                            aug: CdniVerificationKey::ExprPair(None, None)
+                        }
+                    }),
+                    aug: CdniVerificationKey::None
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_response_expr() {
+        let json = read_test_file(Path::new(
+            "./src/ps/tests/synthetic_response/response_expr.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages).expect("Could not verify correct CDNI");
+
+        assert_matches!(
+            &result.value.client_req[0]
+                .value
+                .stage_metadata
+                .value
+                .response_xform,
+            Some(TypedResponseTransform {
+                tpe: _,
+                value: ResponseTransform {
+                    xform: None,
+                    response_status: _,
+                    response_status_expr: _,
+                    synthetic: Some(TypedSyntheticResponse {
+                        tpe: _,
+                        value: SyntheticResponse {
+                            headers: _,
+                            response_status: _,
+                            response_status_expr: _,
+                            body: _,
+                            body_expr: _,
+                            aug: CdniVerificationKey::ExprPair(Some(_), None)
+                        }
+                    }),
+                    aug: CdniVerificationKey::None
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_body_expr() {
+        let json = read_test_file(Path::new(
+            "./src/ps/tests/synthetic_response/body_expr.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages).expect("Could not verify correct CDNI");
+
+        assert_matches!(
+            &result.value.client_req[0]
+                .value
+                .stage_metadata
+                .value
+                .response_xform,
+            Some(TypedResponseTransform {
+                tpe: _,
+                value: ResponseTransform {
+                    xform: None,
+                    response_status: _,
+                    response_status_expr: _,
+                    synthetic: Some(TypedSyntheticResponse {
+                        tpe: _,
+                        value: SyntheticResponse {
+                            headers: _,
+                            response_status: _,
+                            response_status_expr: _,
+                            body: _,
+                            body_expr: _,
+                            aug: CdniVerificationKey::ExprPair(None, Some(_))
+                        }
+                    }),
+                    aug: CdniVerificationKey::None
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_body_and_response_expr() {
+        let json = read_test_file(Path::new(
+            "./src/ps/tests/synthetic_response/both_body_response_exprs.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages).expect("Could not verify correct CDNI");
+
+        assert_matches!(
+            &result.value.client_req[0]
+                .value
+                .stage_metadata
+                .value
+                .response_xform,
+            Some(TypedResponseTransform {
+                tpe: _,
+                value: ResponseTransform {
+                    xform: None,
+                    response_status: _,
+                    response_status_expr: _,
+                    synthetic: Some(TypedSyntheticResponse {
+                        tpe: _,
+                        value: SyntheticResponse {
+                            headers: _,
+                            response_status: _,
+                            response_status_expr: _,
+                            body: _,
+                            body_expr: _,
+                            aug: CdniVerificationKey::ExprPair(Some(_), Some(_))
+                        }
+                    }),
+                    aug: CdniVerificationKey::None
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_wrong_response_expr_type() {
+        let json = read_test_file(Path::new(
+            "./src/ps/tests/synthetic_response/response_expr_wrong_type.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages)
+            .expect_err("Could verify CDNI synthetic response with incorrect MEL type of expression to calculate response");
+
+        assert_matches!(result, ExpressionWrongType(Type::Integer, Type::String));
+    }
+
+    #[test]
+    fn test_verify_synthetic_response_wrong_body_expr_type() {
+        let json = read_test_file(Path::new(
+            "./src/ps/tests/synthetic_response/body_expr_wrong_type.json",
+        ));
+        let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
+            .expect("Could not parse JSON test file");
+
+        let result = verify_cdni(&stages)
+            .expect_err("Could verify CDNI synthetic response with incorrect MEL type of expression to calculate body");
 
         assert_matches!(result, ExpressionWrongType(Type::String, Type::Boolean));
     }
