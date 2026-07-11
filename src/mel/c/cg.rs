@@ -392,15 +392,36 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         &self,
         ast: &TernaryExpr<Analyzed>,
         context: MelCodegenContext,
-        _driver: &AstVisitorDriver,
+        driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {
-        let _context = context.update_log(trace_with_loc!(
+        let mut context = context.update_log(trace_with_loc!(
             context.log,
             ast.location.clone(),
             "Generating code for ternary expression"
         ));
 
-        todo!()
+        context = driver.visit(&ast.condition, self, context.clone())?;
+        let condition_ssa = context.ssa.clone();
+
+        context = driver.visit(&ast.yes, self, context.clone())?;
+        let yes_ssa = context.ssa.clone();
+
+        context = driver.visit(&ast.no, self, context.clone())?;
+        let no_ssa = context.ssa.clone();
+
+        let (ssa, mut context) = context.next_ssa();
+
+        let value = format!("{} ? {} : {}", condition_ssa, yes_ssa, no_ssa);
+        let decl = decl!(ast.aug.tipe, ssa, value);
+
+        context = context.used_ssa(ssa);
+
+        context = context.append_code(LocatableString {
+            s: decl,
+            l: ast.location.clone(),
+        });
+
+        Ok(context)
     }
 
     fn visit_member_access_expr(
