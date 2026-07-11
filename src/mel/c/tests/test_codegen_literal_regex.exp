@@ -1,0 +1,2 @@
+// 0 to 5
+std::regex _var_0 = std::regex("[a]");
