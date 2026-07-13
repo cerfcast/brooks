@@ -26,38 +26,48 @@ use std::fmt::Debug;
 pub type CdniVisitorResult<T, E> = Result<T, E>;
 pub trait CdniVisitor<A: Debug + Clone + Default, O, E> {
     fn visit_processing_stages(
-        &self,
+        &mut self,
         v: &TypedProcessingStages<A>,
         c: &O,
     ) -> CdniVisitorResult<O, E>;
-    fn visit_stage_rules(&self, v: &TypedStageRules<A>, c: &O) -> CdniVisitorResult<O, E>;
-    fn visit_expression_match(&self, v: &TypedExpressionMatch<A>, c: &O)
+    fn visit_stage_rules(&mut self, v: &TypedStageRules<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_expression_match(
+        &mut self,
+        v: &TypedExpressionMatch<A>,
+        c: &O,
+    ) -> CdniVisitorResult<O, E>;
+    fn visit_stage_metadata(&mut self, v: &TypedStageMetadata<A>, c: &O)
     -> CdniVisitorResult<O, E>;
-    fn visit_stage_metadata(&self, v: &TypedStageMetadata<A>, c: &O) -> CdniVisitorResult<O, E>;
     fn visit_request_transform(
-        &self,
+        &mut self,
         v: &TypedRequestTransform<A>,
         c: &O,
     ) -> CdniVisitorResult<O, E>;
     fn visit_response_transform(
-        &self,
+        &mut self,
         v: &TypedResponseTransform<A>,
         c: &O,
     ) -> CdniVisitorResult<O, E>;
-    fn visit_generic_metadata(&self, v: &TypedGenericMetadata<A>, c: &O)
-    -> CdniVisitorResult<O, E>;
-    fn visit_header_transform(&self, v: &TypedHeaderTransform<A>, c: &O)
-    -> CdniVisitorResult<O, E>;
-    fn visit_header(&self, v: &TypedHeader<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_generic_metadata(
+        &mut self,
+        v: &TypedGenericMetadata<A>,
+        c: &O,
+    ) -> CdniVisitorResult<O, E>;
+    fn visit_header_transform(
+        &mut self,
+        v: &TypedHeaderTransform<A>,
+        c: &O,
+    ) -> CdniVisitorResult<O, E>;
+    fn visit_header(&mut self, v: &TypedHeader<A>, c: &O) -> CdniVisitorResult<O, E>;
     fn visit_synthetic_response(
-        &self,
+        &mut self,
         v: &TypedSyntheticResponse<A>,
         c: &O,
     ) -> CdniVisitorResult<O, E>;
     fn visit_client_request_stage(
-        &self,
+        &mut self,
         v: &TypedClientRequestStage<A>,
         c: &O,
     ) -> CdniVisitorResult<O, E>;
-    fn visit_match_group(&self, v: &TypedMatchGroup<A>, c: &O) -> CdniVisitorResult<O, E>;
+    fn visit_match_group(&mut self, v: &TypedMatchGroup<A>, c: &O) -> CdniVisitorResult<O, E>;
 }

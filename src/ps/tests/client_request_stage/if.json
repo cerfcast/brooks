@@ -16,7 +16,32 @@
                             },
                             "stage-metadata": {
                                 "generic-metadata-type": "MI.StageMetadata",
-                                "generic-metadata-value": {}
+                                "generic-metadata-value": {
+                                    "generic-metadata": [],
+                                    "request-transform": {
+                                        "generic-metadata-type": "MI.RequestTransform",
+                                        "generic-metadata-value": {
+                                            "header-transform": {
+                                                "generic-metadata-type": "MI.HeaderTransform",
+                                                "generic-metadata-value": {
+                                                    "delete": [
+                                                        "delete-me"
+                                                    ],
+                                                    "add": [
+                                                        {
+                                                            "generic-metadata-type": "MI.Header",
+                                                            "generic-metadata-value": {
+                                                                "name": "this-is-new",
+                                                                "value": "\"this\" . \"is\" . \"new\"",
+                                                                "value-is-expression": true
+                                                            }
+                                                        }
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

@@ -17,8 +17,9 @@
 
 pub mod spec;
 
+pub mod interpret;
 pub mod verify;
-pub mod visit;
+pub(crate) mod visit;
 
 #[cfg(test)]
 mod tests;

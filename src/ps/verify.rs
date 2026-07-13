@@ -74,7 +74,7 @@ impl Serialize for CdniVerificationKey {
 }
 
 #[derive(Debug, Clone, Default)]
-struct CdniVerifier {}
+pub(crate) struct CdniVerifier {}
 
 impl CdniVerifier {
     #[allow(clippy::result_large_err)]
@@ -86,7 +86,7 @@ impl CdniVerifier {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
-enum CdniVerifierContextValue {
+pub(crate) enum CdniVerifierContextValue {
     ProcessingStages(TypedProcessingStages<CdniVerificationKey>),
     StageRules(TypedStageRules<CdniVerificationKey>),
     ExpressionMatch(TypedExpressionMatch<CdniVerificationKey>),
@@ -102,8 +102,8 @@ enum CdniVerifierContextValue {
 }
 
 #[derive(Debug, Clone, Default)]
-struct CdniVerifierContext {
-    value: Option<CdniVerifierContextValue>,
+pub(crate) struct CdniVerifierContext {
+    pub value: Option<CdniVerifierContextValue>,
 }
 
 type VerifiedCdni = ProcessingStages<CdniVerificationKey>;
@@ -147,7 +147,7 @@ macro_rules! check_generic_md_typename {
 
 impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifier {
     fn visit_processing_stages(
-        &self,
+        &mut self,
         v: &TypedProcessingStages<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -205,7 +205,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_stage_rules(
-        &self,
+        &mut self,
         v: &TypedStageRules<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -252,7 +252,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_expression_match(
-        &self,
+        &mut self,
         v: &TypedExpressionMatch<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -282,7 +282,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_stage_metadata(
-        &self,
+        &mut self,
         v: &TypedStageMetadata<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -351,7 +351,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_request_transform(
-        &self,
+        &mut self,
         v: &TypedRequestTransform<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -414,7 +414,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_response_transform(
-        &self,
+        &mut self,
         v: &TypedResponseTransform<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -491,7 +491,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_generic_metadata(
-        &self,
+        &mut self,
         v: &TypedGenericMetadata<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -515,7 +515,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_header_transform(
-        &self,
+        &mut self,
         v: &TypedHeaderTransform<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -569,7 +569,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_header(
-        &self,
+        &mut self,
         v: &TypedHeader<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -610,7 +610,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_synthetic_response(
-        &self,
+        &mut self,
         v: &TypedSyntheticResponse<()>,
         _c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -695,7 +695,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_client_request_stage(
-        &self,
+        &mut self,
         v: &TypedClientRequestStage<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -730,7 +730,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 
     fn visit_match_group(
-        &self,
+        &mut self,
         v: &TypedMatchGroup<()>,
         c: &CdniVerifierContext,
     ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
@@ -778,7 +778,7 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
     }
 }
 
-fn verifier() -> (CdniVerifier, CdniVerifierContext) {
+pub(crate) fn verifier() -> (CdniVerifier, CdniVerifierContext) {
     (CdniVerifier {}, CdniVerifierContext::default())
 }
 
@@ -792,10 +792,19 @@ fn verifier() -> (CdniVerifier, CdniVerifierContext) {
 pub fn verify_cdni(
     stages: &TypedProcessingStages<()>,
 ) -> Result<TypedProcessingStages<CdniVerificationKey>, CdniVerificationError> {
-    let (verifier, context) = verifier();
+    let (mut verifier, context) = verifier();
     let value = &stages;
     let result = verifier.visit_processing_stages(value, &context)?;
     Ok(expect_some_value!(&result.value, CdniVerifierContextValue::ProcessingStages).clone())
+}
+
+#[allow(clippy::result_large_err)]
+pub fn verify_cdni_client_request_stage(
+    stage: &TypedClientRequestStage<()>,
+) -> Result<TypedClientRequestStage<CdniVerificationKey>, CdniVerificationError> {
+    let (mut verifier, context) = verifier();
+    let result = verifier.visit_client_request_stage(stage, &context)?;
+    Ok(expect_some_value!(&result.value, CdniVerifierContextValue::ClientRequestStage).clone())
 }
 
 #[cfg(test)]
@@ -840,7 +849,7 @@ mod test_verify {
     fn test_verify_generic_metadata_with_bad_type_name() {
         let generic = generic_metadata("Mi.CachePolicy", None);
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_generic_metadata(&generic, &context)
             .expect_err("Could verify CDNI generic metadata with invalid metadata type name");
@@ -851,7 +860,7 @@ mod test_verify {
     #[test]
     fn test_verify_match_wrong_type() {
         let mtch = expression_match("5 + 4");
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_expression_match(&mtch, &context)
             .expect_err("Could verify CDNI expression match with incorrect MEL type");
@@ -862,7 +871,7 @@ mod test_verify {
     #[test]
     fn test_verify_request_transform_uri_expr_wrong_type() {
         let xform = request_transform(None, Some("5+4".to_string()), Some(true));
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_request_transform(&xform, &context)
             .expect_err("Could verify CDNI with incorrect MEL type of expression to calculate URI");
@@ -873,7 +882,7 @@ mod test_verify {
     #[test]
     fn test_verify_response_transform() {
         let xform = response_transform(None, Some("404".to_string()), None, None);
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_response_transform(&xform, &context)
             .expect("Could not verify correct CDNI")
@@ -898,7 +907,7 @@ mod test_verify {
     #[test]
     fn test_verify_response_transform_rs_expr() {
         let xform = response_transform(None, Some("400+4".to_string()), Some(true), None);
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_response_transform(&xform, &context)
             .expect("Could not verify correct CDNI")
@@ -922,7 +931,7 @@ mod test_verify {
     #[test]
     fn test_verify_response_transform_rs_expr_wrong_type() {
         let xform = response_transform(None, Some("false".to_string()), Some(true), None);
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_response_transform(&xform, &context)
             .expect_err("Could verify CDNI response transform with incorrect MEL type of expression to calculate response status");
@@ -942,7 +951,7 @@ mod test_verify {
             Some(vec![header_to_replace]),
         );
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_header_transform(&header_xform, &context)
             .expect("Could not verify correct CDNI")
@@ -974,7 +983,7 @@ mod test_verify {
             Some(vec![header_to_replace]),
         );
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_header_transform(&header_xform, &context)
             .expect("Could not verify correct CDNI")
@@ -1006,7 +1015,7 @@ mod test_verify {
             Some(vec![header_to_replace]),
         );
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_header_transform(&header_xform, &context)
             .expect_err("Could verify CDNI typed header with incorrect MEL type of expression to calculate header value");
@@ -1025,7 +1034,7 @@ mod test_verify {
             Some(vec![header_to_replace]),
         );
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_header_transform(&header_xform, &context)
             .expect_err("Could verify CDNI typed header with incorrect MEL type of expression to calculate header value");
@@ -1041,7 +1050,7 @@ mod test_verify {
 
         let srt = synthetic_response(headers, None, None, None, None);
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_synthetic_response(&srt, &context)
             .expect("Could not verify correct CDNI")
@@ -1072,7 +1081,7 @@ mod test_verify {
 
         let srt = synthetic_response(headers, Some("400 + 4".to_string()), Some(true), None, None);
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_synthetic_response(&srt, &context)
             .expect("Could not verify correct CDNI")
@@ -1109,7 +1118,7 @@ mod test_verify {
             Some(true),
         );
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_synthetic_response(&srt, &context)
             .expect("Could not verify correct CDNI")
@@ -1146,7 +1155,7 @@ mod test_verify {
             Some(true),
         );
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_synthetic_response(&srt, &context)
             .expect("Could not verify correct CDNI")
@@ -1177,7 +1186,7 @@ mod test_verify {
 
         let srt = synthetic_response(headers, Some("true".to_string()), Some(true), None, None);
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_synthetic_response(&srt, &context)
             .expect_err("Could verify CDNI synthetic response with incorrect MEL type of expression to calculate response");
@@ -1193,7 +1202,7 @@ mod test_verify {
 
         let srt = synthetic_response(headers, None, None, Some("true".to_string()), Some(true));
 
-        let (verifier, context) = verifier();
+        let (mut verifier, context) = verifier();
         let result = verifier
             .visit_synthetic_response(&srt, &context)
             .expect_err("Could verify CDNI synthetic response with incorrect MEL type of expression to calculate body");
