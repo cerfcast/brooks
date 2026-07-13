@@ -16,9 +16,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::ps::spec::{
-    TypedExpressionMatch, TypedGenericMetadata, TypedHeader, TypedHeaderTransform,
-    TypedProcessingStages, TypedRequestTransform, TypedResponseTransform, TypedStageMetadata,
-    TypedStageRules, TypedSyntheticResponse,
+    TypedClientRequestStage, TypedExpressionMatch, TypedGenericMetadata, TypedHeader,
+    TypedHeaderTransform, TypedMatchGroup, TypedProcessingStages, TypedRequestTransform,
+    TypedResponseTransform, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
 };
 
 use std::fmt::Debug;
@@ -54,4 +54,10 @@ pub trait CdniVisitor<A: Debug + Clone + Default, O, E> {
         v: &TypedSyntheticResponse<A>,
         c: &O,
     ) -> CdniVisitorResult<O, E>;
+    fn visit_client_request_stage(
+        &self,
+        v: &TypedClientRequestStage<A>,
+        c: &O,
+    ) -> CdniVisitorResult<O, E>;
+    fn visit_match_group(&self, v: &TypedMatchGroup<A>, c: &O) -> CdniVisitorResult<O, E>;
 }

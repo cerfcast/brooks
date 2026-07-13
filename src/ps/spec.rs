@@ -231,6 +231,39 @@ pub struct TypedStageRules<A: Debug + Clone + Default> {
     pub value: StageRules<A>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatchGroup<A: Debug + Clone + Default> {
+    #[serde(rename = "if-rule")]
+    pub if_rule: TypedStageRules<A>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "else-if-rules")]
+    pub else_ifs: Option<Vec<TypedStageRules<A>>>,
+    #[serde(skip)]
+    pub aug: A,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+pub struct TypedMatchGroup<A: Debug + Clone + Default> {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: MatchGroup<A>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientRequestStage<A: Debug + Clone + Default> {
+    #[serde(rename = "match-groups")]
+    pub match_groups: Vec<TypedMatchGroup<A>>,
+    #[serde(skip)]
+    pub aug: A,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+pub struct TypedClientRequestStage<A: Debug + Clone + Default> {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: ClientRequestStage<A>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProcessingStages<A: Debug + Clone + Default> {
     #[serde(rename = "client-request")]
@@ -259,7 +292,7 @@ mod test_spec {
 
     use crate::{
         ps::{
-            spec::{ProcessingStages, TypedProcessingStages},
+            spec::{ProcessingStages, TypedClientRequestStage, TypedProcessingStages},
             tests::test_helpers::{expression_match, stage_metadata, stage_rule},
         },
         tests::read_test_file,
@@ -318,5 +351,20 @@ mod test_spec {
                 .response_xform
                 .is_some()
         );
+    }
+
+    #[test]
+    fn test_deserialize_client_request_stage() {
+        let json = read_test_file(Path::new("./src/ps/tests/client_request_stage/if.json"));
+
+        let result = serde_json::from_str::<TypedClientRequestStage<()>>(&json)
+            .expect("Could not deserialize simple client request stage JSON");
+
+        // There is one client request stage rules ...
+        assert_eq!(result.value.match_groups.len(), 1);
+        let mg = &result.value.match_groups[0];
+
+        // ... and it has a match ...
+        assert!(mg.value.if_rule.value.mtch.is_some());
     }
 }

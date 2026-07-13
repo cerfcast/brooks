@@ -29,9 +29,10 @@ use crate::{
     },
     ps::{
         spec::{
-            ExpressionMatch, Header, HeaderTransform, ProcessingStages, RequestTransform,
-            ResponseTransform, StageMetadata, StageRules, SyntheticResponse, TypedExpressionMatch,
-            TypedGenericMetadata, TypedHeader, TypedHeaderTransform, TypedProcessingStages,
+            ClientRequestStage, ExpressionMatch, Header, HeaderTransform, MatchGroup,
+            ProcessingStages, RequestTransform, ResponseTransform, StageMetadata, StageRules,
+            SyntheticResponse, TypedClientRequestStage, TypedExpressionMatch, TypedGenericMetadata,
+            TypedHeader, TypedHeaderTransform, TypedMatchGroup, TypedProcessingStages,
             TypedRequestTransform, TypedResponseTransform, TypedStageMetadata, TypedStageRules,
             TypedSyntheticResponse,
         },
@@ -96,6 +97,8 @@ enum CdniVerifierContextValue {
     HeaderTransform(TypedHeaderTransform<CdniVerificationKey>),
     Header(TypedHeader<CdniVerificationKey>),
     SyntheticResponse(TypedSyntheticResponse<CdniVerificationKey>),
+    MatchGroup(TypedMatchGroup<CdniVerificationKey>),
+    ClientRequestStage(TypedClientRequestStage<CdniVerificationKey>),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -687,6 +690,89 @@ impl CdniVisitor<(), CdniVerifierContext, CdniVerificationError> for CdniVerifie
                 CdniVerifierContextValue::SyntheticResponse,
                 CdniVerificationKey,
                 TypedSyntheticResponse
+            ),
+        })
+    }
+
+    fn visit_client_request_stage(
+        &self,
+        v: &TypedClientRequestStage<()>,
+        c: &CdniVerifierContext,
+    ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
+        check_generic_md_typename!(v, TypedClientRequestStage);
+        let v = &v.value;
+
+        // Verify each of the match groups!
+        let mut verified_mgs: Vec<TypedMatchGroup<CdniVerificationKey>> = vec![];
+        for mg in &v.match_groups {
+            verified_mgs.push(
+                expect_some_value!(
+                    self.visit_match_group(mg, &c.clone())?.value,
+                    CdniVerifierContextValue::MatchGroup
+                )
+                .clone(),
+            );
+        }
+
+        let result = ClientRequestStage {
+            match_groups: verified_mgs,
+            aug: CdniVerificationKey::None,
+        };
+
+        Ok(CdniVerifierContext {
+            value: make_context_value!(
+                result,
+                CdniVerifierContextValue::ClientRequestStage,
+                CdniVerificationKey,
+                TypedClientRequestStage
+            ),
+        })
+    }
+
+    fn visit_match_group(
+        &self,
+        v: &TypedMatchGroup<()>,
+        c: &CdniVerifierContext,
+    ) -> super::visit::CdniVisitorResult<CdniVerifierContext, CdniVerificationError> {
+        check_generic_md_typename!(v, TypedMatchGroup);
+        let v = &v.value;
+
+        let verified_if_rule = expect_some_value!(
+            self.visit_stage_rules(&v.if_rule, &c.clone())?.value,
+            CdniVerifierContextValue::StageRules
+        )
+        .clone();
+
+        let result = if let Some(else_if_rules) = &v.else_ifs {
+            // Verify each of the match groups!
+            let mut verified_eirs: Vec<TypedStageRules<CdniVerificationKey>> = vec![];
+            for eir in else_if_rules {
+                verified_eirs.push(
+                    expect_some_value!(
+                        self.visit_stage_rules(eir, &c.clone())?.value,
+                        CdniVerifierContextValue::StageRules
+                    )
+                    .clone(),
+                );
+            }
+            MatchGroup {
+                if_rule: verified_if_rule,
+                else_ifs: Some(verified_eirs),
+                aug: CdniVerificationKey::None,
+            }
+        } else {
+            MatchGroup {
+                if_rule: verified_if_rule,
+                else_ifs: None,
+                aug: CdniVerificationKey::None,
+            }
+        };
+        Ok(CdniVerifierContext {
+            value: make_context_value!(
+                result,
+                CdniVerifierContextValue::MatchGroup,
+                CdniVerificationKey,
+                TypedMatchGroup
             ),
         })
     }
