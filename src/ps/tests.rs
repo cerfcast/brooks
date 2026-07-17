@@ -20,11 +20,11 @@ pub mod test_helpers {
     use serde_json::Value;
 
     use crate::ps::spec::{
-        ExpressionMatch, Header, HeaderTransform, ProcessingStages, RequestTransform,
-        ResponseTransform, StageMetadata, StageRules, SyntheticResponse, TypedExpressionMatch,
-        TypedGenericMetadata, TypedHeader, TypedHeaderTransform, TypedProcessingStages,
-        TypedRequestTransform, TypedResponseTransform, TypedStageMetadata, TypedStageRules,
-        TypedSyntheticResponse,
+        ClientRequestStage, ExpressionMatch, Header, HeaderTransform, MatchGroup, ProcessingStages,
+        RequestTransform, ResponseTransform, StageMetadata, StageRules, SyntheticResponse,
+        TypedClientRequestStage, TypedExpressionMatch, TypedGenericMetadata, TypedHeader,
+        TypedHeaderTransform, TypedMatchGroup, TypedProcessingStages, TypedRequestTransform,
+        TypedResponseTransform, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
     };
 
     pub fn expression_match(expression: &str) -> TypedExpressionMatch<()> {
@@ -166,6 +166,44 @@ pub mod test_helpers {
                 response_status_expr,
                 body,
                 body_expr,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn typed_stage_rule(
+        mtch: Option<TypedExpressionMatch<()>>,
+        sm: TypedStageMetadata<()>,
+    ) -> TypedStageRules<()> {
+        TypedStageRules {
+            tpe: TypedStageRules::<()>::typed_generic_metadata_name(),
+            value: StageRules {
+                mtch,
+                stage_metadata: sm,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn match_group(
+        if_rule: TypedStageRules<()>,
+        else_ifs: Option<Vec<TypedStageRules<()>>>,
+    ) -> TypedMatchGroup<()> {
+        TypedMatchGroup {
+            tpe: TypedMatchGroup::<()>::typed_generic_metadata_name(),
+            value: MatchGroup {
+                if_rule,
+                else_ifs,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn client_request_stage(mgs: Vec<TypedMatchGroup<()>>) -> TypedClientRequestStage<()> {
+        TypedClientRequestStage {
+            tpe: TypedClientRequestStage::<()>::typed_generic_metadata_name(),
+            value: ClientRequestStage {
+                match_groups: mgs,
                 aug: (),
             },
         }

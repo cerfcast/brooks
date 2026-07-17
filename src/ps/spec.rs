@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Serializer/Deserializer of CDNI JSON:
+//! Serializer/Deserializer of CDNI Processing Stages JSON:
 //!
 //! This is an implementation of the [CDNI ProcessingStages
 //! Metadata](https://datatracker.ietf.org/doc/draft-ietf-cdni-processing-stages-metadata/)
@@ -249,21 +249,6 @@ pub struct TypedMatchGroup<A: Debug + Clone + Default> {
     pub value: MatchGroup<A>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClientRequestStage<A: Debug + Clone + Default> {
-    #[serde(rename = "match-groups")]
-    pub match_groups: Vec<TypedMatchGroup<A>>,
-    #[serde(skip)]
-    pub aug: A,
-}
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
-pub struct TypedClientRequestStage<A: Debug + Clone + Default> {
-    #[serde(rename = "generic-metadata-type")]
-    pub tpe: String,
-    #[serde(rename = "generic-metadata-value")]
-    pub value: ClientRequestStage<A>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProcessingStages<A: Debug + Clone + Default> {
     #[serde(rename = "client-request")]
@@ -284,6 +269,82 @@ pub struct TypedProcessingStages<A: Debug + Clone + Default> {
     pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
     pub value: ProcessingStages<A>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientRequestStage<A: Debug + Clone + Default> {
+    #[serde(rename = "match-groups")]
+    pub match_groups: Vec<TypedMatchGroup<A>>,
+    #[serde(skip)]
+    pub aug: A,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+pub struct TypedClientRequestStage<A: Debug + Clone + Default> {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: ClientRequestStage<A>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientResponseStage<A: Debug + Clone + Default> {
+    #[serde(rename = "match-groups")]
+    pub match_groups: Vec<TypedMatchGroup<A>>,
+    #[serde(skip)]
+    pub aug: A,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+pub struct TypedClientResponseStage<A: Debug + Clone + Default> {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: ClientResponseStage<A>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OriginRequestStage<A: Debug + Clone + Default> {
+    #[serde(rename = "match-groups")]
+    pub match_groups: Vec<TypedMatchGroup<A>>,
+    #[serde(skip)]
+    pub aug: A,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+pub struct TypedOriginRequestStage<A: Debug + Clone + Default> {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: OriginRequestStage<A>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OriginResponseStage<A: Debug + Clone + Default> {
+    #[serde(rename = "match-groups")]
+    pub match_groups: Vec<TypedMatchGroup<A>>,
+    #[serde(skip)]
+    pub aug: A,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+pub struct TypedOriginResponseStage<A: Debug + Clone + Default> {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: OriginResponseStage<A>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypedStage<A: Debug + Clone + Default> {
+    ClientRequest(TypedClientRequestStage<A>),
+    ClientResponse(TypedClientResponseStage<A>),
+    OriginRequest(TypedOriginRequestStage<A>),
+    OriginResponse(TypedOriginResponseStage<A>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypedGenericStage {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: Value,
 }
 
 #[cfg(test)]

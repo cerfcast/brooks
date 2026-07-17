@@ -17,11 +17,13 @@
 
 //! Verification of CDNI JSON
 
-use http::Uri;
+use http::{HeaderName, HeaderValue, StatusCode, Uri, uri::InvalidUri};
 
 use crate::{
     logging::LogMsgs,
     mel::{
+        analysis::Analyzed,
+        ast::Expr,
         interpreter::{
             self,
             interpret::{
@@ -32,221 +34,356 @@ use crate::{
         tvs::Type,
     },
     ps::{
+        interpret::{
+            PsInterpretError::{WrongMatchGroupValueType, WrongType},
+            PsInterpretMode::HeaderCalculate,
+            PsInterpretValue::{Header, MatchNo, MatchYes},
+            PsInterpretValueType::{MatchResult, SyntheticResponse, Terminate},
+        },
         spec::{
             TypedClientRequestStage, TypedExpressionMatch, TypedGenericMetadata, TypedHeader,
             TypedHeaderTransform, TypedMatchGroup, TypedProcessingStages, TypedRequestTransform,
-            TypedResponseTransform, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
+            TypedResponseTransform, TypedStage, TypedStageMetadata, TypedStageRules,
+            TypedSyntheticResponse,
         },
-        verify::CdniVerificationKey,
-        visit::CdniVisitor,
+        verify::PsVerificationKey,
+        visit::{PsVisitor, PsVisitorResult},
     },
 };
 
 use std::fmt::Debug;
 
-pub trait ProcessableRequest: Debug {
+/// A request that can be manipulated by interpretation processing stages.
+pub trait ProcessableRequestResponse: Debug {
     fn header_value(&self) -> &str;
     fn headers(&self) -> &[&str];
     fn set_header_value(&mut self, header: &str, value: &str);
     fn remove_header(&mut self, header: &str);
     fn add_header(&mut self, header: &str, value: &str);
-    fn request(&self) -> Uri;
+    fn uri(&self) -> Uri;
+    fn set_uri(&mut self, uri: &Uri);
+    fn set_response(&mut self, response: &i64);
 }
 
-pub type CdniInterpreterResult = Result<(), CdniInterpreterError>;
+pub type PsInterpretResult = Result<PsInterpretValue, PsInterpretError>;
 
 #[derive(Debug, Clone)]
-pub enum CdniInterpreterAssertionFailures {
+pub enum PsInterpretAssertionFailures {
     MissingAnalyzedExpression,
     MissingInterpreterExpressionValue,
     InvalidInterpreterMode,
+    MissingResult,
 }
 
 #[allow(clippy::to_string_trait_impl)]
-impl ToString for CdniInterpreterAssertionFailures {
+impl ToString for PsInterpretAssertionFailures {
     fn to_string(&self) -> String {
         match self {
-            CdniInterpreterAssertionFailures::MissingAnalyzedExpression => {
+            PsInterpretAssertionFailures::MissingAnalyzedExpression => {
                 "Missing information about an analyzed expression".to_string()
             }
-            CdniInterpreterAssertionFailures::MissingInterpreterExpressionValue => {
+            PsInterpretAssertionFailures::MissingInterpreterExpressionValue => {
                 "Missing value from an interpreted expression".to_string()
             }
-            CdniInterpreterAssertionFailures::InvalidInterpreterMode => {
+            PsInterpretAssertionFailures::InvalidInterpreterMode => {
                 "Invalid interpreter mode".to_string()
             }
+            PsInterpretAssertionFailures::MissingResult => "Missing result".to_string(),
         }
     }
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone, Default)]
-pub enum CdniInterpreterError {
+#[derive(Debug, Default)]
+pub enum PsInterpretError {
     #[default]
     NoError,
-    AssertionFailure(CdniInterpreterAssertionFailures),
+    AssertionFailure(PsInterpretAssertionFailures),
     MelInterpreterError(MelInterpLocatableError),
+    InvalidRequest,
+    InvalidUri(InvalidUri),
+    InvalidResponse(String),
+    WrongType(PsInterpretValueType, PsInterpretValueType),
+    WrongMatchGroupValueType(PsInterpretValueType),
 }
 
 #[allow(clippy::to_string_trait_impl)]
-impl ToString for CdniInterpreterError {
+impl ToString for PsInterpretError {
     fn to_string(&self) -> String {
         match self {
-            CdniInterpreterError::NoError => "No Error".to_string(),
-            CdniInterpreterError::AssertionFailure(af) => {
+            PsInterpretError::NoError => "No Error".to_string(),
+            PsInterpretError::AssertionFailure(af) => {
                 format!("Assertion failure: {}", af.to_string())
             }
-            CdniInterpreterError::MelInterpreterError(meli) => {
+            PsInterpretError::MelInterpreterError(meli) => {
                 format!("MEL Interpreter error: {}", meli)
+            }
+            PsInterpretError::InvalidRequest => "Invalid HTTP request".to_string(),
+            PsInterpretError::InvalidUri(iuri) => format!("Invalid URI: {iuri}"),
+            PsInterpretError::InvalidResponse(response) => {
+                format!("Invalid Response: {response}")
+            }
+            WrongType(expected, actual) => {
+                format!(
+                    "Wrong type: expected: {} actual: {}",
+                    expected.to_string(),
+                    actual.to_string()
+                )
+            }
+            WrongMatchGroupValueType(actual) => {
+                format!(
+                    "Match group value should not have {} type",
+                    actual.to_string()
+                )
             }
         }
     }
 }
 
 #[derive(Debug)]
-struct CdniInterpreter<'a> {
-    pub req: &'a mut dyn ProcessableRequest,
+struct PsInterpreter<'a> {
+    pub req: &'a mut dyn ProcessableRequestResponse,
+}
+
+impl<'a> PsInterpreter<'a> {
+    #[allow(clippy::result_large_err)]
+    fn scopes_from_req(&self) -> Result<Scopes<TypedValue>, PsInterpretError> {
+        let mel_req = http::Request::builder()
+            .uri(self.req.uri())
+            .body("")
+            .map_err(|_| PsInterpretError::InvalidRequest)?;
+
+        Ok(Scopes::<TypedValue>::from(mel_req))
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn evaluate_mel_expr(
+        &self,
+        expr: &Expr<Analyzed>,
+        expected: Type,
+    ) -> Result<TypedValue, PsInterpretError> {
+        let expr_context = MelInterpContext {
+            val: None,
+            scopes: self.scopes_from_req()?,
+            log: LogMsgs::new(crate::logging::LogLevel::Trace),
+        };
+
+        let result = interpreter::interpret(expr, expr_context.clone())
+            .map_err(PsInterpretError::MelInterpreterError)?
+            .val
+            .ok_or(PsInterpretError::AssertionFailure(
+                PsInterpretAssertionFailures::MissingInterpreterExpressionValue,
+            ))?;
+
+        if result.tipe == expected {
+            Ok(result)
+        } else {
+            Err(PsInterpretError::MelInterpreterError(
+                MelInterpLocatableError {
+                    error: MelInterpError::Assertion(
+                        interpreter::interpret::MelInterpAssertion::TypeMismatch(
+                            expected,
+                            result.tipe,
+                        ),
+                    ),
+                    context: expr_context.clone(),
+                    location: expr.location().clone(),
+                },
+            ))
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
-enum CdniInterpreterMode {
+pub enum PsInterpretMode {
     Request,
     Response,
     HeaderAdd,
     HeaderReplace,
+    HeaderCalculate,
     #[default]
     None,
 }
 
 #[derive(Debug, Clone)]
-enum CdniInterpreterVisitResult {
+pub enum PsInterpretValueType {
     SyntheticResponse,
+    Terminate,
+    MatchResult,
+    Header,
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for PsInterpretValueType {
+    fn to_string(&self) -> String {
+        match &self {
+            SyntheticResponse => "Synthetic response".to_string(),
+            Terminate => "Terminate".to_string(),
+            MatchResult => "Match result".to_string(),
+            PsInterpretValueType::Header => "Header".to_string(),
+        }
+    }
+}
+#[derive(Debug, Clone)]
+pub enum PsInterpretValue {
+    SyntheticResponse(http::Response<String>),
     Terminate,
     MatchYes,
     MatchNo,
+    Header(String, String),
+}
+
+impl From<PsInterpretValue> for PsInterpretValueType {
+    fn from(value: PsInterpretValue) -> Self {
+        match value {
+            PsInterpretValue::SyntheticResponse(_) => SyntheticResponse,
+            PsInterpretValue::Terminate => Terminate,
+            MatchYes | MatchNo => MatchResult,
+            PsInterpretValue::Header(_, _) => PsInterpretValueType::Header,
+        }
+    }
+}
+
+impl From<bool> for PsInterpretValue {
+    fn from(value: bool) -> Self {
+        if value { MatchYes } else { MatchNo }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
-struct CdniInterpreterContext {
-    mode: CdniInterpreterMode,
-    match_result: Option<CdniInterpreterVisitResult>,
+struct PsInterpretContext {
+    mode: PsInterpretMode,
+    result: Option<PsInterpretValue>,
 }
 
-impl<'a> CdniVisitor<CdniVerificationKey, CdniInterpreterContext, CdniInterpreterError>
-    for CdniInterpreter<'a>
-{
+impl PsInterpretContext {
+    fn update_mode(&self, new_mode: PsInterpretMode) -> PsInterpretContext {
+        let mut nc = self.clone();
+        nc.mode = new_mode;
+        nc
+    }
+    fn update_result(&self, new_result: Option<PsInterpretValue>) -> PsInterpretContext {
+        let mut nc = self.clone();
+        nc.result = new_result;
+        nc
+    }
+}
+
+impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for PsInterpreter<'a> {
     fn visit_processing_stages(
         &mut self,
-        _v: &TypedProcessingStages<CdniVerificationKey>,
-        _c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
+        _v: &TypedProcessingStages<PsVerificationKey>,
+        _c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         todo!()
     }
 
     fn visit_stage_rules(
         &mut self,
-        v: &TypedStageRules<CdniVerificationKey>,
-        c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
+        v: &TypedStageRules<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         let doq = if let Some(mtch) = &v.value.mtch {
             let expr = match &mtch.value.aug {
-                CdniVerificationKey::Expr(expr) => expr,
+                PsVerificationKey::Expr(expr) => expr,
                 _ => {
-                    return Err(CdniInterpreterError::AssertionFailure(
-                        CdniInterpreterAssertionFailures::MissingAnalyzedExpression,
+                    return Err(PsInterpretError::AssertionFailure(
+                        PsInterpretAssertionFailures::MissingAnalyzedExpression,
                     ));
                 }
             };
-
-            let expr_context = MelInterpContext {
-                val: None,
-                scopes: Scopes::default(),
-                log: LogMsgs::new(crate::logging::LogLevel::Trace),
-            };
-
-            let result = interpreter::interpret(expr, expr_context.clone())
-                .map_err(CdniInterpreterError::MelInterpreterError)?
-                .val
-                .ok_or(CdniInterpreterError::AssertionFailure(
-                    CdniInterpreterAssertionFailures::MissingInterpreterExpressionValue,
-                ))?;
-
+            let result = self.evaluate_mel_expr(expr, Type::Boolean)?;
             match result {
                 TypedValue {
                     tipe: Type::Boolean,
                     value: Value::Boolean(v),
                 } => v,
-                TypedValue { tipe: a, value: _ } => {
-                    return Err(CdniInterpreterError::MelInterpreterError(
-                        MelInterpLocatableError {
-                            error: MelInterpError::Assertion(
-                                interpreter::interpret::MelInterpAssertion::TypeMismatch(
-                                    Type::Boolean,
-                                    a,
-                                ),
-                            ),
-                            context: expr_context.clone(),
-                            location: expr.location().clone(),
-                        },
-                    ));
-                }
+                _ => unreachable!(),
             }
         } else {
             true
         };
 
         if doq {
-            match &c.mode {
-                CdniInterpreterMode::Request => {
-                    if let Some(req_xform) = &v.value.stage_metadata.value.request_xform {
-                        self.visit_request_transform(req_xform, &c.clone())?;
-                    }
-                }
-                CdniInterpreterMode::Response => {
-                    if let Some(res_xform) = &v.value.stage_metadata.value.response_xform {
-                        self.visit_response_transform(res_xform, &c.clone())?;
-                    }
-                }
-                _ => {
-                    return Err(CdniInterpreterError::AssertionFailure(
-                        CdniInterpreterAssertionFailures::InvalidInterpreterMode,
-                    ));
-                }
-            }
+            self.visit_stage_metadata(&v.value.stage_metadata, &c.update_result(Some(doq.into())))
+        } else {
+            Ok(c.update_result(Some(doq.into())))
         }
-
-        Ok(c.clone())
     }
 
     fn visit_expression_match(
         &mut self,
-        _v: &TypedExpressionMatch<CdniVerificationKey>,
-        _c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
+        _v: &TypedExpressionMatch<PsVerificationKey>,
+        _c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         todo!()
     }
 
     fn visit_stage_metadata(
         &mut self,
-        _v: &TypedStageMetadata<CdniVerificationKey>,
-        _c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
-        todo!()
+        v: &TypedStageMetadata<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        match &c.mode {
+            PsInterpretMode::Request => {
+                if let Some(req_xform) = &v.value.request_xform {
+                    return self.visit_request_transform(req_xform, &c.clone());
+                }
+            }
+            PsInterpretMode::Response => {
+                if let Some(res_xform) = &v.value.response_xform {
+                    return self.visit_response_transform(res_xform, &c.clone());
+                }
+            }
+            _ => {
+                return Err(PsInterpretError::AssertionFailure(
+                    PsInterpretAssertionFailures::InvalidInterpreterMode,
+                ));
+            }
+        }
+        Ok(c.clone())
     }
 
     fn visit_request_transform(
         &mut self,
-        v: &TypedRequestTransform<CdniVerificationKey>,
-        c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
+        v: &TypedRequestTransform<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         if let Some(header_xform) = &v.value.xform {
             self.visit_header_transform(
                 header_xform,
-                &CdniInterpreterContext {
-                    mode: CdniInterpreterMode::Request,
-                    match_result: None,
+                &PsInterpretContext {
+                    mode: PsInterpretMode::Request,
+                    result: None,
                 },
             )?;
+        }
+
+        if let Some(new_uri) = &v.value.uri {
+            let new_uri = if let Some(uri_is_expr) = &v.value.uri_is_expr
+                && *uri_is_expr
+            {
+                let expr = match &v.value.aug {
+                    PsVerificationKey::Expr(expr) => expr,
+                    _ => {
+                        return Err(PsInterpretError::AssertionFailure(
+                            PsInterpretAssertionFailures::MissingAnalyzedExpression,
+                        ));
+                    }
+                };
+                let result = self.evaluate_mel_expr(expr, Type::String)?;
+                match result {
+                    TypedValue {
+                        tipe: Type::String,
+                        value: Value::String(s),
+                    } => Uri::try_from(s),
+                    _ => unreachable!(),
+                }
+            } else {
+                Uri::try_from(new_uri.clone())
+            }
+            .map_err(PsInterpretError::InvalidUri)?;
+            self.req.set_uri(&new_uri);
         }
 
         Ok(c.clone())
@@ -254,25 +391,66 @@ impl<'a> CdniVisitor<CdniVerificationKey, CdniInterpreterContext, CdniInterprete
 
     fn visit_response_transform(
         &mut self,
-        _v: &TypedResponseTransform<CdniVerificationKey>,
-        _c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
-        todo!()
+        v: &TypedResponseTransform<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        if let Some(synthetic_response) = &v.value.synthetic {
+            return self.visit_synthetic_response(synthetic_response, c);
+        }
+
+        if let Some(header_xform) = &v.value.xform {
+            self.visit_header_transform(
+                header_xform,
+                &PsInterpretContext {
+                    mode: PsInterpretMode::Request,
+                    result: None,
+                },
+            )?;
+        }
+
+        if let Some(new_response) = &v.value.response_status {
+            let new_response = if let Some(response_is_expr) = &v.value.response_status_expr
+                && *response_is_expr
+            {
+                let expr = match &v.value.aug {
+                    PsVerificationKey::Expr(expr) => expr,
+                    _ => {
+                        return Err(PsInterpretError::AssertionFailure(
+                            PsInterpretAssertionFailures::MissingAnalyzedExpression,
+                        ));
+                    }
+                };
+                let result = self.evaluate_mel_expr(expr, Type::Integer)?;
+                match result {
+                    TypedValue {
+                        tipe: Type::Integer,
+                        value: Value::Integer(i),
+                    } => Ok(i),
+                    _ => unreachable!(),
+                }
+            } else {
+                new_response.parse::<i64>()
+            }
+            .map_err(|e| PsInterpretError::InvalidResponse(e.to_string()))?;
+            self.req.set_response(&new_response);
+        }
+
+        Ok(c.clone())
     }
 
     fn visit_generic_metadata(
         &mut self,
-        _v: &TypedGenericMetadata<CdniVerificationKey>,
-        _c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
+        _v: &TypedGenericMetadata<PsVerificationKey>,
+        _c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         todo!()
     }
 
     fn visit_header_transform(
         &mut self,
-        v: &TypedHeaderTransform<CdniVerificationKey>,
-        c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
+        v: &TypedHeaderTransform<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         if let Some(to_delete) = &v.value.delete {
             for htr in to_delete {
                 self.req.remove_header(htr);
@@ -283,8 +461,8 @@ impl<'a> CdniVisitor<CdniVerificationKey, CdniInterpreterContext, CdniInterprete
             for htr in to_add {
                 self.visit_header(
                     htr,
-                    &CdniInterpreterContext {
-                        mode: CdniInterpreterMode::HeaderAdd,
+                    &PsInterpretContext {
+                        mode: PsInterpretMode::HeaderAdd,
                         ..Default::default()
                     },
                 )?;
@@ -295,8 +473,8 @@ impl<'a> CdniVisitor<CdniVerificationKey, CdniInterpreterContext, CdniInterprete
             for htr in to_replace {
                 self.visit_header(
                     htr,
-                    &CdniInterpreterContext {
-                        mode: CdniInterpreterMode::HeaderReplace,
+                    &PsInterpretContext {
+                        mode: PsInterpretMode::HeaderReplace,
                         ..Default::default()
                     },
                 )?;
@@ -308,167 +486,280 @@ impl<'a> CdniVisitor<CdniVerificationKey, CdniInterpreterContext, CdniInterprete
 
     fn visit_header(
         &mut self,
-        v: &TypedHeader<CdniVerificationKey>,
-        c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
+        v: &TypedHeader<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         let value = if let Some(expr) = &v.value.value_expr
             && *expr
         {
-            let expr_context = MelInterpContext {
-                val: None,
-                scopes: Scopes::default(),
-                log: LogMsgs::new(crate::logging::LogLevel::Trace),
-            };
-
             let expr = match &v.value.aug {
-                CdniVerificationKey::Expr(expr) => expr,
+                PsVerificationKey::Expr(expr) => expr,
                 _ => {
-                    return Err(CdniInterpreterError::AssertionFailure(
-                        CdniInterpreterAssertionFailures::MissingAnalyzedExpression,
+                    return Err(PsInterpretError::AssertionFailure(
+                        PsInterpretAssertionFailures::MissingAnalyzedExpression,
                     ));
                 }
             };
-
-            let result = interpreter::interpret(expr, expr_context.clone())
-                .map_err(CdniInterpreterError::MelInterpreterError)?
-                .val
-                .ok_or(CdniInterpreterError::AssertionFailure(
-                    CdniInterpreterAssertionFailures::MissingInterpreterExpressionValue,
-                ))?;
-
+            let result = self.evaluate_mel_expr(expr, Type::String)?;
             match result {
                 TypedValue {
                     tipe: Type::String,
                     value: Value::String(s),
                 } => s,
-                TypedValue { tipe: a, value: _ } => {
-                    return Err(CdniInterpreterError::MelInterpreterError(
-                        MelInterpLocatableError {
-                            error: MelInterpError::Assertion(
-                                interpreter::interpret::MelInterpAssertion::TypeMismatch(
-                                    Type::Boolean,
-                                    a,
-                                ),
-                            ),
-                            context: expr_context.clone(),
-                            location: expr.location().clone(),
-                        },
-                    ));
-                }
+                _ => unreachable!(),
             }
         } else {
             v.value.value.clone()
         };
 
         match c.mode {
-            CdniInterpreterMode::HeaderAdd => {
+            PsInterpretMode::HeaderAdd => {
                 self.req.add_header(&v.value.name, &value);
+                Ok(c.clone())
             }
-            CdniInterpreterMode::HeaderReplace => {
+            PsInterpretMode::HeaderReplace => {
                 self.req.set_header_value(&v.value.name, &value);
+                Ok(c.clone())
+            }
+            PsInterpretMode::HeaderCalculate => {
+                Ok(c.update_result(Some(Header(v.value.name.clone(), value))))
             }
             _ => todo!(),
         }
-
-        Ok(c.clone())
     }
 
     fn visit_synthetic_response(
         &mut self,
-        _v: &TypedSyntheticResponse<CdniVerificationKey>,
-        _c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
-        todo!()
+        v: &TypedSyntheticResponse<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        let mut response = http::Response::builder();
+
+        if let Some(headers) = &v.value.headers {
+            for header in headers {
+                let result = self.visit_header(header, &c.update_mode(HeaderCalculate))?;
+                match result.result.ok_or(PsInterpretError::AssertionFailure(
+                    PsInterpretAssertionFailures::MissingAnalyzedExpression,
+                ))? {
+                    PsInterpretValue::Header(name, value) => {
+                        response.headers_mut().unwrap().insert(
+                            HeaderName::from_bytes(name.as_bytes()).expect("Todo"),
+                            HeaderValue::from_str(&value).expect("Todo"),
+                        );
+                    }
+                    r => {
+                        return Err(PsInterpretError::WrongType(
+                            PsInterpretValueType::Header,
+                            r.into(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        response = response.status(if let Some(new_response) = &v.value.response_status {
+            if let Some(response_is_expr) = &v.value.response_status_expr
+                && *response_is_expr
+            {
+                let expr = match &v.value.aug {
+                    PsVerificationKey::ExprPair(Some(expr), _) => expr,
+                    _ => {
+                        return Err(PsInterpretError::AssertionFailure(
+                            PsInterpretAssertionFailures::MissingAnalyzedExpression,
+                        ));
+                    }
+                };
+                let result = self.evaluate_mel_expr(expr, Type::Integer)?;
+                match result {
+                    TypedValue {
+                        tipe: Type::Integer,
+                        value: Value::Integer(i),
+                    } => StatusCode::from_u16(i as u16),
+                    _ => unreachable!(),
+                }
+            } else {
+                new_response.parse::<StatusCode>()
+            }
+            .map_err(|e| PsInterpretError::InvalidResponse(e.to_string()))?
+        } else {
+            StatusCode::OK
+        });
+
+        let response = response
+            .body(if let Some(body) = &v.value.body {
+                if let Some(body_is_expr) = &v.value.body_expr
+                    && *body_is_expr
+                {
+                    let expr = match &v.value.aug {
+                        PsVerificationKey::ExprPair(_, Some(expr)) => expr,
+                        _ => {
+                            return Err(PsInterpretError::AssertionFailure(
+                                PsInterpretAssertionFailures::MissingAnalyzedExpression,
+                            ));
+                        }
+                    };
+                    let result = self.evaluate_mel_expr(expr, Type::String)?;
+                    match result {
+                        TypedValue {
+                            tipe: Type::String,
+                            value: Value::String(s),
+                        } => s,
+                        _ => unreachable!(),
+                    }
+                } else {
+                    body.clone()
+                }
+            } else {
+                "".to_string()
+            })
+            .expect("Could not create HTTP response");
+
+        Ok(c.update_result(Some(PsInterpretValue::SyntheticResponse(response))))
     }
 
     fn visit_client_request_stage(
         &mut self,
-        v: &TypedClientRequestStage<CdniVerificationKey>,
-        c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
+        v: &TypedClientRequestStage<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        let mut result: Result<PsInterpretValue, PsInterpretError> = Err(
+            PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult),
+        );
         for mg in &v.value.match_groups {
-            match &self.visit_match_group(mg, &c.clone())?.match_result {
-                Some(CdniInterpreterVisitResult::Terminate) => {
+            match self.visit_match_group(mg, &c.clone())?.result {
+                Some(
+                    r @ (PsInterpretValue::Terminate | PsInterpretValue::SyntheticResponse(_)),
+                ) => {
                     // This result stops processing.
-                    todo!()
+                    result = Ok(r);
+                    break;
                 }
-                Some(CdniInterpreterVisitResult::SyntheticResponse) => {
-                    // This result stops processing.
-                    todo!()
+                Some(r @ (PsInterpretValue::MatchYes | PsInterpretValue::MatchNo)) => {
+                    // This result continues processing.
+                    result = Ok(r);
                 }
-                Some(CdniInterpreterVisitResult::MatchYes) => {
-                    todo!()
-                }
-                Some(CdniInterpreterVisitResult::MatchNo) => {
-                    todo!()
+                Some(r) => {
+                    return Err(WrongType(PsInterpretValueType::Terminate, r.into()));
                 }
                 None => {
-                    // Continue
+                    return Err(PsInterpretError::AssertionFailure(
+                        PsInterpretAssertionFailures::MissingResult,
+                    ));
                 }
             }
         }
-        Ok(c.clone())
+        Ok(c.update_result(Some(result?)))
     }
 
     fn visit_match_group(
         &mut self,
-        v: &TypedMatchGroup<CdniVerificationKey>,
-        c: &CdniInterpreterContext,
-    ) -> super::visit::CdniVisitorResult<CdniInterpreterContext, CdniInterpreterError> {
-        self.visit_stage_rules(&v.value.if_rule, &c.clone())
+        v: &TypedMatchGroup<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        let r = v
+            .value
+            .else_ifs
+            .as_ref()
+            .map(|else_ifs| else_ifs.iter())
+            .unwrap_or([].iter());
+
+        let mut result: Result<PsInterpretValue, PsInterpretError> = Err(
+            PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult),
+        );
+        let rules = [&v.value.if_rule].into_iter().chain(r);
+        for r in rules {
+            match self.visit_stage_rules(r, &c.clone())?.result {
+                Some(r @ PsInterpretValue::MatchNo) => {
+                    result = Ok(r);
+                    continue; // do the next rule.
+                }
+                Some(r) => {
+                    result = Ok(r);
+                    break; // do _not_ do the next rule in any other case.
+                }
+                None => {
+                    return Err(PsInterpretError::AssertionFailure(
+                        PsInterpretAssertionFailures::MissingResult,
+                    ));
+                }
+            };
+        }
+        Ok(c.update_result(Some(result?)))
     }
 }
 
 #[allow(clippy::result_large_err)]
-pub fn interpret_client_request(
-    cr: &TypedClientRequestStage<CdniVerificationKey>,
-    req: &mut dyn ProcessableRequest,
-) -> CdniInterpreterResult {
-    let mut visitor = CdniInterpreter { req };
-    let context = CdniInterpreterContext {
-        mode: CdniInterpreterMode::Request,
+pub fn interpret_stage(
+    ts: &TypedStage<PsVerificationKey>,
+    req: &mut dyn ProcessableRequestResponse,
+    mode: PsInterpretMode,
+) -> PsInterpretResult {
+    let mut visitor = PsInterpreter { req };
+    let context = PsInterpretContext {
+        mode,
         ..Default::default()
     };
-    visitor.visit_client_request_stage(cr, &context)?;
-    Ok(())
+
+    match ts {
+        TypedStage::ClientRequest(typed_client_request_stage) => {
+            visitor.visit_client_request_stage(typed_client_request_stage, &context)
+        }
+        TypedStage::ClientResponse(_) => todo!(),
+        TypedStage::OriginRequest(_) => todo!(),
+        TypedStage::OriginResponse(_) => todo!(),
+    }?
+    .result
+    .ok_or(PsInterpretError::AssertionFailure(
+        PsInterpretAssertionFailures::MissingResult,
+    ))
 }
 
 #[derive(Debug)]
 enum EffectfulRequestActions {
-    Delete(String),
-    Add(String, String),
+    DeleteHeader(String),
+    AddHeader(String, String),
+    SetUri(String),
+    SetResponse(i64),
 }
 
 #[derive(Debug, Default)]
-struct EffectfulProcessableRequest {
+struct EffectfulProcessableRequestResponse {
     log: Vec<EffectfulRequestActions>,
 }
 
 #[cfg(test)]
-impl ProcessableRequest for EffectfulProcessableRequest {
+impl ProcessableRequestResponse for EffectfulProcessableRequestResponse {
     fn header_value(&self) -> &str {
-        todo!()
+        ""
     }
 
     fn headers(&self) -> &[&str] {
-        todo!()
+        &[]
     }
 
-    fn set_header_value(&mut self, _header: &str, _value: &str) {
-        todo!()
-    }
+    fn set_header_value(&mut self, _header: &str, _value: &str) {}
 
     fn remove_header(&mut self, header: &str) {
         self.log
-            .push(EffectfulRequestActions::Delete(header.to_string()));
+            .push(EffectfulRequestActions::DeleteHeader(header.to_string()));
     }
 
-    fn request(&self) -> Uri {
-        todo!()
+    fn uri(&self) -> Uri {
+        Uri::default()
+    }
+
+    fn set_uri(&mut self, uri: &Uri) {
+        self.log
+            .push(EffectfulRequestActions::SetUri(uri.to_string()));
+    }
+
+    fn set_response(&mut self, response: &i64) {
+        self.log
+            .push(EffectfulRequestActions::SetResponse(*response));
     }
 
     fn add_header(&mut self, header: &str, value: &str) {
-        self.log.push(EffectfulRequestActions::Add(
+        self.log.push(EffectfulRequestActions::AddHeader(
             header.to_string(),
             value.to_string(),
         ));
@@ -478,13 +769,20 @@ impl ProcessableRequest for EffectfulProcessableRequest {
 #[cfg(test)]
 mod ps_interpreter_tests {
     use crate::{
+        mel::{scope::Scopes, tvs::Type},
         ps::{
             interpret::{
-                EffectfulProcessableRequest, EffectfulRequestActions, interpret_client_request,
+                EffectfulProcessableRequestResponse, EffectfulRequestActions, PsInterpretMode,
+                PsInterpretValue, interpret_stage,
             },
-            spec::TypedClientRequestStage,
-            verify::{CdniVerifierContextValue, verifier},
-            visit::CdniVisitor,
+            spec::{TypedGenericStage, TypedStage},
+            tests::test_helpers::{
+                client_request_stage, expression_match, match_group, request_transform,
+                response_transform, stage_metadata, synthetic_response, typed_header,
+                typed_stage_rule,
+            },
+            verify::{PsVerifierContextValue, verifier, verify_ps_request_stage},
+            visit::PsVisitor,
         },
         tests::read_test_file,
     };
@@ -495,26 +793,548 @@ mod ps_interpreter_tests {
     fn test_interpret_client_request_stage() {
         let json = read_test_file(Path::new("./src/ps/tests/client_request_stage/if.json"));
 
-        let result = serde_json::from_str::<TypedClientRequestStage<()>>(&json)
+        let result = serde_json::from_str::<TypedGenericStage>(&json)
             .expect("Could not deserialize simple client request stage JSON");
 
-        let (mut verifier, context) = verifier();
-        let result = verifier
-            .visit_client_request_stage(&result, &context)
-            .expect("Could not verify value client request stage JSON")
-            .value
-            .expect("Could not get the client request stage value");
+        let result = verify_ps_request_stage(&result, Scopes::<Type>::default())
+            .expect("Could not verify valid client request stage JSON");
 
-        let value = match result {
-            CdniVerifierContextValue::ClientRequestStage(crs) => crs,
-            _ => todo!(),
-        };
-        let mut req = EffectfulProcessableRequest::default();
-        interpret_client_request(&value, &mut req)
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(&result, &mut req, PsInterpretMode::Request)
             .expect("Could not interpret a valid client request");
 
         assert_eq!(req.log.len(), 2);
-        assert_matches!(req.log[0], EffectfulRequestActions::Delete(_));
-        assert_matches!(req.log[1], EffectfulRequestActions::Add(_, _));
+        assert_matches!(req.log[0], EffectfulRequestActions::DeleteHeader(_));
+        assert_matches!(req.log[1], EffectfulRequestActions::AddHeader(_, _));
+        assert_matches!(result, PsInterpretValue::MatchYes);
+    }
+
+    #[test]
+    fn test_interpret_client_request_stage_request_response_header_transform() {
+        let json = read_test_file(Path::new(
+            "./src/ps/tests/client_request_stage/request_response_header_transform.json",
+        ));
+
+        let result = serde_json::from_str::<TypedGenericStage>(&json)
+            .expect("Could not deserialize simple client request stage JSON");
+
+        let result = verify_ps_request_stage(&result, Scopes::<Type>::default())
+            .expect("Could not verify valid client request stage JSON");
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(&result, &mut req, PsInterpretMode::Request)
+            .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 2);
+        assert_matches!(req.log[0], EffectfulRequestActions::DeleteHeader(_));
+        assert_matches!(req.log[1], EffectfulRequestActions::AddHeader(_, _));
+        assert_matches!(result, PsInterpretValue::MatchYes);
+    }
+
+    #[test]
+    fn test_interpret_client_request_stage_request_uri_transform() {
+        let mut request_xform_stage = stage_metadata();
+
+        let request_xform_match = expression_match("true");
+        let request_xform = request_transform(
+            None,
+            Some("\"http://\" . \"example.com\"".to_string()),
+            Some(true),
+        );
+        request_xform_stage.value.request_xform = Some(request_xform);
+
+        let request_xform_mg = match_group(
+            typed_stage_rule(Some(request_xform_match), request_xform_stage),
+            None,
+        );
+
+        let crs = client_request_stage(vec![request_xform_mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, &context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &mut req,
+            PsInterpretMode::Request,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 1);
+        assert_matches!(&req.log[0], EffectfulRequestActions::SetUri(r) if r == "http://example.com/");
+        assert_matches!(result, PsInterpretValue::MatchYes);
+    }
+
+    fn test_interpret_client_request_stage_request_uri_transform_if() {
+        let mut request_xform_false_stage = stage_metadata();
+        let mut request_xform_true_stage = stage_metadata();
+
+        let request_xform_false_match = expression_match("true");
+        let request_xform_false = request_transform(
+            None,
+            Some("\"http://\" . \"example.com\"".to_string()),
+            Some(true),
+        );
+        request_xform_false_stage.value.request_xform = Some(request_xform_false);
+
+        let request_xform_true_match = expression_match("true");
+        let request_xform_true = request_transform(
+            None,
+            Some("\"http://\" . \"example2.com\"".to_string()),
+            Some(true),
+        );
+        request_xform_true_stage.value.request_xform = Some(request_xform_true);
+
+        let mg = match_group(
+            typed_stage_rule(Some(request_xform_false_match), request_xform_false_stage),
+            Some(vec![typed_stage_rule(
+                Some(request_xform_true_match),
+                request_xform_true_stage,
+            )]),
+        );
+        let crs = client_request_stage(vec![mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, &context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &mut req,
+            PsInterpretMode::Request,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 1);
+        assert_matches!(&req.log[0], EffectfulRequestActions::SetUri(r) if r == "http://example.com/");
+        assert_matches!(result, PsInterpretValue::MatchYes);
+    }
+
+    #[test]
+    fn test_interpret_client_request_stage_request_uri_transform_else() {
+        let mut request_xform_false_stage = stage_metadata();
+        let mut request_xform_false_false_stage = stage_metadata();
+        let mut request_xform_true_stage = stage_metadata();
+
+        let request_xform_false_match = expression_match("false");
+        let request_xform_false = request_transform(
+            None,
+            Some("\"http://\" . \"example.com\"".to_string()),
+            Some(true),
+        );
+        request_xform_false_stage.value.request_xform = Some(request_xform_false);
+
+        let request_xform_false_false_match = expression_match("true");
+        let request_xform_false_false = request_transform(
+            None,
+            Some("\"http://\" . \"example1.com\"".to_string()),
+            Some(true),
+        );
+        request_xform_false_false_stage.value.request_xform = Some(request_xform_false_false);
+
+        let request_xform_true_match = expression_match("true");
+        let request_xform_true = request_transform(
+            None,
+            Some("\"http://\" . \"example2.com\"".to_string()),
+            Some(true),
+        );
+
+        request_xform_true_stage.value.request_xform = Some(request_xform_true);
+
+        let mg = match_group(
+            typed_stage_rule(Some(request_xform_false_match), request_xform_false_stage),
+            Some(vec![
+                typed_stage_rule(
+                    Some(request_xform_false_false_match),
+                    request_xform_false_false_stage,
+                ),
+                typed_stage_rule(Some(request_xform_true_match), request_xform_true_stage),
+            ]),
+        );
+        let crs = client_request_stage(vec![mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, &context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &mut req,
+            PsInterpretMode::Request,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 1);
+        assert_matches!(&req.log[0], EffectfulRequestActions::SetUri(r) if r == "http://example1.com/");
+        assert_matches!(result, PsInterpretValue::MatchYes);
+    }
+
+    fn test_interpret_client_request_stage_request_uri_transform_else_if() {
+        let mut request_xform_false_stage = stage_metadata();
+        let mut request_xform_false_false_stage = stage_metadata();
+        let mut request_xform_true_stage = stage_metadata();
+
+        let request_xform_false_match = expression_match("false");
+        let request_xform_false = request_transform(
+            None,
+            Some("\"http://\" . \"example.com\"".to_string()),
+            Some(true),
+        );
+        request_xform_false_stage.value.request_xform = Some(request_xform_false);
+
+        let request_xform_false_false_match = expression_match("false");
+        let request_xform_false_false = request_transform(
+            None,
+            Some("\"http://\" . \"example1.com\"".to_string()),
+            Some(true),
+        );
+        request_xform_false_false_stage.value.request_xform = Some(request_xform_false_false);
+
+        let request_xform_true_match = expression_match("true");
+        let request_xform_true = request_transform(
+            None,
+            Some("\"http://\" . \"example2.com\"".to_string()),
+            Some(true),
+        );
+
+        request_xform_true_stage.value.request_xform = Some(request_xform_true);
+
+        let mg = match_group(
+            typed_stage_rule(Some(request_xform_false_match), request_xform_false_stage),
+            Some(vec![
+                typed_stage_rule(
+                    Some(request_xform_false_false_match),
+                    request_xform_false_false_stage,
+                ),
+                typed_stage_rule(Some(request_xform_true_match), request_xform_true_stage),
+            ]),
+        );
+        let crs = client_request_stage(vec![mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, &context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &mut req,
+            PsInterpretMode::Request,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 1);
+        assert_matches!(&req.log[0], EffectfulRequestActions::SetUri(r) if r == "http://example2.com/");
+        assert_matches!(result, PsInterpretValue::MatchYes);
+    }
+
+    #[test]
+    fn test_interpret_client_request_stage_response_status_transform() {
+        let mut response_xform_stage = stage_metadata();
+
+        let response_xform_match = expression_match("true");
+        let response_xform = response_transform(None, Some("5 + 4".to_string()), Some(true), None);
+        response_xform_stage.value.response_xform = Some(response_xform);
+
+        let response_xform_mg = match_group(
+            typed_stage_rule(Some(response_xform_match), response_xform_stage),
+            None,
+        );
+
+        let crs = client_request_stage(vec![response_xform_mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, &context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+        let mut req = EffectfulProcessableRequestResponse::default();
+        interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &mut req,
+            PsInterpretMode::Response,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 1);
+        assert_matches!(&req.log[0], EffectfulRequestActions::SetResponse(9));
+    }
+
+    fn test_interpret_client_request_stage_response_status_transform_if() {
+        let mut response_xform_false_stage = stage_metadata();
+        let mut response_xform_true_stage = stage_metadata();
+
+        let response_xform_false_match = expression_match("true");
+        let response_xform_false =
+            response_transform(None, Some("5 + 4".to_string()), Some(true), None);
+        response_xform_false_stage.value.response_xform = Some(response_xform_false);
+
+        let response_xform_true_match = expression_match("true");
+        let response_xform_true =
+            response_transform(None, Some("5 + 5".to_string()), Some(true), None);
+        response_xform_true_stage.value.response_xform = Some(response_xform_true);
+
+        let mg = match_group(
+            typed_stage_rule(Some(response_xform_false_match), response_xform_false_stage),
+            Some(vec![typed_stage_rule(
+                Some(response_xform_true_match),
+                response_xform_true_stage,
+            )]),
+        );
+        let crs = client_request_stage(vec![mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, &context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &mut req,
+            PsInterpretMode::Response,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 1);
+        assert_matches!(&req.log[0], EffectfulRequestActions::SetResponse(9));
+        assert_matches!(result, PsInterpretValue::MatchYes);
+    }
+
+    #[test]
+    fn test_interpret_client_request_stage_response_status_transform_else() {
+        let mut response_xform_false_stage = stage_metadata();
+        let mut response_xform_false_false_stage = stage_metadata();
+        let mut response_xform_true_stage = stage_metadata();
+
+        let response_xform_false_match = expression_match("false");
+        let response_xform_false =
+            response_transform(None, Some("5 + 4".to_string()), Some(true), None);
+        response_xform_false_stage.value.response_xform = Some(response_xform_false);
+
+        let response_xform_false_false_match = expression_match("true");
+        let response_xform_false_false =
+            response_transform(None, Some("5 + 5".to_string()), Some(true), None);
+        response_xform_false_false_stage.value.response_xform = Some(response_xform_false_false);
+
+        let response_xform_true_match = expression_match("true");
+        let response_xform_true =
+            response_transform(None, Some("5 + 6".to_string()), Some(true), None);
+
+        response_xform_true_stage.value.response_xform = Some(response_xform_true);
+
+        let mg = match_group(
+            typed_stage_rule(Some(response_xform_false_match), response_xform_false_stage),
+            Some(vec![
+                typed_stage_rule(
+                    Some(response_xform_false_false_match),
+                    response_xform_false_false_stage,
+                ),
+                typed_stage_rule(Some(response_xform_true_match), response_xform_true_stage),
+            ]),
+        );
+        let crs = client_request_stage(vec![mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, &context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &mut req,
+            PsInterpretMode::Response,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 1);
+        assert_matches!(&req.log[0], EffectfulRequestActions::SetResponse(10));
+        assert_matches!(result, PsInterpretValue::MatchYes);
+    }
+
+    fn test_interpret_client_request_stage_response_status_transform_else_if() {
+        let mut response_xform_false_stage = stage_metadata();
+        let mut response_xform_false_false_stage = stage_metadata();
+        let mut response_xform_true_stage = stage_metadata();
+
+        let response_xform_false_match = expression_match("false");
+        let response_xform_false =
+            response_transform(None, Some("5 + 4".to_string()), Some(true), None);
+        response_xform_false_stage.value.response_xform = Some(response_xform_false);
+
+        let response_xform_false_false_match = expression_match("false");
+        let response_xform_false_false =
+            response_transform(None, Some("5 + 5".to_string()), Some(true), None);
+        response_xform_false_false_stage.value.response_xform = Some(response_xform_false_false);
+
+        let response_xform_true_match = expression_match("true");
+        let response_xform_true =
+            response_transform(None, Some("5 + 6".to_string()), Some(true), None);
+
+        response_xform_true_stage.value.response_xform = Some(response_xform_true);
+
+        let mg = match_group(
+            typed_stage_rule(Some(response_xform_false_match), response_xform_false_stage),
+            Some(vec![
+                typed_stage_rule(
+                    Some(response_xform_false_false_match),
+                    response_xform_false_false_stage,
+                ),
+                typed_stage_rule(Some(response_xform_true_match), response_xform_true_stage),
+            ]),
+        );
+        let crs = client_request_stage(vec![mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, &context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &mut req,
+            PsInterpretMode::Response,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 1);
+        assert_matches!(&req.log[0], EffectfulRequestActions::SetResponse(11));
+        assert_matches!(result, PsInterpretValue::MatchYes);
+    }
+
+    #[test]
+    fn test_interpret_client_request_stage_response_synthetic() {
+        let mut response_xform_true_stage = stage_metadata();
+
+        let response_xform_true_match = expression_match("true");
+        let response_xform_true = response_transform(
+            None,
+            None,
+            None,
+            Some(synthetic_response(
+                Some(vec![
+                    typed_header("X-custom1", "Custom value 1", None),
+                    typed_header("X-custom2", "Custom value 2", None),
+                ]),
+                Some("400 + 4".to_string()),
+                Some(true),
+                Some("\"This \" . \"is \" . \"a \" . \"test.\"".to_string()),
+                Some(true),
+            )),
+        );
+        response_xform_true_stage.value.response_xform = Some(response_xform_true);
+
+        let mg = match_group(
+            typed_stage_rule(Some(response_xform_true_match), response_xform_true_stage),
+            None,
+        );
+        let crs = client_request_stage(vec![mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, &context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+        let mut req = EffectfulProcessableRequestResponse::default();
+        let result = interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &mut req,
+            PsInterpretMode::Response,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_eq!(req.log.len(), 0);
+        assert_matches!(&result, PsInterpretValue::SyntheticResponse(r)
+            if r.status() == 404 && r.body() == "This is a test." && r.headers().len() == 2);
     }
 }
