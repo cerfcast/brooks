@@ -82,14 +82,21 @@ impl StructValue {
 #[allow(clippy::to_string_trait_impl)]
 impl ToString for StructValue {
     fn to_string(&self) -> String {
+        let field_values = self
+            .fields
+            .iter()
+            .map(|(k, v)| format!("{k}: {v}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+
         format!(
             "Type: {}, Field Values: {}",
             self.tpe.name,
-            self.fields
-                .iter()
-                .map(|(k, v)| { format!("{k}: {v}") })
-                .collect::<Vec<_>>()
-                .join(","),
+            if !field_values.is_empty() {
+                field_values
+            } else {
+                "None".to_string()
+            }
         )
     }
 }
@@ -118,7 +125,7 @@ impl Display for TypedValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
             Value::Integer(i) => write!(f, "{i}"),
-            Value::String(s) => write!(f, "{s}"),
+            Value::String(s) => write!(f, "\"{s}\""),
             Value::Boolean(b) => write!(f, "{b}"),
             Value::Regex(regex) => write!(f, "{regex}"),
             Value::IPAddress(ip_addr) => write!(f, "{ip_addr}"),
