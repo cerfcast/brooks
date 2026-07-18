@@ -342,12 +342,9 @@ mod interpreter_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        let mut reqs = tvs::Struct {
-            name: "req".to_string(),
-            fields: HashMap::new(),
-        };
+        let mut reqs = tvs::Struct::new("req");
 
-        reqs.fields.insert("incoming".to_string(), Type::String);
+        reqs.insert_field("incoming", Type::String);
         context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs.clone())));
 
         let result = driver
@@ -410,12 +407,8 @@ mod interpreter_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        let mut reqs = tvs::Struct {
-            name: "req".to_string(),
-            fields: HashMap::new(),
-        };
-
-        reqs.fields.insert("incoming".to_string(), Type::Boolean);
+        let mut reqs = tvs::Struct::new("req");
+        reqs.insert_field("incoming", Type::Boolean);
         context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs.clone())));
 
         let result = driver
@@ -542,12 +535,9 @@ mod interpreter_logger_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        let mut reqs = tvs::Struct {
-            name: "req".to_string(),
-            fields: HashMap::new(),
-        };
+        let mut reqs = tvs::Struct::new("req");
 
-        reqs.fields.insert("incoming".to_string(), Type::Boolean);
+        reqs.insert_field("incoming", Type::Boolean);
         context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs.clone())));
 
         let result = driver
@@ -618,8 +608,7 @@ mod interpreter_value_tests {
     fn test_typed_struct_field() {
         let mut st = Struct::new("st");
 
-        st.fields
-            .insert("field1".to_string(), crate::mel::tvs::Type::Integer);
+        st.insert_field("field1", Type::Integer);
 
         let mut sv = StructValue::new(st);
 
@@ -639,8 +628,7 @@ mod interpreter_value_tests {
     fn test_mistyped_struct_field() {
         let mut st = Struct::new("st");
 
-        st.fields
-            .insert("field1".to_string(), crate::mel::tvs::Type::Integer);
+        st.insert_field("field1", Type::Integer);
 
         let mut sv = StructValue::new(st);
 

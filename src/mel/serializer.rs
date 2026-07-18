@@ -998,7 +998,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
 #[cfg(test)]
 mod analyzed_serializer_tests {
-    use std::{collections::HashMap, sync::Arc};
+    use std::sync::Arc;
 
     use crate::mel::tvs::{
         self, Struct,
@@ -1307,18 +1307,11 @@ mod analyzed_serializer_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        let mut headers = Struct {
-            name: "headers".to_string(),
-            fields: HashMap::new(),
-        };
-        headers.fields.insert("headers".to_string(), Type::String);
+        let mut headers = Struct::new("headers");
+        headers.insert_field("headers", Type::String);
 
-        let mut reqs = Struct {
-            name: "req".to_string(),
-            fields: HashMap::new(),
-        };
-        reqs.fields
-            .insert("incoming".to_string(), Type::Struct(headers));
+        let mut reqs = Struct::new("req");
+        reqs.insert_field("incoming", Type::Struct(headers));
 
         context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs)));
 
@@ -1367,12 +1360,9 @@ mod analyzed_serializer_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        let mut reqs = Struct {
-            name: "req".to_string(),
-            fields: HashMap::new(),
-        };
+        let mut reqs = Struct::new("req");
+        reqs.insert_field("incoming", Type::Boolean);
 
-        reqs.fields.insert("incoming".to_string(), Type::Boolean);
         context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs)));
 
         let result = driver
@@ -1418,13 +1408,10 @@ mod analyzed_serializer_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        let mut reqs = Struct {
-            name: "req".to_string(),
-            fields: HashMap::new(),
-        };
+        let mut reqs = Struct::new("req");
 
-        reqs.fields.insert(
-            "callable".to_string(),
+        reqs.insert_field(
+            "callable",
             Function(
                 Arc::new(Type::Boolean),
                 tvs::Params {

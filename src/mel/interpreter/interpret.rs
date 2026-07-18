@@ -62,11 +62,10 @@ impl StructValue {
     pub fn insert_field(&mut self, name: &str, value: TypedValue) -> Result<(), MelInterpError> {
         let ft = self
             .tpe
-            .fields
-            .get(name)
+            .get_field(name)
             .ok_or(MelInterpError::UnknownField(name.to_string()))?;
 
-        if ft != &value.tipe {
+        if ft != value.tipe {
             return Err(MelInterpError::MistypedField(
                 name.to_string(),
                 ft.clone(),
@@ -1023,8 +1022,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
 
         let member_type =
             base_type
-                .fields
-                .get(&ast.member.identifier)
+                .get_field(&ast.member.identifier)
                 .ok_or(MelInterpLocatableError {
                     error: MelInterpError::UnknownField(ast.member.identifier.clone()),
                     location: ast.member.location.clone(),
@@ -1041,7 +1039,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                     context: context.clone(),
                 })?;
 
-        if member_type != &member_value.tipe {
+        if member_type != member_value.tipe {
             return Err(MelInterpLocatableError {
                 error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
                     member_type.clone(),

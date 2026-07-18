@@ -17,12 +17,21 @@
 
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
+use regex::Regex;
+
 /// Types
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Struct {
     pub name: String,
-    pub fields: HashMap<String, Type>,
+    fields: HashMap<String, Type>,
+    wild: Vec<(Regex, Type)>,
+}
+
+impl PartialEq for Struct {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
 }
 
 impl Struct {
@@ -30,11 +39,37 @@ impl Struct {
         Struct {
             name: name.to_string(),
             fields: HashMap::new(),
+            wild: vec![],
         }
     }
 
     pub fn insert_field(&mut self, name: &str, tipe: Type) {
         self.fields.insert(name.to_string(), tipe);
+    }
+
+    pub fn insert_wild_field(&mut self, matcher: &Regex, tipe: Type) {
+        self.wild.push((matcher.clone(), tipe));
+    }
+
+    pub fn get_field(&self, name: &str) -> Option<Type> {
+        if let Some(exact_field) = self.fields.get(name) {
+            Some(exact_field.clone())
+        } else {
+            self.wild.iter().find_map(|(regex, tpe)| {
+                if regex.is_match(name) {
+                    Some(tpe.clone())
+                } else {
+                    None
+                }
+            })
+        }
+    }
+
+    pub fn fields(&self) -> impl Iterator<Item = (Option<&String>, Option<&Regex>)> {
+        self.fields
+            .keys()
+            .map(|f| (Some(f), None))
+            .chain(self.wild.iter().map(|f| (None, Some(&f.0))))
     }
 }
 
@@ -104,5 +139,31 @@ impl ToString for Type {
 impl Struct {
     pub fn type_for_field(&self, field_name: &str) -> Option<Type> {
         self.fields.get(field_name).cloned()
+    }
+}
+
+#[cfg(test)]
+mod test_struct {
+    use regex::Regex;
+
+    use crate::mel::tvs::{Struct, Type};
+
+    #[test]
+    fn test_wild_struct_field() {
+        let mut s = Struct::new("s");
+
+        s.insert_field("testing", Type::String);
+        s.insert_wild_field(
+            &Regex::new("w.*").expect("Could not compile testing regex"),
+            Type::Integer,
+        );
+
+        let found = s
+            .get_field("testing")
+            .expect("Could not find testing field");
+        assert_eq!(found, Type::String);
+
+        let found = s.get_field("wild").expect("Could not find wild field");
+        assert_eq!(found, Type::Integer);
     }
 }

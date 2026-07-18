@@ -666,13 +666,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             Type::Struct(struct_type) => struct_type,
             t => {
                 return Err(MelAnalysisLocatableError {
-                    error: MelAnalysisError::Mismatch(
-                        Struct(tvs::Struct {
-                            name: "TODO".to_string(),
-                            ..Default::default()
-                        }),
-                        t,
-                    ),
+                    error: MelAnalysisError::Mismatch(Struct(tvs::Struct::new("TODO")), t),
                     location: ast.base.location(),
                 });
             }
