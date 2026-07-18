@@ -81,13 +81,13 @@ impl StructValue {
 #[allow(clippy::to_string_trait_impl)]
 impl ToString for StructValue {
     fn to_string(&self) -> String {
-        let field_values = self
+        let mut field_values = self
             .fields
             .iter()
             .map(|(k, v)| format!("{k}: {v}"))
-            .collect::<Vec<_>>()
-            .join(", ");
-
+            .collect::<Vec<_>>();
+        field_values.sort();
+        let field_values = field_values.join(", ");
         format!(
             "Type: {}, Field Values: {}",
             self.tpe.name,
