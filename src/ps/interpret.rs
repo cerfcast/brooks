@@ -30,7 +30,7 @@ use crate::{
                 MelInterpContext, MelInterpError, MelInterpLocatableError, TypedValue, Value,
             },
         },
-        scope::Scopes,
+        scope::{Scope, Scopes},
         tvs::Type,
     },
     ps::{
@@ -153,7 +153,9 @@ impl<'a> PsInterpreter<'a> {
             .body("")
             .map_err(|_| PsInterpretError::InvalidRequest)?;
 
-        Ok(Scopes::<TypedValue>::from(mel_req))
+        Ok(Scopes::<TypedValue> {
+            scopes: vec![Scope::<TypedValue>::from(mel_req)],
+        })
     }
 
     #[allow(clippy::result_large_err)]

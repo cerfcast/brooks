@@ -15,13 +15,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug, ops::Add};
+use std::{collections::HashMap, fmt::Debug, ops::Add, sync::Arc};
 
 use http::uri::Scheme;
+use regex::Regex;
 
 use crate::mel::{
-    interpreter::interpret::{StructValue, TypedValue, Value},
-    tvs::{Struct, Type},
+    interpreter::{
+        builtins::{BooleanBuiltin, BuiltinFunction, Path_ElementBuiltin},
+        interpret::{StructValue, TypedValue, Value},
+    },
+    tvs::{
+        Struct,
+        Type::{self, Function},
+    },
 };
 
 #[derive(Debug, Clone, Default)]
@@ -95,6 +102,18 @@ impl<I: Clone + Default> Default for Scopes<I> {
     }
 }
 
+fn header_type(wild: bool) -> Struct {
+    let mut ht = Struct::new("h");
+    if wild {
+        ht.insert_wild_field(
+            &Regex::new(".*").expect("Could not compile wildcard regex for header type"),
+            Type::String,
+        );
+    }
+
+    ht
+}
+
 fn header_type_from_req<A>(value: &http::Request<A>) -> Struct {
     // Make the header type.
     let mut ht = Struct::new("h");
@@ -129,10 +148,36 @@ fn req_type(header_type: Struct, uri_type: Struct) -> Struct {
     reqs
 }
 
-impl<A> From<http::Request<A>> for Scopes<Type> {
+/// Create a scope that contains the types of the MEL core variables.
+pub fn minimal_core_variable_types() -> Scope<Type> {
+    let mut scope = Scope::<Type>::default();
+    let ht = header_type(true);
+    scope = scope.insert("req", Type::Struct(req_type(ht, uri_type())));
+    scope
+}
+
+/// Create a scope that contains the types of the MEL builtin functions.
+pub fn builtin_function_types() -> Scope<Type> {
+    let b = Path_ElementBuiltin {};
+    let boolean = BooleanBuiltin {};
+
+    let mut scopes = Scope::<Type>::default();
+    scopes = scopes.insert(
+        &b.name(),
+        Function(Arc::new(b.return_type()), b.parameters()),
+    );
+    scopes = scopes.insert(
+        &boolean.name(),
+        Function(Arc::new(boolean.return_type()), boolean.parameters()),
+    );
+    scopes
+}
+
+/// Create a scope that contains the types of only the MEL core variables present in an HTTP request.
+impl<A> From<http::Request<A>> for Scope<Type> {
     fn from(value: http::Request<A>) -> Self {
         // Set up the built-in variables for type checking.
-        let mut scope = Scopes::<Type>::default();
+        let mut scope = Scope::<Type>::default();
 
         let ht = header_type_from_req(&value);
         let urit = uri_type();
@@ -145,14 +190,15 @@ impl<A> From<http::Request<A>> for Scopes<Type> {
     }
 }
 
-impl<A> From<http::Request<A>> for Scopes<TypedValue> {
+/// Create a scope that contains the values of only the MEL core variables present in an HTTP request.
+impl<A> From<http::Request<A>> for Scope<TypedValue> {
     fn from(value: http::Request<A>) -> Self {
         let ht = header_type_from_req(&value);
         let urit = uri_type();
         let reqt = req_type(ht.clone(), urit.clone());
 
         // Set up the built-in variables for interpreting.
-        let mut value_scope = Scopes::<TypedValue>::default();
+        let mut value_scope = Scope::<TypedValue>::default();
 
         let mut reqv = StructValue::new(reqt.clone());
 

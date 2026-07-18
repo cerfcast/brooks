@@ -15,12 +15,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 use brooks_macros::builtin_function;
 
 use crate::mel::{
     interpreter::interpret::{TypedValue, Value},
+    scope::Scope,
     tvs::{self, Type},
 };
 
@@ -106,4 +110,27 @@ impl BooleanBuiltin {
             tipe: Type::Boolean,
         })
     }
+}
+
+pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
+    let b = Path_ElementBuiltin {};
+    let boolean = BooleanBuiltin {};
+
+    let mut scopes = Scope::<TypedValue>::default();
+
+    scopes = scopes.insert(
+        &b.name(),
+        TypedValue {
+            value: Value::Function(Arc::new(b.clone())),
+            tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+        },
+    );
+    scopes = scopes.insert(
+        &boolean.name(),
+        TypedValue {
+            value: Value::Function(Arc::new(boolean.clone())),
+            tipe: Type::Function(Arc::new(boolean.return_type()), boolean.parameters()),
+        },
+    );
+    scopes
 }
