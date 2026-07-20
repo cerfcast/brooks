@@ -18,7 +18,6 @@
 use std::{collections::HashMap, fmt::Debug, ops::Add, sync::Arc};
 
 use http::uri::Scheme;
-use regex::Regex;
 
 use crate::mel::{
     interpreter::{
@@ -26,8 +25,8 @@ use crate::mel::{
         interpret::{StructValue, TypedValue, Value},
     },
     tvs::{
-        Struct,
         Type::{self, Function},
+        header_type, header_type_from_req, req_type, uri_type,
     },
 };
 
@@ -100,52 +99,6 @@ impl<I: Clone + Default> Default for Scopes<I> {
             scopes: vec![Scope::default()],
         }
     }
-}
-
-fn header_type(wild: bool) -> Struct {
-    let mut ht = Struct::new("h");
-    if wild {
-        ht.insert_wild_field(
-            &Regex::new(".*").expect("Could not compile wildcard regex for header type"),
-            Type::String,
-        );
-    }
-
-    ht
-}
-
-fn header_type_from_req<A>(value: &http::Request<A>) -> Struct {
-    // Make the header type.
-    let mut ht = Struct::new("h");
-    value.headers().iter().for_each(|header| {
-        ht.insert_field(
-            &header.0.to_string().replace("-", "_").to_lowercase(),
-            Type::String,
-        );
-    });
-    ht
-}
-
-fn uri_type() -> Struct {
-    // Make the URI type.
-    let mut urit = Struct::new("uri");
-    urit.insert_field("path", Type::String);
-    urit.insert_field("query", Type::String);
-
-    urit
-}
-
-fn req_type(header_type: Struct, uri_type: Struct) -> Struct {
-    // Make the req type.
-    let mut reqs = Struct::new("req");
-    reqs.insert_field("h", Type::Struct(header_type));
-    reqs.insert_field("uri", Type::Struct(uri_type));
-    reqs.insert_field("method", Type::String);
-    reqs.insert_field("scheme", Type::String);
-    reqs.insert_field("clientip", Type::IPAddress);
-    reqs.insert_field("clientport", Type::Integer);
-
-    reqs
 }
 
 /// Create a scope that contains the types of the MEL core variables.
