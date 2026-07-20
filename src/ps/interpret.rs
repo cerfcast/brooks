@@ -35,7 +35,6 @@ use crate::{
     },
     ps::{
         interpret::{
-            PsInterpretError::{WrongMatchGroupValueType, WrongType},
             PsInterpretMode::HeaderCalculate,
             PsInterpretValue::{Header, MatchNo, MatchYes},
             PsInterpretValueType::{MatchResult, SyntheticResponse, Terminate},
@@ -53,16 +52,41 @@ use crate::{
 
 use std::fmt::Debug;
 
+#[derive(Debug, Clone)]
+pub enum ProcessableRequestResponseError {
+    BadValue,
+    InvalidMode,
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for ProcessableRequestResponseError {
+    fn to_string(&self) -> String {
+        match &self {
+            ProcessableRequestResponseError::BadValue => "Bad value".to_string(),
+            ProcessableRequestResponseError::InvalidMode => "Invalid mode".to_string(),
+        }
+    }
+}
+
+pub type ProcessableRequestResponseResult<T> = Result<T, ProcessableRequestResponseError>;
+
 /// A request that can be manipulated by interpretation processing stages.
 pub trait ProcessableRequestResponse: Debug {
-    fn header_value(&self) -> &str;
+    fn header_value(&self) -> Option<&str>;
     fn headers(&self) -> &[&str];
-    fn set_header_value(&mut self, header: &str, value: &str);
-    fn remove_header(&mut self, header: &str);
-    fn add_header(&mut self, header: &str, value: &str);
+
+    fn set_header_value(
+        &mut self,
+        header: &str,
+        value: &str,
+    ) -> ProcessableRequestResponseResult<()>;
+    fn remove_header(&mut self, header: &str) -> ProcessableRequestResponseResult<()>;
+    fn add_header(&mut self, header: &str, value: &str) -> ProcessableRequestResponseResult<()>;
+
     fn uri(&self) -> Uri;
-    fn set_uri(&mut self, uri: &Uri);
-    fn set_response(&mut self, response: &i64);
+    fn set_uri(&mut self, uri: &Uri) -> ProcessableRequestResponseResult<()>;
+
+    fn set_response(&mut self, response: &u16) -> ProcessableRequestResponseResult<()>;
 }
 
 pub type PsInterpretResult = Result<PsInterpretValue, PsInterpretError>;
@@ -105,6 +129,7 @@ pub enum PsInterpretError {
     InvalidResponse(String),
     WrongType(PsInterpretValueType, PsInterpretValueType),
     WrongMatchGroupValueType(PsInterpretValueType),
+    ProcessableRequestResponseError(ProcessableRequestResponseError),
 }
 
 #[allow(clippy::to_string_trait_impl)]
@@ -123,17 +148,25 @@ impl ToString for PsInterpretError {
             PsInterpretError::InvalidResponse(response) => {
                 format!("Invalid Response: {response}")
             }
-            WrongType(expected, actual) => {
+            PsInterpretError::WrongType(expected, actual) => {
                 format!(
                     "Wrong type: expected: {} actual: {}",
                     expected.to_string(),
                     actual.to_string()
                 )
             }
-            WrongMatchGroupValueType(actual) => {
+            PsInterpretError::WrongMatchGroupValueType(actual) => {
                 format!(
                     "Match group value should not have {} type",
                     actual.to_string()
+                )
+            }
+            PsInterpretError::ProcessableRequestResponseError(
+                processable_request_response_error,
+            ) => {
+                format!(
+                    "Error occurred when modifying the request/response: {}",
+                    processable_request_response_error.to_string()
                 )
             }
         }
@@ -385,7 +418,9 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
                 Uri::try_from(new_uri.clone())
             }
             .map_err(PsInterpretError::InvalidUri)?;
-            self.req.set_uri(&new_uri);
+            self.req
+                .set_uri(&new_uri)
+                .map_err(PsInterpretError::ProcessableRequestResponseError)?
         }
 
         Ok(c.clone())
@@ -434,7 +469,16 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
                 new_response.parse::<i64>()
             }
             .map_err(|e| PsInterpretError::InvalidResponse(e.to_string()))?;
-            self.req.set_response(&new_response);
+            let new_response = u16::try_from(new_response).map_err(|e| {
+                PsInterpretError::InvalidResponse(format!(
+                    "Could not convert {new_response} to unsigned 16-bit number: {e}"
+                ))
+            })?;
+            self.req.set_response(&new_response).map_err(|_| {
+                PsInterpretError::ProcessableRequestResponseError(
+                    ProcessableRequestResponseError::BadValue,
+                )
+            })?;
         }
 
         Ok(c.clone())
@@ -455,7 +499,9 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         if let Some(to_delete) = &v.value.delete {
             for htr in to_delete {
-                self.req.remove_header(htr);
+                self.req
+                    .remove_header(htr)
+                    .map_err(PsInterpretError::ProcessableRequestResponseError)?
             }
         }
 
@@ -516,11 +562,15 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
 
         match c.mode {
             PsInterpretMode::HeaderAdd => {
-                self.req.add_header(&v.value.name, &value);
+                self.req
+                    .add_header(&v.value.name, &value)
+                    .map_err(PsInterpretError::ProcessableRequestResponseError)?;
                 Ok(c.clone())
             }
             PsInterpretMode::HeaderReplace => {
-                self.req.set_header_value(&v.value.name, &value);
+                self.req
+                    .set_header_value(&v.value.name, &value)
+                    .map_err(PsInterpretError::ProcessableRequestResponseError)?;
                 Ok(c.clone())
             }
             PsInterpretMode::HeaderCalculate => {
@@ -641,7 +691,10 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
                     result = Ok(r);
                 }
                 Some(r) => {
-                    return Err(WrongType(PsInterpretValueType::Terminate, r.into()));
+                    return Err(PsInterpretError::WrongType(
+                        PsInterpretValueType::Terminate,
+                        r.into(),
+                    ));
                 }
                 None => {
                     return Err(PsInterpretError::AssertionFailure(
@@ -721,7 +774,7 @@ enum EffectfulRequestActions {
     DeleteHeader(String),
     AddHeader(String, String),
     SetUri(String),
-    SetResponse(i64),
+    SetResponse(u16),
 }
 
 #[derive(Debug, Default)]
@@ -731,40 +784,54 @@ struct EffectfulProcessableRequestResponse {
 
 #[cfg(test)]
 impl ProcessableRequestResponse for EffectfulProcessableRequestResponse {
-    fn header_value(&self) -> &str {
-        ""
+    fn header_value(&self) -> Option<&str> {
+        None
     }
 
     fn headers(&self) -> &[&str] {
         &[]
     }
 
-    fn set_header_value(&mut self, _header: &str, _value: &str) {}
+    fn set_header_value(
+        &mut self,
+        _header: &str,
+        _value: &str,
+    ) -> Result<(), ProcessableRequestResponseError> {
+        Ok(())
+    }
 
-    fn remove_header(&mut self, header: &str) {
+    fn remove_header(&mut self, header: &str) -> Result<(), ProcessableRequestResponseError> {
         self.log
             .push(EffectfulRequestActions::DeleteHeader(header.to_string()));
+        Ok(())
     }
 
     fn uri(&self) -> Uri {
         Uri::default()
     }
 
-    fn set_uri(&mut self, uri: &Uri) {
+    fn set_uri(&mut self, uri: &Uri) -> Result<(), ProcessableRequestResponseError> {
         self.log
             .push(EffectfulRequestActions::SetUri(uri.to_string()));
+        Ok(())
     }
 
-    fn set_response(&mut self, response: &i64) {
+    fn set_response(&mut self, response: &u16) -> Result<(), ProcessableRequestResponseError> {
         self.log
             .push(EffectfulRequestActions::SetResponse(*response));
+        Ok(())
     }
 
-    fn add_header(&mut self, header: &str, value: &str) {
+    fn add_header(
+        &mut self,
+        header: &str,
+        value: &str,
+    ) -> Result<(), ProcessableRequestResponseError> {
         self.log.push(EffectfulRequestActions::AddHeader(
             header.to_string(),
             value.to_string(),
         ));
+        Ok(())
     }
 }
 
