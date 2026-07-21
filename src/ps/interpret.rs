@@ -50,7 +50,7 @@ use crate::{
     },
 };
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Clone)]
 pub enum ProcessableRequestResponseError {
@@ -58,12 +58,11 @@ pub enum ProcessableRequestResponseError {
     InvalidMode,
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ProcessableRequestResponseError {
-    fn to_string(&self) -> String {
+impl Display for ProcessableRequestResponseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            ProcessableRequestResponseError::BadValue => "Bad value".to_string(),
-            ProcessableRequestResponseError::InvalidMode => "Invalid mode".to_string(),
+            ProcessableRequestResponseError::BadValue => write!(f, "Bad value"),
+            ProcessableRequestResponseError::InvalidMode => write!(f, "Invalid mode"),
         }
     }
 }
@@ -99,20 +98,19 @@ pub enum PsInterpretAssertionFailures {
     MissingResult,
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for PsInterpretAssertionFailures {
-    fn to_string(&self) -> String {
+impl Display for PsInterpretAssertionFailures {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PsInterpretAssertionFailures::MissingAnalyzedExpression => {
-                "Missing information about an analyzed expression".to_string()
+                write!(f, "Missing information about an analyzed expression")
             }
             PsInterpretAssertionFailures::MissingInterpreterExpressionValue => {
-                "Missing value from an interpreted expression".to_string()
+                write!(f, "Missing value from an interpreted expression")
             }
             PsInterpretAssertionFailures::InvalidInterpreterMode => {
-                "Invalid interpreter mode".to_string()
+                write!(f, "Invalid interpreter mode")
             }
-            PsInterpretAssertionFailures::MissingResult => "Missing result".to_string(),
+            PsInterpretAssertionFailures::MissingResult => write!(f, "Missing result"),
         }
     }
 }
@@ -132,41 +130,33 @@ pub enum PsInterpretError {
     ProcessableRequestResponseError(ProcessableRequestResponseError),
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for PsInterpretError {
-    fn to_string(&self) -> String {
+impl Display for PsInterpretError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PsInterpretError::NoError => "No Error".to_string(),
+            PsInterpretError::NoError => write!(f, "No Error"),
             PsInterpretError::AssertionFailure(af) => {
-                format!("Assertion failure: {}", af.to_string())
+                write!(f, "Assertion failure: {af}")
             }
             PsInterpretError::MelInterpreterError(meli) => {
-                format!("MEL Interpreter error: {}", meli)
+                write!(f, "MEL Interpreter error: {}", meli)
             }
-            PsInterpretError::InvalidRequest => "Invalid HTTP request".to_string(),
-            PsInterpretError::InvalidUri(iuri) => format!("Invalid URI: {iuri}"),
+            PsInterpretError::InvalidRequest => write!(f, "Invalid HTTP request"),
+            PsInterpretError::InvalidUri(iuri) => write!(f, "Invalid URI: {iuri}"),
             PsInterpretError::InvalidResponse(response) => {
-                format!("Invalid Response: {response}")
+                write!(f, "Invalid Response: {response}")
             }
             PsInterpretError::WrongType(expected, actual) => {
-                format!(
-                    "Wrong type: expected: {} actual: {}",
-                    expected.to_string(),
-                    actual.to_string()
-                )
+                write!(f, "Wrong type: expected: {expected} actual: {actual}",)
             }
             PsInterpretError::WrongMatchGroupValueType(actual) => {
-                format!(
-                    "Match group value should not have {} type",
-                    actual.to_string()
-                )
+                write!(f, "Match group value should not have {actual} type")
             }
             PsInterpretError::ProcessableRequestResponseError(
                 processable_request_response_error,
             ) => {
-                format!(
-                    "Error occurred when modifying the request/response: {}",
-                    processable_request_response_error.to_string()
+                write!(
+                    f,
+                    "Error occurred when modifying the request/response: {processable_request_response_error}"
                 )
             }
         }
@@ -248,17 +238,17 @@ pub enum PsInterpretValueType {
     Header,
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for PsInterpretValueType {
-    fn to_string(&self) -> String {
+impl Display for PsInterpretValueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            SyntheticResponse => "Synthetic response".to_string(),
-            Terminate => "Terminate".to_string(),
-            MatchResult => "Match result".to_string(),
-            PsInterpretValueType::Header => "Header".to_string(),
+            SyntheticResponse => write!(f, "Synthetic response"),
+            Terminate => write!(f, "Terminate"),
+            MatchResult => write!(f, "Match result"),
+            PsInterpretValueType::Header => write!(f, "Header"),
         }
     }
 }
+
 #[derive(Debug, Clone)]
 pub enum PsInterpretValue {
     SyntheticResponse(http::Response<String>),

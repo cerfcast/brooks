@@ -44,9 +44,7 @@ impl Display for BuiltinInterpError {
             }
             BuiltinInterpError::ArgumentMismatch(which, expected, actual) => write!(
                 f,
-                "Expected argument {which} to have type {} but it has {}",
-                expected.to_string(),
-                actual.to_string()
+                "Expected argument {which} to have type {expected} but it has {actual}",
             ),
             BuiltinInterpError::ArgumentsInvalid => write!(f, "Invalid arguments"),
             BuiltinInterpError::RuntimeError(e) => write!(f, "Runtime error: {e}"),

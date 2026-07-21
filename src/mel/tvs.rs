@@ -15,7 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    sync::Arc,
+};
 
 use regex::Regex;
 
@@ -92,10 +96,10 @@ pub enum Type {
     None,
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for Struct {
-    fn to_string(&self) -> String {
-        format!(
+impl Display for Struct {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
             "Name: {}, Fields: {}",
             self.name,
             self.fields.keys().cloned().collect::<Vec<_>>().join(","),
@@ -103,16 +107,16 @@ impl ToString for Struct {
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for Type {
-    fn to_string(&self) -> String {
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Type::Boolean => "Bool".into(),
-            Type::Integer => "Integer".into(),
-            Type::String => "String".into(),
-            Type::Regex => "Regex".into(),
-            Type::IPAddress => "IPAddress".into(),
-            Type::Params(items) => format!(
+            Type::Boolean => write!(f, "Bool"),
+            Type::Integer => write!(f, "Integer"),
+            Type::String => write!(f, "String"),
+            Type::Regex => write!(f, "Regex"),
+            Type::IPAddress => write!(f, "IPAddress"),
+            Type::Params(items) => write!(
+                f,
                 "Parameters: {}",
                 items
                     .args
@@ -121,17 +125,17 @@ impl ToString for Type {
                     .collect::<Vec<_>>()
                     .join(","),
             ),
-            Type::Function(result, args) => format!(
-                "Return Type: {}, Argument Types: {}",
-                result.to_string(),
+            Type::Function(result, args) => write!(
+                f,
+                "Return Type: {result}, Argument Types: {}",
                 args.args
                     .iter()
                     .map(|a| a.to_string())
                     .collect::<Vec<_>>()
                     .join(","),
             ),
-            Type::Struct(s) => format!("Struct: {}", s.to_string()),
-            Type::None => "None".to_string(),
+            Type::Struct(s) => write!(f, "Struct: {s}"),
+            Type::None => write!(f, "None"),
         }
     }
 }

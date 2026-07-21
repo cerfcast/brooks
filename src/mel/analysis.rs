@@ -188,8 +188,7 @@ impl Display for MelAnalysisError {
             ),
             InvalidType(valids, actual) => write!(
                 f,
-                "{} is not one of the expected types ({})",
-                actual.to_string(),
+                "{actual} is not one of the expected types ({})",
                 valids
                     .iter()
                     .map(|v| v.to_string())

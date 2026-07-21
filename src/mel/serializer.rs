@@ -15,7 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
+
 use crate::common::GrammarLocation;
+use crate::mel::ast::{
+    BinaryInfixOperator, ComparisonOperator, LogicOperator, MathOperator, MemberAccessOperator,
+    StringConcatOperator, TernaryOperator,
+};
 use crate::mel::{
     analysis::{self, Analyzed},
     ast::{
@@ -24,126 +30,133 @@ use crate::mel::{
     },
 };
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::BinaryInfixOperator {
-    fn to_string(&self) -> String {
+impl Display for MemberAccessOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, " . ")
+    }
+}
+
+impl Display for BinaryInfixOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ast::BinaryInfixOperator::Logic(lo) => lo.to_string(),
-            ast::BinaryInfixOperator::Math(m) => m.to_string(),
-            ast::BinaryInfixOperator::Concat(_) => "concat".to_string(),
-            ast::BinaryInfixOperator::Comparison(c) => c.to_string(),
-            ast::BinaryInfixOperator::MemberAccess(m) => m.to_string(),
+            BinaryInfixOperator::Logic(logic_operator) => write!(f, "{logic_operator}"),
+            BinaryInfixOperator::Comparison(comparison_operator) => {
+                write!(f, "{comparison_operator}")
+            }
+            BinaryInfixOperator::Math(math_operator) => write!(f, "{math_operator}"),
+            BinaryInfixOperator::Concat(string_concat_operator) => {
+                write!(f, "{string_concat_operator}")
+            }
+            BinaryInfixOperator::MemberAccess(member_access_operator) => {
+                write!(f, "{member_access_operator}")
+            }
         }
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::MemberAccessOperator {
-    fn to_string(&self) -> String {
+impl Display for ComparisonOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ast::MemberAccessOperator::MemberAccess => "^".into(),
+            ComparisonOperator::Eq => write!(f, "=="),
+            ComparisonOperator::Ne => write!(f, "!="),
+            ComparisonOperator::Lt => write!(f, "<"),
+            ComparisonOperator::Lte => write!(f, "<="),
+            ComparisonOperator::Gt => write!(f, ">"),
+            ComparisonOperator::Gte => write!(f, ">="),
+            ComparisonOperator::Re => write!(f, "~="),
+            ComparisonOperator::IP => write!(f, "ipmatch"),
         }
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::LogicOperator {
-    fn to_string(&self) -> String {
+impl Display for LogicOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ast::LogicOperator::And => "and".into(),
-            ast::LogicOperator::Or => "or".into(),
+            LogicOperator::And => write!(f, "and"),
+            LogicOperator::Or => write!(f, "or"),
         }
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::ComparisonOperator {
-    fn to_string(&self) -> String {
+impl Display for StringConcatOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "concat")
+    }
+}
+
+impl Display for MathOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ast::ComparisonOperator::Eq => "==".into(),
-            ast::ComparisonOperator::Lt => "<".into(),
-            ast::ComparisonOperator::Lte => "<=".into(),
-            ast::ComparisonOperator::Gt => ">".into(),
-            ast::ComparisonOperator::Gte => ">=".into(),
-            ast::ComparisonOperator::Ne => "!=".into(),
-            ast::ComparisonOperator::Re => "~=".into(),
-            ast::ComparisonOperator::IP => "ipmatch".into(),
+            MathOperator::Plus => write!(f, "plus"),
+            MathOperator::Minus => write!(f, "minus"),
+            MathOperator::Multiply => write!(f, "multiply"),
+            MathOperator::Divide => write!(f, "divide"),
+            MathOperator::Modulo => write!(f, "modulo"),
         }
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::MathOperator {
-    fn to_string(&self) -> String {
+impl Display for TernaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ast::MathOperator::Plus => "plus".into(),
-            ast::MathOperator::Minus => "minus".into(),
-            ast::MathOperator::Multiply => "multiply".into(),
-            ast::MathOperator::Divide => "divide".into(),
-            ast::MathOperator::Modulo => "modulo".into(),
+            TernaryOperator::Question => write!(f, "?"),
+            TernaryOperator::Colon => write!(f, ":"),
         }
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::Literal {
-    fn to_string(&self) -> String {
+impl Display for ast::Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ast::Literal::Boolean(bl) => bl.to_string(),
-            ast::Literal::Number(nl) => nl.to_string(),
-            ast::Literal::String(sl) => sl.to_string(),
-            ast::Literal::Regex(rl) => rl.to_string(),
-            ast::Literal::IPAddress(ip) => ip.to_string(),
+            ast::Literal::Boolean(bl) => write!(f, "{bl}"),
+            ast::Literal::Number(nl) => write!(f, "{nl}"),
+            ast::Literal::String(sl) => write!(f, "{sl}"),
+            ast::Literal::Regex(rl) => write!(f, "{rl}"),
+            ast::Literal::IPAddress(ip) => write!(f, "{ip}"),
         }
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::BooleanLiteral {
-    fn to_string(&self) -> String {
+impl Display for ast::BooleanLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ast::BooleanLiteral::True => "true".into(),
-            ast::BooleanLiteral::False => "false".into(),
+            ast::BooleanLiteral::True => write!(f, "true"),
+            ast::BooleanLiteral::False => write!(f, "false"),
         }
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::NumberLiteral {
-    fn to_string(&self) -> String {
-        self.literal.to_string()
+impl Display for ast::NumberLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.literal)
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::StringLiteral {
-    fn to_string(&self) -> String {
-        self.literal.to_string()
+impl Display for ast::StringLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.literal)
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::RegexLiteral {
-    fn to_string(&self) -> String {
-        self.literal.to_string()
+impl Display for ast::RegexLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.literal)
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for ast::IPAddressLiteral {
-    fn to_string(&self) -> String {
-        self.literal.to_string()
+impl Display for ast::IPAddressLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.literal)
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for analysis::CompiledConstant {
-    fn to_string(&self) -> String {
+impl Display for analysis::CompiledConstant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            analysis::CompiledConstant::Integer(i) => i.to_string(),
-            analysis::CompiledConstant::String(s) => s.clone(),
-            analysis::CompiledConstant::Boolean(b) => b.to_string(),
-            analysis::CompiledConstant::IPAddress(ip) => ip.to_string(),
+            analysis::CompiledConstant::Integer(i) => write!(f, "{i}"),
+            analysis::CompiledConstant::String(s) => write!(f, "{s}"),
+            analysis::CompiledConstant::Boolean(b) => write!(f, "{b}"),
+            analysis::CompiledConstant::IPAddress(ip) => write!(f, "{ip}"),
         }
     }
 }
@@ -255,8 +268,7 @@ impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTex
 
         context = context.append("\n".into());
 
-        context = context
-            .append("\t".repeat(context.indent) + &format!("Operation: {}\n", ast.op.to_string()));
+        context = context.append("\t".repeat(context.indent) + &format!("Operation: {}\n", ast.op));
 
         context = context.append("\t".repeat(context.indent) + "Right:\n");
         context = driver.visit(&ast.right, self, context.indent())?;
@@ -796,8 +808,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         context = self.visit_argument_list(&ast.arguments, context.indent(), driver)?;
 
         context = context.append("\n".into());
-        context = context
-            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe.to_string()));
+        context = context.append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe));
 
         Ok(context.unindent())
     }
@@ -856,16 +867,14 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
         context = context.append("\n".into());
 
-        context = context
-            .append("\t".repeat(context.indent) + &format!("Operation: {}\n", ast.op.to_string()));
+        context = context.append("\t".repeat(context.indent) + &format!("Operation: {}\n", ast.op));
 
         context = context.append("\t".repeat(context.indent) + "Right:\n");
         context = driver.visit(&ast.right, self, context.indent())?;
         context = context.unindent();
 
         context = context.append("\n".into());
-        context = context
-            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe.to_string()));
+        context = context.append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe));
         context = context.append("\n".into());
 
         context = context.append(
@@ -874,7 +883,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
                     .aug
                     .constant
                     .as_ref()
-                    .map(|c| format!("Constant value: {}", c.to_string()))
+                    .map(|c| format!("Constant value: {c}"))
                     .unwrap_or("Not a constant".to_string()),
         );
 
@@ -894,8 +903,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
         context = context.indent();
 
-        context = context
-            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.2.tipe.to_string()));
+        context = context.append("\t".repeat(context.indent) + &format!("Type: {}", ast.2.tipe));
         context = context.append("\n".into());
 
         context = context.append(
@@ -904,7 +912,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
                     .2
                     .constant
                     .as_ref()
-                    .map(|c| format!("Constant value: {}", c.to_string()))
+                    .map(|c| format!("Constant value: {c}"))
                     .unwrap_or("Not a constant".to_string()),
         );
         Ok(context.unindent())
@@ -938,8 +946,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
         context = context.append("\n".into());
 
-        context = context
-            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe.to_string()));
+        context = context.append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe));
         context = context.append("\n".into());
 
         context = context.append(
@@ -948,7 +955,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
                     .aug
                     .constant
                     .as_ref()
-                    .map(|c| format!("Constant value: {}", c.to_string()))
+                    .map(|c| format!("Constant value: {c}"))
                     .unwrap_or("Not a constant".to_string()),
         );
 
@@ -976,8 +983,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
         context = context.append("\n".into());
         context = context.unindent();
 
-        context = context
-            .append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe.to_string()));
+        context = context.append("\t".repeat(context.indent) + &format!("Type: {}", ast.aug.tipe));
         context = context.append("\n".into());
 
         context = context.append(
@@ -986,7 +992,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
                     .aug
                     .constant
                     .as_ref()
-                    .map(|c| format!("Constant value: {}", c.to_string()))
+                    .map(|c| format!("Constant value: {c}"))
                     .unwrap_or("Not a constant".to_string()),
         );
 

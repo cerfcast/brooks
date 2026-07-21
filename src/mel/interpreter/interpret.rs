@@ -78,9 +78,8 @@ impl StructValue {
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for StructValue {
-    fn to_string(&self) -> String {
+impl Display for StructValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut field_values = self
             .fields
             .iter()
@@ -88,7 +87,8 @@ impl ToString for StructValue {
             .collect::<Vec<_>>();
         field_values.sort();
         let field_values = field_values.join(", ");
-        format!(
+        write!(
+            f,
             "Type: {}, Field Values: {}",
             self.tpe.name,
             if !field_values.is_empty() {
@@ -129,7 +129,7 @@ impl Display for TypedValue {
             Value::Regex(regex) => write!(f, "{regex}"),
             Value::IPAddress(ip_addr) => write!(f, "{ip_addr}"),
             Value::Function(builtin_function) => write!(f, "Function: {}", builtin_function.name()),
-            Value::Struct(struct_value) => write!(f, "{}", struct_value.to_string()),
+            Value::Struct(struct_value) => write!(f, "{}", struct_value),
             Value::ArgumentList(typed_values) => write!(
                 f,
                 "Argument List: {}",
@@ -183,15 +183,11 @@ impl Display for MelInterpAssertion {
             ),
             MelInterpAssertion::UnexpectedOperator(oper) => write!(
                 f,
-                "Unexpected binary infix operator during evaluation: {}",
-                oper.to_string()
+                "Unexpected binary infix operator during evaluation: {oper}",
             ),
-            MelInterpAssertion::TypeMismatch(expected, actual) => write!(
-                f,
-                "Expected type {}, have type {}",
-                expected.to_string(),
-                actual.to_string()
-            ),
+            MelInterpAssertion::TypeMismatch(expected, actual) => {
+                write!(f, "Expected type {expected}, have type {actual}",)
+            }
         }
     }
 }
@@ -233,9 +229,7 @@ impl Display for MelInterpError {
             MelInterpError::MistypedField(field, expected, actual) => {
                 write!(
                     f,
-                    "error adding field to struct: field {field} has wrong type (expected: {}, actual: {})",
-                    expected.to_string(),
-                    actual.to_string()
+                    "error adding field to struct: field {field} has wrong type (expected: {expected}, actual: {actual})",
                 )
             }
         }
