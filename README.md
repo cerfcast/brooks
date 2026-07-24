@@ -14,15 +14,12 @@ the [CDNI Processing Stages Metadata](https://datatracker.ietf.org/doc/draft-iet
 
 ### Try It Out
 
-There is a MEL Compiler Explorer[^ce] backed by a wasm compilation of this library online at
+There are a few different ways to try out the library! They are all documented in the peer repository that hosts
+the source code for a CLI tool that uses this library. You can find it at
 
-[https://brooks.cerfca.st/](https://brooks.cerfca.st/)
 
-You can use it to explore the capabilities of Brooks implementation of MEL.
+[https://github.com/cerfcast/brooks-cli](https://github.com/cerfcast/brooks-cli)
 
-If you are interested in the source code for the MEL Compiler Explorer, you can find it [here](https://github.com/cerfcast/brooks-wasm).
-
-[^ce]: Yes, we are jealous of [Matt](https://xania.org/)!
 
 ### Goals
 
