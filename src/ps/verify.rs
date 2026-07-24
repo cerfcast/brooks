@@ -43,7 +43,7 @@ use crate::{
     },
 };
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 type PsVisitorResult<T, E> = Result<T, E>;
 
@@ -59,6 +59,35 @@ pub enum PsVerificationError {
     ExpressionWrongType(Type, Type),
     InvalidTypedResponseStage,
     ParseError,
+}
+
+impl Display for PsVerificationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PsVerificationError::NoError => write!(f, "No error!"),
+            PsVerificationError::WrongType => write!(f, "Wrong type"),
+            PsVerificationError::WrongGenericMetadataTypeName(expected, actual) => write!(
+                f,
+                "Wrong generic metadata type; expected {expected} and got {actual}"
+            ),
+            PsVerificationError::NoVerifiedValue => write!(f, "Missing verified value"),
+            PsVerificationError::ExpressionCompile(compiler_error) => {
+                write!(f, "Expression compilation error: {compiler_error}")
+            }
+            PsVerificationError::ExpressionAnalyze(mel_analysis_locatable_error) => write!(
+                f,
+                "Expression analysis error: {mel_analysis_locatable_error}"
+            ),
+            PsVerificationError::ExpressionWrongType(expected, actual) => write!(
+                f,
+                "Wrong expression type; expected {expected} and got {actual}"
+            ),
+            PsVerificationError::InvalidTypedResponseStage => {
+                write!(f, "Invalid typed response stage")
+            }
+            ParseError => write!(f, "Parse error"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
