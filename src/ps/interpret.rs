@@ -701,7 +701,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
         v: &TypedMatchGroup<PsVerificationKey>,
         c: &PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        let r = v
+        let else_ifs = v
             .value
             .else_ifs
             .as_ref()
@@ -711,7 +711,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
         let mut result: Result<PsInterpretValue, PsInterpretError> = Err(
             PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult),
         );
-        let rules = [&v.value.if_rule].into_iter().chain(r);
+        let rules = [&v.value.if_rule].into_iter().chain(else_ifs);
         for r in rules {
             match self.visit_stage_rules(r, &c.clone())?.result {
                 Some(r @ PsInterpretValue::MatchNo) => {
