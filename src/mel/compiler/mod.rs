@@ -20,9 +20,10 @@ use tree_sitter;
 use crate::common::GrammarLocation;
 use crate::mel::ast::Expr;
 use crate::mel::compiler::compile::CompileResult;
-use crate::mel::compiler::compile::CompilerError;
 use crate::mel::compiler::compile::MELCompiler;
 use crate::mel::compiler::compile::MELCompilerContext;
+use crate::mel::compiler::compile::MelCompilerError;
+use crate::mel::compiler::compile::MelCompilerLocatableError;
 use crate::mel::compiler::compile::SyntaxVisitorDriver;
 
 pub mod compile;
@@ -33,24 +34,24 @@ mod test;
 pub fn compile(source: &str) -> CompileResult<Expr<()>> {
     let mut parser = tree_sitter::Parser::new();
     let language = tree_sitter_mel::LANGUAGE;
-    parser.set_language(&language.into()).map_err(|e| {
-        CompilerError::SyntaxError(
-            GrammarLocation {
+    parser
+        .set_language(&language.into())
+        .map_err(|e| MelCompilerLocatableError {
+            error: MelCompilerError::SyntaxError(format!("Could not parse: {e}")),
+            location: GrammarLocation {
                 start: 0,
                 extent: 0,
             },
-            e.to_string(),
-        )
-    })?;
+        })?;
     let result = parser
         .parse(source, None)
-        .ok_or(CompilerError::SyntaxError(
-            GrammarLocation {
+        .ok_or(MelCompilerLocatableError {
+            error: MelCompilerError::SyntaxError("Could not parse.".to_string()),
+            location: GrammarLocation {
                 start: 0,
                 extent: 0,
             },
-            "Could not parse".to_string(),
-        ))?;
+        })?;
 
     let vd = SyntaxVisitorDriver {};
     let sd = MELCompiler::new(source);
@@ -60,6 +61,12 @@ pub fn compile(source: &str) -> CompileResult<Expr<()>> {
 
     match result {
         MELCompilerContext::Expr(expr) => Ok(expr),
-        _ => Err(CompilerError::EmptyContext),
+        _ => Err(MelCompilerLocatableError {
+            error: MelCompilerError::EmptyContext,
+            location: GrammarLocation {
+                start: 0,
+                extent: 0,
+            },
+        }),
     }
 }

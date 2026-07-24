@@ -39,7 +39,7 @@ use crate::mel::{
         Expr, FunctionCall, IPAddressLiteral, Identifier, MemberAccessExpression, NumberLiteral,
         StringLiteral, TernaryExpr,
     },
-    compiler::compile::CompilerError,
+    compiler::compile::MelCompilerError,
     scope::{self, Scopes},
     tvs::{
         self,
@@ -153,7 +153,7 @@ impl Display for MelAnalysisPreconditions {
 
 #[derive(Debug, Clone)]
 pub enum MelAnalysisError {
-    CompilerError(CompilerError),
+    CompilerError(MelCompilerError),
     Mismatch(Type, Type),
     RegexSame,
     InvalidType(Vec<Type>, Type),

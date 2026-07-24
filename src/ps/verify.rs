@@ -23,7 +23,7 @@ use crate::{
     mel::{
         analysis::{Analyzed, MelAnalysisLocatableError, analyze},
         ast::Expr,
-        compiler::{self, compile::CompilerError},
+        compiler::{self, compile::MelCompilerLocatableError},
         scope::Scopes,
         tvs::Type,
     },
@@ -54,7 +54,7 @@ pub enum PsVerificationError {
     WrongType,
     WrongGenericMetadataTypeName(String, String),
     NoVerifiedValue,
-    ExpressionCompile(CompilerError),
+    ExpressionCompile(MelCompilerLocatableError),
     ExpressionAnalyze(MelAnalysisLocatableError),
     ExpressionWrongType(Type, Type),
     InvalidTypedResponseStage,

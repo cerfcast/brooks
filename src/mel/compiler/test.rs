@@ -18,7 +18,8 @@
 #[cfg(test)]
 mod tests {
     use crate::mel::compiler::compile;
-    use crate::mel::compiler::compile::CompilerError;
+    use crate::mel::compiler::compile::MelCompilerError;
+    use crate::mel::compiler::compile::MelCompilerLocatableError;
     use std::assert_matches;
 
     #[test]
@@ -158,7 +159,13 @@ mod tests {
     fn parse_regex_literal_empty_character_set() {
         let code = "/[]/";
         let compile_result = compile(code).expect_err("Could compile code with syntax error");
-        assert_matches!(compile_result, CompilerError::BadLiteral(_))
+        assert_matches!(
+            compile_result,
+            MelCompilerLocatableError {
+                error: MelCompilerError::BadLiteral(_),
+                location: _
+            }
+        )
     }
 
     #[test]
@@ -188,7 +195,10 @@ mod tests {
         let compile_result = compile(code).expect_err("Could compile code with syntax error");
 
         assert_matches!(compile_result,
-            CompilerError::SyntaxError(_,msg)
+            MelCompilerLocatableError {
+                error: MelCompilerError::SyntaxError(msg),
+                location: _
+            }
             if msg == "Unexpected token j");
     }
 
@@ -198,7 +208,10 @@ mod tests {
         let compile_result = compile(code).expect_err("Could compile code with syntax error");
 
         assert_matches!(compile_result,
-            CompilerError::SyntaxError(_,msg)
+            MelCompilerLocatableError {
+                error: MelCompilerError::SyntaxError(msg),
+                location: _
+            }
             if msg == "Missing identifier");
     }
 }
