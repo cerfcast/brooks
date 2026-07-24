@@ -26,11 +26,14 @@ use std::{
     fs::OpenOptions,
     io::Read,
     marker::PhantomData,
+    str::FromStr,
 };
 
+use http::{HeaderName, HeaderValue, Request};
 use libc::malloc;
 
 use crate::{
+    ffi::NginxTransformError::{BadHeaderName, BadHeaderValue},
     mel::{
         scope::{Scopes, minimal_core_variable_types},
         tvs::Type,
@@ -41,6 +44,18 @@ use crate::{
         verify::{PsVerificationKey, verify_ps_request_stage},
     },
 };
+
+unsafe fn from_nginx_str(s: ngx_str_t) -> String {
+    let mut v = vec![0u8; s.len];
+
+    let mut d = s.data;
+    for y in v.iter_mut().take(s.len) {
+        *y = *d;
+        d = d.wrapping_add(1);
+    }
+
+    String::from_utf8_unchecked(v)
+}
 
 unsafe fn to_nginx_str(s: &str) -> ngx_str_t {
     let len = s.len();
@@ -106,15 +121,62 @@ pub unsafe extern "C" fn ngx_brooks_analyze(
     true
 }
 
+#[derive(Debug, Clone)]
+pub enum NginxTransformError {
+    BadHeaderName(String),
+    BadHeaderValue(String),
+    CreationError(String),
+}
+
+impl TryFrom<ngx_http_headers_in_t> for Request<String> {
+    type Error = NginxTransformError;
+
+    fn try_from(value: ngx_http_headers_in_t) -> Result<Self, Self::Error> {
+        let mut part = &value.headers.part;
+        let mut v = part.elts as *mut ngx_table_elt_s;
+
+        let mut request = Request::builder();
+        unsafe {
+            let mut i = 0usize;
+            loop {
+                if i >= part.nelts {
+                    if part.next.is_null() {
+                        break;
+                    }
+
+                    part = &(*part.next);
+                    v = part.elts as *mut ngx_table_elt_s;
+                    i = 0;
+                }
+
+                let k = from_nginx_str((*v).key);
+                let val = from_nginx_str((*v).value);
+
+                request = request.header(
+                    HeaderName::from_str(&k).map_err(|_| BadHeaderName(k))?,
+                    HeaderValue::from_str(&val).map_err(|_| BadHeaderValue(val))?,
+                );
+
+                v = v.wrapping_add(1);
+                i += 1;
+            }
+        }
+        request
+            .body("".to_string())
+            .map_err(|e| NginxTransformError::CreationError(e.to_string()))
+    }
+}
+
 #[allow(clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ngx_brooks_proxy(
     cookie: *mut BrooksC,
-    _i: *mut ngx_http_headers_in_t,
+    i: *mut ngx_http_headers_in_t,
     _o: *mut ngx_http_headers_out_t,
 ) {
     let typed_stage = &(*cookie)._data;
-    println!("typed_stage: {:?}", typed_stage);
+
+    let _http = TryInto::<Request<String>>::try_into(*i);
 
     let mut effectful_req = EffectfulProcessableRequestResponse::default();
     let result = interpret_stage(typed_stage, &mut effectful_req, PsInterpretMode::Response)
