@@ -21,7 +21,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::common::GrammarLocation;
+use crate::{common::GrammarLocation, mel::compiler::compile::MelCompilerLocatableError};
 
 use crate::mel::{
     analysis::{
@@ -39,7 +39,6 @@ use crate::mel::{
         Expr, FunctionCall, IPAddressLiteral, Identifier, MemberAccessExpression, NumberLiteral,
         StringLiteral, TernaryExpr,
     },
-    compiler::compile::MelCompilerError,
     scope::{self, Scopes},
     tvs::{
         self,
@@ -153,7 +152,7 @@ impl Display for MelAnalysisPreconditions {
 
 #[derive(Debug, Clone)]
 pub enum MelAnalysisError {
-    CompilerError(MelCompilerError),
+    CompilerError(MelCompilerLocatableError),
     Mismatch(Type, Type),
     RegexSame,
     InvalidType(Vec<Type>, Type),
