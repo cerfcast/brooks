@@ -28,5 +28,9 @@ pub mod mel;
 #[allow(dead_code)]
 pub mod ps;
 
+#[allow(dead_code)]
+#[cfg(feature = "nginx")]
+pub mod ffi;
+
 #[cfg(test)]
 pub(crate) mod tests;

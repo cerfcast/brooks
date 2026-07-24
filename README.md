@@ -34,6 +34,27 @@ We want Brooks to
 
 Of course, those goals are all _very_ aspirational at this point!
 
+### Features
+
+The library has optional features that can be enabled/disabled depending on the environment being used to host the library.
+
+In particular, Brooks can be built with support for exposing the Processing Stages interpreter to nginx. Select the `nginx`
+feature when importing this library to select that feature.
+
+#### nginx
+
+When the nginx feature is enabled, the library will configure your environment for building an nginx module that uses
+brooks to handle HTTP requests/responses according to a Processing Stages document. To do that, the library will
+
+1. clone the nginx source code into the library's `nginx/nginx` directory.
+1. configure the nginx build system
+    - to build the brooks nginx module, and
+    - to install the built nginx binary into `nginx/install`.
+
+The brooks nginx module source code is in `nginx/module`.
+
+Additional documentation for this feature is coming soon.
+
 ### Documentation
 
 The core of Brooks is a Rust library for parsing and manipulating expressions of the MEL. The most up-to-date

@@ -768,11 +768,10 @@ enum EffectfulRequestActions {
 }
 
 #[derive(Debug, Default)]
-struct EffectfulProcessableRequestResponse {
+pub(crate) struct EffectfulProcessableRequestResponse {
     log: Vec<EffectfulRequestActions>,
 }
 
-#[cfg(test)]
 impl ProcessableRequestResponse for EffectfulProcessableRequestResponse {
     fn header_value(&self) -> Option<&str> {
         None
