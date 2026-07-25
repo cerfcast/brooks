@@ -19,6 +19,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(unsafe_op_in_unsafe_fn)]
+#![allow(unnecessary_transmutes)]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 use std::{
@@ -29,17 +30,21 @@ use std::{
     str::FromStr,
 };
 
-use http::{HeaderName, HeaderValue, Request};
+use http::{HeaderName, HeaderValue, Method, Request, Uri};
 use libc::malloc;
 
 use crate::{
-    ffi::NginxTransformError::{BadHeaderName, BadHeaderValue},
+    ffi::NginxTransformError::{BadHeaderName, BadHeaderValue, BadMethodValue, BadUri},
     mel::{
         scope::{Scopes, minimal_core_variable_types},
         tvs::Type,
     },
     ps::{
-        interpret::{EffectfulProcessableRequestResponse, PsInterpretMode, interpret_stage},
+        interpret::{
+            ProcessableRequestResponse,
+            ProcessableRequestResponseError::{BadValue, InvalidMode},
+            ProcessableRequestResponseResult, PsInterpretMode, interpret_stage,
+        },
         spec::{TypedGenericStage, TypedStage},
         verify::{PsVerificationKey, verify_ps_request_stage},
     },
@@ -89,9 +94,12 @@ pub unsafe extern "C" fn ngx_brooks_analyze(
     .to_string();
 
     let mut ps_contents: Vec<u8> = vec![];
-    let mut ps_file = match OpenOptions::new().read(true).open(path) {
+    let mut ps_file = match OpenOptions::new().read(true).open(path.clone()) {
         Ok(o) => o,
-        Err(_) => return false,
+        Err(_) => {
+            println!("Could not open path: {}", path);
+            return false;
+        }
     };
 
     if ps_file.read_to_end(&mut ps_contents).is_err() {
@@ -125,64 +133,141 @@ pub unsafe extern "C" fn ngx_brooks_analyze(
 pub enum NginxTransformError {
     BadHeaderName(String),
     BadHeaderValue(String),
+    BadMethodValue(String),
+    BadUri(String),
     CreationError(String),
 }
 
-impl TryFrom<ngx_http_headers_in_t> for Request<String> {
+impl TryFrom<ngx_http_request_s> for Request<String> {
     type Error = NginxTransformError;
 
-    fn try_from(value: ngx_http_headers_in_t) -> Result<Self, Self::Error> {
-        let mut part = &value.headers.part;
-        let mut v = part.elts as *mut ngx_table_elt_s;
+    fn try_from(value: ngx_http_request_s) -> Result<Self, Self::Error> {
+        let mut header_part = &value.headers_in.headers.part;
+        let mut header_element = header_part.elts as *mut ngx_table_elt_s;
 
         let mut request = Request::builder();
         unsafe {
             let mut i = 0usize;
             loop {
-                if i >= part.nelts {
-                    if part.next.is_null() {
+                if i >= header_part.nelts {
+                    if header_part.next.is_null() {
                         break;
                     }
 
-                    part = &(*part.next);
-                    v = part.elts as *mut ngx_table_elt_s;
+                    header_part = &(*header_part.next);
+                    header_element = header_part.elts as *mut ngx_table_elt_s;
                     i = 0;
                 }
 
-                let k = from_nginx_str((*v).key);
-                let val = from_nginx_str((*v).value);
+                let k = from_nginx_str((*header_element).key);
+                let val = from_nginx_str((*header_element).value);
 
                 request = request.header(
                     HeaderName::from_str(&k).map_err(|_| BadHeaderName(k))?,
                     HeaderValue::from_str(&val).map_err(|_| BadHeaderValue(val))?,
                 );
 
-                v = v.wrapping_add(1);
+                header_element = header_element.wrapping_add(1);
                 i += 1;
             }
+
+            let parsed_uri = Uri::from_str(&format!(
+                "{}?{}",
+                from_nginx_str(value.uri),
+                from_nginx_str(value.args)
+            ))
+            .map_err(|e| BadUri(e.to_string()))?;
+
+            request = request.uri(parsed_uri.clone());
+
+            request = request.method(
+                Method::from_str(&from_nginx_str(value.method_name))
+                    .map_err(|e| BadMethodValue(e.to_string()))?,
+            );
         }
+
         request
             .body("".to_string())
             .map_err(|e| NginxTransformError::CreationError(e.to_string()))
     }
 }
 
+#[derive(Debug, Clone)]
+struct ProcessedRequest {
+    req: Request<String>,
+    updated_uri: Option<Uri>,
+}
+
+impl ProcessableRequestResponse for ProcessedRequest {
+    fn header_value(&self) -> Option<String> {
+        todo!()
+    }
+
+    fn headers(&self) -> Vec<String> {
+        self.req.headers().keys().map(|hv| hv.to_string()).collect()
+    }
+
+    fn set_header_value(
+        &mut self,
+        header: &str,
+        value: &str,
+    ) -> ProcessableRequestResponseResult<()> {
+        self.req.headers_mut().insert(
+            HeaderName::from_str(header).map_err(|_| BadValue)?,
+            HeaderValue::from_str(value).map_err(|_| BadValue)?,
+        );
+        Ok(())
+    }
+
+    fn remove_header(&mut self, header: &str) -> ProcessableRequestResponseResult<()> {
+        self.req
+            .headers_mut()
+            .remove(HeaderName::from_str(header).map_err(|_| BadValue)?);
+        Ok(())
+    }
+
+    fn add_header(&mut self, header: &str, value: &str) -> ProcessableRequestResponseResult<()> {
+        self.set_header_value(header, value)
+    }
+
+    fn uri(&self) -> Uri {
+        self.req.uri().clone()
+    }
+
+    fn set_uri(&mut self, uri: &Uri) -> ProcessableRequestResponseResult<()> {
+        self.updated_uri = Some(uri.clone());
+        Ok(())
+    }
+
+    fn set_response(&mut self, _response: &u16) -> ProcessableRequestResponseResult<()> {
+        Err(InvalidMode)
+    }
+}
+
 #[allow(clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn ngx_brooks_proxy(
-    cookie: *mut BrooksC,
-    i: *mut ngx_http_headers_in_t,
-    _o: *mut ngx_http_headers_out_t,
-) {
+pub unsafe extern "C" fn ngx_brooks_proxy(cookie: *mut BrooksC, req: *mut ngx_http_request_s) {
     let typed_stage = &(*cookie)._data;
 
-    let _http = TryInto::<Request<String>>::try_into(*i);
+    let http_req = match TryInto::<Request<String>>::try_into(*req) {
+        Err(_) => {
+            (*req).headers_out.status = 500;
+            return;
+        }
+        Ok(o) => o,
+    };
 
-    let mut effectful_req = EffectfulProcessableRequestResponse::default();
-    let result = interpret_stage(typed_stage, &mut effectful_req, PsInterpretMode::Response)
-        .expect("Could not interpret a valid client response");
+    let mut processed_http_req = ProcessedRequest {
+        req: http_req,
+        updated_uri: None,
+    };
 
-    println!("result: {:?}", result);
+    let _result = interpret_stage(
+        typed_stage,
+        &mut processed_http_req,
+        PsInterpretMode::Response,
+    )
+    .expect("Could not interpret a valid client response");
 
     todo!()
 }

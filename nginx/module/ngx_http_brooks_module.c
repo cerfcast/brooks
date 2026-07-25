@@ -38,9 +38,7 @@
 // Turn clang-format back on.
 
 
-struct BrooksC;
-extern void ngx_brooks_proxy(struct BrooksC *, ngx_http_headers_in_t *, ngx_http_headers_out_t *);
-extern bool ngx_brooks_analyze(const char *path, struct BrooksC **);
+#include "brooks.h"
 
 /*
  * The data structure that holds the configuration that the user
@@ -168,7 +166,7 @@ static ngx_int_t ngx_http_brooks_handler(ngx_http_request_t *r) {
   ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "output: %lu", r->headers_in.server.len);
 
-  ngx_brooks_proxy(conf->bc, &r->headers_in, &r->headers_out);
+  ngx_brooks_proxy(conf->bc, r);
 
   ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "output: \"%V\"", &r->headers_out.content_type);
@@ -176,7 +174,7 @@ static ngx_int_t ngx_http_brooks_handler(ngx_http_request_t *r) {
 	cv.value.len = r->headers_out.content_type.len;
 	cv.value.data = r->headers_out.content_type.data;
 
-  return ngx_http_send_response(r, NGX_HTTP_OK, &r->headers_out.content_type, &cv);
+  return ngx_http_send_response(r, r->headers_out.status, &r->headers_out.content_type, &cv);
 }
 
 
@@ -256,12 +254,22 @@ static char *ngx_http_brooks_enable(ngx_conf_t *cf, ngx_command_t *cmd,
   ngx_str_t *value;
   value = cf->args->elts;
   rlcf->path = value[1];
+  u_char pathstr[NGX_MAX_PATH] = {0, };
 
-	if (!ngx_brooks_analyze("/home/hawkinsw/code/brooks/brooks-cli/tests/proxy/synthetic_response.json", &rlcf->bc)) {
+	if (rlcf->path.len >= NGX_MAX_PATH) {
     ngx_log_error(
         NGX_LOG_CRIT, cf->log, 0,
-        "brooks could not verify");
-  	return NGX_CONF_OK;
+        "brooks: path to processing stages JSON document too long");
+    return NGX_CONF_ERROR;
+	}
+
+	ngx_memcpy(pathstr, rlcf->path.data, rlcf->path.len);
+
+	if (!ngx_brooks_analyze((const char*)pathstr, &rlcf->bc)) {
+    ngx_log_error(
+        NGX_LOG_CRIT, cf->log, 0,
+        "brooks: path to processing stages JSON document could not be verified");
+    return NGX_CONF_ERROR;
 	}
     
   ngx_http_core_loc_conf_t *clcf =

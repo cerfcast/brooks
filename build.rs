@@ -57,6 +57,7 @@ fn main() {
         // The input header we would like to generate
         // bindings for.
         .header("src/ffi/nginx.h")
+        .allowlist_item("ngx_http_request_s")
         .allowlist_item("ngx_http_headers_in_t")
         .allowlist_item("ngx_http_headers_out_t")
         // Tell cargo to invalidate the built crate whenever any of the
