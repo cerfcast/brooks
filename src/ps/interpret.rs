@@ -71,8 +71,8 @@ pub type ProcessableRequestResponseResult<T> = Result<T, ProcessableRequestRespo
 
 /// A request that can be manipulated by interpretation processing stages.
 pub trait ProcessableRequestResponse: Debug {
-    fn header_value(&self) -> Option<&str>;
-    fn headers(&self) -> &[&str];
+    fn header_value(&self) -> Option<String>;
+    fn headers(&self) -> Vec<String>;
 
     fn set_header_value(
         &mut self,
@@ -773,12 +773,12 @@ pub(crate) struct EffectfulProcessableRequestResponse {
 }
 
 impl ProcessableRequestResponse for EffectfulProcessableRequestResponse {
-    fn header_value(&self) -> Option<&str> {
+    fn header_value(&self) -> Option<String> {
         None
     }
 
-    fn headers(&self) -> &[&str] {
-        &[]
+    fn headers(&self) -> Vec<String> {
+        vec![]
     }
 
     fn set_header_value(
