@@ -27,7 +27,7 @@ fn main() {
                         "--add-module={}",
                         nginx_module_path
                             .to_str()
-                            .expect("Could not convert the nginx module path to a string")
+                            .expect("could not convert the nginx module path to a string")
                     ),
                     &format!(
                         "--prefix={}",
@@ -60,6 +60,9 @@ fn main() {
         .allowlist_item("ngx_http_request_s")
         .allowlist_item("ngx_http_headers_in_t")
         .allowlist_item("ngx_http_headers_out_t")
+        .allowlist_item("ngx_pcalloc")
+        .allowlist_item("ngx_list_push")
+        .allowlist_item("ngx_log.*")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

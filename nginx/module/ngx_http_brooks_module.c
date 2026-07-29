@@ -139,14 +139,12 @@ ngx_module_t ngx_http_brooks_module = {
  */
 static ngx_int_t ngx_http_brooks_handler(ngx_http_request_t *r) {
   ngx_http_brooks_conf_t *conf = NULL;
-
-	ngx_http_complex_value_t  cv;
+  ngx_chain_t   body_out;
+  ngx_buf_t     *body_out_buf;
 
 	if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
 					return NGX_HTTP_NOT_ALLOWED;
 	}
-
-	ngx_memzero(&cv, sizeof(ngx_http_complex_value_t));
 
 
   /*
@@ -160,21 +158,25 @@ static ngx_int_t ngx_http_brooks_handler(ngx_http_request_t *r) {
     return NGX_HTTP_INTERNAL_SERVER_ERROR;
   }
 
-  ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                "ngx_http_brooks_create_conf starting");
+  ngx_int_t rc = ngx_brooks_proxy(conf->bc, r, &body_out_buf);
+  if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "brooks failed to proxy.");
+    return rc;
+	}
 
-  ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "output: %lu", r->headers_in.server.len);
+  rc = ngx_http_send_header(r);
 
-  ngx_brooks_proxy(conf->bc, r);
+  if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "bad result sending headers.");
+    return rc;
+  }
 
-  ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "output: \"%V\"", &r->headers_out.content_type);
+	body_out.buf = body_out_buf;
+	body_out.next = NULL;
 
-	cv.value.len = r->headers_out.content_type.len;
-	cv.value.data = r->headers_out.content_type.data;
-
-  return ngx_http_send_response(r, r->headers_out.status, &r->headers_out.content_type, &cv);
+  return ngx_http_output_filter(r, &body_out);
 }
 
 
