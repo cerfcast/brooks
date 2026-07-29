@@ -82,7 +82,7 @@ pub trait ProcessableRequestResponse: Debug {
     fn remove_header(&mut self, header: &str) -> ProcessableRequestResponseResult<()>;
     fn add_header(&mut self, header: &str, value: &str) -> ProcessableRequestResponseResult<()>;
 
-    fn uri(&self) -> Uri;
+    fn uri(&self) -> ProcessableRequestResponseResult<Uri>;
     fn set_uri(&mut self, uri: &Uri) -> ProcessableRequestResponseResult<()>;
 
     fn set_response(&mut self, response: &u16) -> ProcessableRequestResponseResult<()>;
@@ -172,7 +172,11 @@ impl<'a> PsInterpreter<'a> {
     #[allow(clippy::result_large_err)]
     fn scopes_from_req(&self) -> Result<Scopes<TypedValue>, PsInterpretError> {
         let mel_req = http::Request::builder()
-            .uri(self.req.uri())
+            .uri(
+                self.req
+                    .uri()
+                    .map_err(|_| PsInterpretError::InvalidRequest)?,
+            )
             .body("")
             .map_err(|_| PsInterpretError::InvalidRequest)?;
 
@@ -795,8 +799,8 @@ impl ProcessableRequestResponse for EffectfulProcessableRequestResponse {
         Ok(())
     }
 
-    fn uri(&self) -> Uri {
-        Uri::default()
+    fn uri(&self) -> Result<Uri, ProcessableRequestResponseError> {
+        Ok(Uri::default())
     }
 
     fn set_uri(&mut self, uri: &Uri) -> Result<(), ProcessableRequestResponseError> {
