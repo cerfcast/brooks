@@ -429,7 +429,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
             self.visit_header_transform(
                 header_xform,
                 &PsInterpretContext {
-                    mode: PsInterpretMode::Request,
+                    mode: PsInterpretMode::Response,
                     result: None,
                 },
             )?;
