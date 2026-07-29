@@ -81,6 +81,14 @@ impl LogMsg {
     pub fn pretty(&self, _formatter: &impl Formatter<LogMsg>) -> String {
         _formatter.format(self)
     }
+
+    pub fn level(&self) -> LogLevel {
+        self.level.clone()
+    }
+
+    pub fn msg(&self) -> String {
+        self.msg.clone()
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -127,6 +135,10 @@ impl LogMsgs {
             .collect::<Vec<_>>()
             .join(if formatter.newline { "\n" } else { ";" })
     }
+
+    pub fn use_msgs(&self) -> &Vec<LogMsg> {
+        &self.msgs
+    }
 }
 
 macro_rules! emit_ {
@@ -134,14 +146,14 @@ macro_rules! emit_ {
         #[allow(unused_macros)]
         macro_rules! $nameloc {
             ($log:expr, $loc:expr, $msg:expr ) => {
-                $log.log(LogMsg::new_with_location($msg, LogLevel::Trace, Some($loc)))
+                $log.log(LogMsg::new_with_location($msg, $level, Some($loc)))
             };
         }
 
         #[allow(unused_macros)]
-        macro_rules! name {
+        macro_rules! $name {
             ($log:ident, $msg:expr ) => {
-                $log = $log.log(LogMsg::new($msg, LogLevel::Trace));
+                $log = $log.log(LogMsg::new($msg, $level));
             };
         }
     };
