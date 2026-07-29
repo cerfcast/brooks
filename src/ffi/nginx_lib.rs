@@ -105,11 +105,18 @@ impl From<LogLevel> for NginxLogLevels {
 /// Copy the given bytes into newly allocated space from the given pool and framed in a buffer.
 pub(crate) unsafe fn log_nginx_msgs(nxl: *mut ngx_log_s, log: &LogMsgs) {
     for msg in log.use_msgs() {
+        let msg_contents = msg.msg();
+        let nginx_msg = ngx_str_t {
+            len: msg_contents.len(),
+            data: msg_contents.as_ptr() as *mut u8,
+        };
+
         ngx_log_error_core(
             Into::<NginxLogLevels>::into(msg.level()) as usize,
             nxl,
             0,
-            msg.msg().as_ptr() as *const i8,
+            c"%V".as_ptr(),
+            &nginx_msg,
         );
     }
 }
