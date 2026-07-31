@@ -15,10 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::cdni::spec::TypedGenericMetadata;
+
 use crate::ps::spec::{
-    TypedClientRequestStage, TypedExpressionMatch, TypedGenericMetadata, TypedHeader,
-    TypedHeaderTransform, TypedMatchGroup, TypedProcessingStages, TypedRequestTransform,
-    TypedResponseTransform, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
+    TypedClientRequestStage, TypedClientResponseStage, TypedExpressionMatch, TypedHeader,
+    TypedHeaderTransform, TypedMatchGroup, TypedOriginRequestStage, TypedOriginResponseStage,
+    TypedProcessingStages, TypedRequestTransform, TypedResponseTransform, TypedStageMetadata,
+    TypedStageRules, TypedSyntheticResponse,
 };
 
 use std::fmt::Debug;

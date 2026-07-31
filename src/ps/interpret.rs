@@ -20,6 +20,7 @@
 use http::{HeaderName, HeaderValue, StatusCode, Uri, uri::InvalidUri};
 
 use crate::{
+    cdni::spec::TypedGenericMetadata,
     logging::LogMsgs,
     mel::{
         analysis::Analyzed,
@@ -40,10 +41,9 @@ use crate::{
             PsInterpretValueType::{MatchResult, SyntheticResponse, Terminate},
         },
         spec::{
-            TypedClientRequestStage, TypedExpressionMatch, TypedGenericMetadata, TypedHeader,
-            TypedHeaderTransform, TypedMatchGroup, TypedProcessingStages, TypedRequestTransform,
-            TypedResponseTransform, TypedStage, TypedStageMetadata, TypedStageRules,
-            TypedSyntheticResponse,
+            TypedClientRequestStage, TypedExpressionMatch, TypedHeader, TypedHeaderTransform,
+            TypedMatchGroup, TypedProcessingStages, TypedRequestTransform, TypedResponseTransform,
+            TypedStage, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
         },
         verify::PsVerificationKey,
         visit::{PsVisitor, PsVisitorResult},

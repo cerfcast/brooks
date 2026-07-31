@@ -15,25 +15,5 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-pub mod logging;
-#[allow(dead_code)]
-pub mod common;
-#[allow(dead_code)]
-pub mod utils;
-
-#[allow(dead_code)]
-pub mod mel;
-
-#[allow(dead_code)]
-pub mod cdni;
-
-#[allow(dead_code)]
-pub mod ps;
-
-#[allow(dead_code)]
-#[cfg(feature = "nginx")]
-pub mod ffi;
-
-#[cfg(test)]
-pub(crate) mod tests;
+pub mod spec;
+pub mod verify;

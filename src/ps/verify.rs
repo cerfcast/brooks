@@ -20,6 +20,7 @@
 use serde::Serialize;
 
 use crate::{
+    cdni::spec::TypedGenericMetadata,
     mel::{
         analysis::{Analyzed, MelAnalysisLocatableError, analyze},
         ast::Expr,
@@ -29,14 +30,14 @@ use crate::{
     },
     ps::{
         spec::{
-            ClientRequestStage, ExpressionMatch, Header, HeaderTransform, MatchGroup,
-            ProcessingStages, RequestTransform, ResponseTransform, StageMetadata, StageRules,
-            SyntheticResponse, TypedClientRequestStage, TypedClientResponseStage,
-            TypedExpressionMatch, TypedGenericMetadata, TypedGenericStage, TypedHeader,
-            TypedHeaderTransform, TypedMatchGroup, TypedOriginRequestStage,
-            TypedOriginResponseStage, TypedProcessingStages, TypedRequestTransform,
-            TypedResponseTransform, TypedStage, TypedStageMetadata, TypedStageRules,
-            TypedSyntheticResponse,
+            ClientRequestStage, ClientResponseStage, ExpressionMatch, Header, HeaderTransform,
+            MatchGroup, OriginRequestStage, OriginResponseStage, ProcessingStages,
+            RequestTransform, ResponseTransform, StageMetadata, StageRules, SyntheticResponse,
+            TypedClientRequestStage, TypedClientResponseStage, TypedExpressionMatch,
+            TypedGenericStage, TypedHeader, TypedHeaderTransform, TypedMatchGroup,
+            TypedOriginRequestStage, TypedOriginResponseStage, TypedProcessingStages,
+            TypedRequestTransform, TypedResponseTransform, TypedStage, TypedStageMetadata,
+            TypedStageRules, TypedSyntheticResponse,
         },
         verify::PsVerificationError::ParseError,
         visit::PsVisitor,

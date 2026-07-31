@@ -19,12 +19,13 @@
 pub mod test_helpers {
     use serde_json::Value;
 
+    use crate::cdni::spec::TypedGenericMetadata;
     use crate::ps::spec::{
         ClientRequestStage, ExpressionMatch, Header, HeaderTransform, MatchGroup, ProcessingStages,
         RequestTransform, ResponseTransform, StageMetadata, StageRules, SyntheticResponse,
-        TypedClientRequestStage, TypedExpressionMatch, TypedGenericMetadata, TypedHeader,
-        TypedHeaderTransform, TypedMatchGroup, TypedProcessingStages, TypedRequestTransform,
-        TypedResponseTransform, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
+        TypedClientRequestStage, TypedExpressionMatch, TypedHeader, TypedHeaderTransform,
+        TypedMatchGroup, TypedProcessingStages, TypedRequestTransform, TypedResponseTransform,
+        TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
     };
 
     pub fn expression_match(expression: &str) -> TypedExpressionMatch<()> {
