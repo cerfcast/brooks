@@ -31,9 +31,13 @@ use reqwest::Url;
 use tokio::runtime;
 
 use crate::{
+    cdni::{
+        spec::{HostMetadata, TypedHostMetadata},
+        verify::{HostMetadataVerificationKey, verify_host_metadata},
+    },
     ffi::{
         nginx_lib::{from_nginx_str, log_nginx_msgs, to_nginx_buf, to_nginx_str},
-        ngx_buf_s, ngx_http_request_s, ngx_list_push, ngx_table_elt_s,
+        ngx_buf_s, ngx_http_request_s, ngx_list_push, ngx_log_s, ngx_table_elt_s,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
@@ -44,16 +48,16 @@ use crate::{
         interpret::{
             ProcessableRequestResponse,
             ProcessableRequestResponseError::{BadValue, InvalidMode},
-            ProcessableRequestResponseResult, PsInterpretError, PsInterpretMode, interpret_stage,
+            ProcessableRequestResponseResult, PsInterpretError, PsInterpretMode, PsInterpretValue,
+            interpret_stage,
         },
-        spec::{TypedGenericStage, TypedStage},
-        verify::{PsVerificationKey, verify_ps_request_stage},
+        spec::TypedStageTypes,
     },
 };
 
 #[repr(C)]
 pub struct BrooksC {
-    _data: TypedStage<PsVerificationKey>,
+    _data: HostMetadata<HostMetadataVerificationKey>,
     _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
 }
 
@@ -62,18 +66,29 @@ pub struct BrooksC {
 pub unsafe extern "C" fn ngx_brooks_analyze(
     path: *const c_char,
     cookie: *mut *const BrooksC,
+    nlx: *mut ngx_log_s,
 ) -> bool {
+    let mut log = LogMsgs::new_with_prefix("brooks analysis", crate::logging::LogLevel::Debug);
+
     let path = match CStr::from_ptr(path).to_str() {
         Ok(o) => o,
-        Err(_) => return false,
+        Err(e) => {
+            log = error!(
+                log,
+                &format!("Could not turn given path into Rust string: {e}")
+            );
+            log_nginx_msgs(nlx, &log);
+            return false;
+        }
     }
     .to_string();
 
     let mut ps_contents: Vec<u8> = vec![];
     let mut ps_file = match OpenOptions::new().read(true).open(path.clone()) {
         Ok(o) => o,
-        Err(_) => {
-            println!("Could not open path: {}", path);
+        Err(e) => {
+            log = error!(log, &format!("Could not open path: {e}"));
+            log_nginx_msgs(nlx, &log);
             return false;
         }
     };
@@ -84,17 +99,26 @@ pub unsafe extern "C" fn ngx_brooks_analyze(
 
     let ps_source = &String::from_utf8_lossy(&ps_contents);
 
-    let result = match serde_json::from_str::<TypedGenericStage>(ps_source) {
+    let result = match serde_json::from_str::<TypedHostMetadata<()>>(ps_source) {
         Ok(o) => o,
-        Err(_) => return false,
+        Err(e) => {
+            log = error!(log, &format!("Error when parsing from JSON: {e}"));
+            log_nginx_msgs(nlx, &log);
+            return false;
+        }
     };
 
     let types_scope = Scopes::<Type> {
         scopes: vec![minimal_core_variable_types()],
     };
-    let result = match verify_ps_request_stage(&result, types_scope) {
+
+    let result = match verify_host_metadata(&result.value, types_scope) {
         Ok(o) => o,
-        Err(_) => return false,
+        Err(e) => {
+            log = error!(log, &format!("Error when verifying host metadata: {e}"));
+            log_nginx_msgs(nlx, &log);
+            return false;
+        }
     };
 
     *cookie = Box::into_raw(Box::new(BrooksC {
@@ -334,11 +358,22 @@ impl<'a> ProcessableRequestResponse for ProcessedRequest<'a> {
     }
 
     fn uri(&self) -> ProcessableRequestResponseResult<Uri> {
-        Ok(self.req.uri().clone())
+        if let Some(uri) = &self.updated_uri {
+            Ok(uri.clone())
+        } else {
+            Ok(self.req.uri().clone())
+        }
     }
 
     fn set_uri(&mut self, uri: &Uri) -> ProcessableRequestResponseResult<()> {
         self.updated_uri = Some(uri.clone());
+
+        // When the caller updates the URI, make sure to update the request headers.
+        self.req.headers_mut().insert(
+            http::header::HOST,
+            HeaderValue::from_str(uri.authority().ok_or(BadValue)?.as_ref())
+                .map_err(|_| BadValue)?,
+        );
         Ok(())
     }
 
@@ -359,12 +394,12 @@ pub unsafe extern "C" fn ngx_brooks_proxy(
     req: *mut ngx_http_request_s,
     body: *mut *mut ngx_buf_s,
 ) -> intptr_t {
-    let mut log = LogMsgs::new(crate::logging::LogLevel::Debug);
+    let mut log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
 
     let mut result = NginxReturnCodes::Ok;
     match do_ngx_brooks_proxy(cookie, req, body, &mut log) {
         Ok(_) => {
-            error!(log, "Successful proxy");
+            log = error!(log, "Successful proxy");
         }
         Err(e) => {
             error!(log, &e.to_string());
@@ -373,7 +408,7 @@ pub unsafe extern "C" fn ngx_brooks_proxy(
             *body = match to_nginx_buf(&e.to_string().into_bytes(), (*req).pool) {
                 Ok(o) => o,
                 Err(e) => {
-                    error!(
+                    log = error!(
                         log,
                         &format!("Failed to generate body of proxy response: {}", e)
                     );
@@ -390,14 +425,16 @@ pub unsafe extern "C" fn ngx_brooks_proxy(
     result as intptr_t
 }
 
-#[allow(clippy::result_large_err)]
+#[allow(clippy::result_large_err, unused_assignments)]
 unsafe fn do_ngx_brooks_proxy(
     cookie: *mut BrooksC,
     req: *mut ngx_http_request_s,
     body: *mut *mut ngx_buf_s,
     _log: &mut LogMsgs,
 ) -> Result<(), NginxProxyError> {
-    let typed_stage = &(*cookie)._data;
+    let mut log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
+
+    let host_metadata = &(*cookie)._data;
 
     let mut http_req =
         TryInto::<Request<String>>::try_into(*req).map_err(NginxProxyError::TransformError)?;
@@ -407,20 +444,52 @@ unsafe fn do_ngx_brooks_proxy(
         updated_uri: None,
     };
 
-    let _ = interpret_stage(
-        typed_stage,
-        &mut processed_http_req,
-        PsInterpretMode::Request,
-    )
-    .map_err(NginxProxyError::PsInterpretError)?;
+    // For any of the host metadata entries that are client requests,
+    // do them now.
+    for stage in &host_metadata.metadata {
+        // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
+        if let Some(stge) = &stage.aug.stage
+            && TypedStageTypes::ClientRequest == stge.into()
+        {
+            let result = interpret_stage(stge, &mut processed_http_req, PsInterpretMode::Request)
+                .map_err(NginxProxyError::PsInterpretError)?;
 
-    let get_uri = if let Some(uri) = processed_http_req.updated_uri {
-        uri
-    } else {
-        Uri::from_str(&from_nginx_str((*req).uri)).map_err(|e| {
-            NginxProxyError::TransformError(NginxTransformError::BadUri(e.to_string()))
-        })?
-    };
+            if let PsInterpretValue::SyntheticResponse(_sr) = result {
+                log = debug!(log, "Got a synthetic response");
+                todo!("Handle Synthetic Responses")
+            }
+        }
+    }
+
+    // If there were a cache, we would access it here.
+    if false {
+        todo!("Implement caching.")
+    }
+
+    // For any of the host metadata entries that are origin requests,
+    // do them now.
+    for stage in &host_metadata.metadata {
+        // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
+        if let Some(stge) = &stage.aug.stage
+            && TypedStageTypes::OriginRequest == stge.into()
+        {
+            let result = interpret_stage(stge, &mut processed_http_req, PsInterpretMode::Request)
+                .map_err(NginxProxyError::PsInterpretError)?;
+
+            if let PsInterpretValue::SyntheticResponse(_sr) = result {
+                log = debug!(log, "Got a synthetic response");
+                todo!("Handle Synthetic Responses")
+            }
+        }
+    }
+
+    // Now, send the request to the origin.
+    let processed_uri = processed_http_req
+        .uri()
+        .map_err(|e| NginxProxyError::TransformError(NginxTransformError::BadUri(e.to_string())))?;
+
+    let get_uri = Uri::from_str(&processed_uri.to_string())
+        .map_err(|e| NginxProxyError::TransformError(NginxTransformError::BadUri(e.to_string())))?;
 
     let get_url = Url::from_str(&get_uri.to_string())
         .map_err(|e| NginxProxyError::TransformError(NginxTransformError::BadUrl(e.to_string())))?;
@@ -429,10 +498,16 @@ unsafe fn do_ngx_brooks_proxy(
         .enable_all()
         .build()
         .map_err(|e| NginxProxyError::RuntimeError(e.to_string()))?;
+
+    let mut proxy_request = reqwest::Client::new().get(get_url.clone());
+
+    for (name, value) in processed_http_req.req.headers() {
+        proxy_request = proxy_request.header(name, value);
+    }
+
     let mut result = runtime
-        .block_on(reqwest::get(get_url))
+        .block_on(proxy_request.send())
         .map_err(|e| NginxProxyError::UpstreamError(e.to_string()))?;
-    println!("result: {:?}", result);
 
     let mut processed_http_res = ProcessedResponse {
         requested_uri: get_uri,
@@ -440,12 +515,47 @@ unsafe fn do_ngx_brooks_proxy(
         new_status: None,
     };
 
-    let _ = interpret_stage(
-        typed_stage,
-        &mut processed_http_res,
-        PsInterpretMode::Response,
-    )
-    .map_err(NginxProxyError::PsInterpretError)?;
+    // For any of the host metadata entries that are origin requests or origin responses,
+    // do them now. Remember: The *Request metadata objects can contain response transformations, too.
+    for stage in &host_metadata.metadata {
+        // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
+        if let Some(stge) = &stage.aug.stage
+            && (TypedStageTypes::OriginRequest == stge.into()
+                || TypedStageTypes::OriginResponse == stge.into())
+        {
+            let result = interpret_stage(stge, &mut processed_http_res, PsInterpretMode::Response)
+                .map_err(NginxProxyError::PsInterpretError)?;
+
+            if let PsInterpretValue::SyntheticResponse(_sr) = result {
+                log = debug!(log, "Got a synthetic response");
+                todo!("Handle Synthetic Responses")
+            }
+        }
+    }
+
+    // If there were a cache, we would updated it here.
+    if false {
+        todo!("Implement caching.")
+    }
+
+    // For any of the host metadata entries that are client requests or client responses,
+    // do them now. Remember: The *Client metadata objects can contain response transformations, too.
+    // do them now.
+    for stage in &host_metadata.metadata {
+        // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
+        if let Some(stge) = &stage.aug.stage
+            && (TypedStageTypes::ClientResponse == stge.into()
+                || TypedStageTypes::ClientRequest == stge.into())
+        {
+            let result = interpret_stage(stge, &mut processed_http_res, PsInterpretMode::Response)
+                .map_err(NginxProxyError::PsInterpretError)?;
+
+            if let PsInterpretValue::SyntheticResponse(_sr) = result {
+                log = debug!(log, "Got a synthetic response");
+                todo!("Handle Synthetic Responses")
+            }
+        }
+    }
 
     try_from_response(&processed_http_res, req).map_err(NginxProxyError::TransformError)?;
 
@@ -456,5 +566,8 @@ unsafe fn do_ngx_brooks_proxy(
     *body = to_nginx_buf(&result_body, (*req).pool).map_err(NginxProxyError::TransformError)?;
 
     (*req).headers_out.content_length_n = result_body.len() as i64;
+
+    log_nginx_msgs((*(*req).connection).log, &log);
+
     Ok(())
 }

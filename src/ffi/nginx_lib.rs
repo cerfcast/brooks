@@ -47,6 +47,11 @@ pub(crate) unsafe fn to_nginx_str(s: &str, pool: *mut ngx_pool_s) -> ngx_str_t {
 }
 
 /// Copy the given bytes into newly allocated space in the given pool.
+///
+/// The function returns a tuple of pointers. The first element in the tuple
+/// is a pointer to the beginning of the memory in the pool where `s` was copied.
+/// The second element is a pointer to "one past the end" of the bytes in `s` copied
+/// into the pool.
 pub(crate) unsafe fn copy_to_pool(s: &[u8], pool: *mut ngx_pool_s) -> (*mut u8, *mut u8) {
     let len = s.len();
     let data = ngx_pcalloc(pool, len) as *mut u8;
@@ -102,7 +107,7 @@ impl From<LogLevel> for NginxLogLevels {
     }
 }
 
-/// Copy the given bytes into newly allocated space from the given pool and framed in a buffer.
+/// Log the messages in `log` to the given Nginx log `nxl`.
 pub(crate) unsafe fn log_nginx_msgs(nxl: *mut ngx_log_s, log: &LogMsgs) {
     for msg in log.use_msgs() {
         let msg_contents = msg.msg();

@@ -267,7 +267,7 @@ static char *ngx_http_brooks_enable(ngx_conf_t *cf, ngx_command_t *cmd,
 
 	ngx_memcpy(pathstr, rlcf->path.data, rlcf->path.len);
 
-	if (!ngx_brooks_analyze((const char*)pathstr, &rlcf->bc)) {
+	if (!ngx_brooks_analyze((const char*)pathstr, &rlcf->bc, cf->log)) {
     ngx_log_error(
         NGX_LOG_CRIT, cf->log, 0,
         "brooks: path to processing stages JSON document could not be verified");
