@@ -40,6 +40,8 @@ use brooks_macros::TypedGenericMetadata;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::cdni::spec::TypedGenericMetadata;
+
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,16 +111,6 @@ pub struct TypedHeaderTransform<A: Debug + Clone + Default> {
     pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
     pub value: HeaderTransform<A>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TypedGenericMetadata<A: Debug + Clone + Default> {
-    #[serde(rename = "generic-metadata-type")]
-    pub tpe: String,
-    #[serde(rename = "generic-metadata-value")]
-    pub value: Value,
-    #[serde(skip)]
-    pub aug: A,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -331,12 +323,31 @@ pub struct TypedOriginResponseStage<A: Debug + Clone + Default> {
     pub value: OriginResponseStage<A>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypedStageTypes {
+    ClientRequest,
+    ClientResponse,
+    OriginRequest,
+    OriginResponse,
+}
+
 #[derive(Debug, Clone)]
 pub enum TypedStage<A: Debug + Clone + Default> {
     ClientRequest(TypedClientRequestStage<A>),
     ClientResponse(TypedClientResponseStage<A>),
     OriginRequest(TypedOriginRequestStage<A>),
     OriginResponse(TypedOriginResponseStage<A>),
+}
+
+impl<A: Debug + Clone + Default> From<&TypedStage<A>> for TypedStageTypes {
+    fn from(value: &TypedStage<A>) -> Self {
+        match value {
+            TypedStage::ClientRequest(_) => TypedStageTypes::ClientRequest,
+            TypedStage::ClientResponse(_) => TypedStageTypes::ClientResponse,
+            TypedStage::OriginRequest(_) => TypedStageTypes::OriginRequest,
+            TypedStage::OriginResponse(_) => TypedStageTypes::OriginResponse,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
