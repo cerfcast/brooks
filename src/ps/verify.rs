@@ -170,6 +170,9 @@ pub(crate) enum PsVerifierContextValue {
     SyntheticResponse(TypedSyntheticResponse<PsVerificationKey>),
     MatchGroup(TypedMatchGroup<PsVerificationKey>),
     ClientRequestStage(TypedClientRequestStage<PsVerificationKey>),
+    ClientResponseStage(TypedClientResponseStage<PsVerificationKey>),
+    OriginRequestStage(TypedOriginRequestStage<PsVerificationKey>),
+    OriginResponseStage(TypedOriginResponseStage<PsVerificationKey>),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -859,6 +862,114 @@ impl PsVisitor<(), PsVerifierContext, PsVerificationError> for PsVerifier {
             ),
         })
     }
+
+    fn visit_origin_request_stage(
+        &mut self,
+        v: &TypedOriginRequestStage<()>,
+        c: &PsVerifierContext,
+    ) -> super::visit::PsVisitorResult<PsVerifierContext, PsVerificationError> {
+        check_generic_md_typename!(v, TypedOriginRequestStage);
+        let v = &v.value;
+
+        // Verify each of the match groups!
+        let mut verified_mgs: Vec<TypedMatchGroup<PsVerificationKey>> = vec![];
+        for mg in &v.match_groups {
+            verified_mgs.push(
+                expect_some_value!(
+                    self.visit_match_group(mg, &c.clone())?.value,
+                    PsVerifierContextValue::MatchGroup
+                )
+                .clone(),
+            );
+        }
+
+        let result = OriginRequestStage {
+            match_groups: verified_mgs,
+            aug: PsVerificationKey::None,
+        };
+
+        Ok(PsVerifierContext {
+            scopes: c.scopes.clone(),
+            value: make_context_value!(
+                result,
+                PsVerifierContextValue::OriginRequestStage,
+                PsVerificationKey,
+                TypedOriginRequestStage
+            ),
+        })
+    }
+
+    fn visit_client_response_stage(
+        &mut self,
+        v: &TypedClientResponseStage<()>,
+        c: &PsVerifierContext,
+    ) -> super::visit::PsVisitorResult<PsVerifierContext, PsVerificationError> {
+        check_generic_md_typename!(v, TypedClientResponseStage);
+        let v = &v.value;
+
+        // Verify each of the match groups!
+        let mut verified_mgs: Vec<TypedMatchGroup<PsVerificationKey>> = vec![];
+        for mg in &v.match_groups {
+            verified_mgs.push(
+                expect_some_value!(
+                    self.visit_match_group(mg, &c.clone())?.value,
+                    PsVerifierContextValue::MatchGroup
+                )
+                .clone(),
+            );
+        }
+
+        let result = ClientResponseStage {
+            match_groups: verified_mgs,
+            aug: PsVerificationKey::None,
+        };
+
+        Ok(PsVerifierContext {
+            scopes: c.scopes.clone(),
+            value: make_context_value!(
+                result,
+                PsVerifierContextValue::ClientResponseStage,
+                PsVerificationKey,
+                TypedClientResponseStage
+            ),
+        })
+    }
+
+    fn visit_origin_response_stage(
+        &mut self,
+        v: &TypedOriginResponseStage<()>,
+        c: &PsVerifierContext,
+    ) -> super::visit::PsVisitorResult<PsVerifierContext, PsVerificationError> {
+        check_generic_md_typename!(v, TypedOriginResponseStage);
+        let v = &v.value;
+
+        // Verify each of the match groups!
+        let mut verified_mgs: Vec<TypedMatchGroup<PsVerificationKey>> = vec![];
+        for mg in &v.match_groups {
+            verified_mgs.push(
+                expect_some_value!(
+                    self.visit_match_group(mg, &c.clone())?.value,
+                    PsVerifierContextValue::MatchGroup
+                )
+                .clone(),
+            );
+        }
+
+        let result = OriginResponseStage {
+            match_groups: verified_mgs,
+            aug: PsVerificationKey::None,
+        };
+
+        Ok(PsVerifierContext {
+            scopes: c.scopes.clone(),
+            value: make_context_value!(
+                result,
+                PsVerifierContextValue::OriginResponseStage,
+                PsVerificationKey,
+                TypedOriginResponseStage
+            ),
+        })
+    }
 }
 
 pub(crate) fn verifier() -> (PsVerifier, PsVerifierContext) {
@@ -889,18 +1000,42 @@ pub fn verify_ps_request_stage(
     scopes: Scopes<Type>,
 ) -> Result<TypedStage<PsVerificationKey>, PsVerificationError> {
     match stage.typed()? {
-        TypedStage::ClientRequest(cr) => {
+        TypedStage::ClientRequest(crq) => {
             let (mut verifier, mut context) = verifier();
             context.scopes = scopes;
-            let result = verifier.visit_client_request_stage(&cr, &context)?;
+            let result = verifier.visit_client_request_stage(&crq, &context)?;
             Ok(TypedStage::ClientRequest(
                 expect_some_value!(&result.value, PsVerifierContextValue::ClientRequestStage)
                     .clone(),
             ))
         }
-        TypedStage::ClientResponse(_) => todo!(),
-        TypedStage::OriginRequest(_) => todo!(),
-        TypedStage::OriginResponse(_) => todo!(),
+        TypedStage::ClientResponse(crs) => {
+            let (mut verifier, mut context) = verifier();
+            context.scopes = scopes;
+            let result = verifier.visit_client_response_stage(&crs, &context)?;
+            Ok(TypedStage::ClientResponse(
+                expect_some_value!(&result.value, PsVerifierContextValue::ClientResponseStage)
+                    .clone(),
+            ))
+        }
+        TypedStage::OriginRequest(orq) => {
+            let (mut verifier, mut context) = verifier();
+            context.scopes = scopes;
+            let result = verifier.visit_origin_request_stage(&orq, &context)?;
+            Ok(TypedStage::OriginRequest(
+                expect_some_value!(&result.value, PsVerifierContextValue::OriginRequestStage)
+                    .clone(),
+            ))
+        }
+        TypedStage::OriginResponse(ors) => {
+            let (mut verifier, mut context) = verifier();
+            context.scopes = scopes;
+            let result = verifier.visit_origin_response_stage(&ors, &context)?;
+            Ok(TypedStage::OriginResponse(
+                expect_some_value!(&result.value, PsVerifierContextValue::OriginResponseStage)
+                    .clone(),
+            ))
+        }
     }
 }
 

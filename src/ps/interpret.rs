@@ -221,6 +221,44 @@ impl<'a> PsInterpreter<'a> {
             ))
         }
     }
+
+    #[allow(clippy::result_large_err)]
+    fn interpret_match_groups_in_stage(
+        &mut self,
+        mgs: &Vec<TypedMatchGroup<PsVerificationKey>>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        let mut result: Result<PsInterpretValue, PsInterpretError> = Err(
+            PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult),
+        );
+        for mg in mgs {
+            match self.visit_match_group(mg, &c.clone())?.result {
+                Some(
+                    r @ (PsInterpretValue::Terminate | PsInterpretValue::SyntheticResponse(_)),
+                ) => {
+                    // This result stops processing.
+                    result = Ok(r);
+                    break;
+                }
+                Some(r @ (PsInterpretValue::MatchYes | PsInterpretValue::MatchNo)) => {
+                    // This result continues processing.
+                    result = Ok(r);
+                }
+                Some(r) => {
+                    return Err(PsInterpretError::WrongType(
+                        PsInterpretValueType::Terminate,
+                        r.into(),
+                    ));
+                }
+                None => {
+                    return Err(PsInterpretError::AssertionFailure(
+                        PsInterpretAssertionFailures::MissingResult,
+                    ));
+                }
+            }
+        }
+        Ok(c.update_result(Some(result?)))
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -663,43 +701,6 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
         Ok(c.update_result(Some(PsInterpretValue::SyntheticResponse(response))))
     }
 
-    fn visit_client_request_stage(
-        &mut self,
-        v: &TypedClientRequestStage<PsVerificationKey>,
-        c: &PsInterpretContext,
-    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        let mut result: Result<PsInterpretValue, PsInterpretError> = Err(
-            PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult),
-        );
-        for mg in &v.value.match_groups {
-            match self.visit_match_group(mg, &c.clone())?.result {
-                Some(
-                    r @ (PsInterpretValue::Terminate | PsInterpretValue::SyntheticResponse(_)),
-                ) => {
-                    // This result stops processing.
-                    result = Ok(r);
-                    break;
-                }
-                Some(r @ (PsInterpretValue::MatchYes | PsInterpretValue::MatchNo)) => {
-                    // This result continues processing.
-                    result = Ok(r);
-                }
-                Some(r) => {
-                    return Err(PsInterpretError::WrongType(
-                        PsInterpretValueType::Terminate,
-                        r.into(),
-                    ));
-                }
-                None => {
-                    return Err(PsInterpretError::AssertionFailure(
-                        PsInterpretAssertionFailures::MissingResult,
-                    ));
-                }
-            }
-        }
-        Ok(c.update_result(Some(result?)))
-    }
-
     fn visit_match_group(
         &mut self,
         v: &TypedMatchGroup<PsVerificationKey>,
@@ -735,6 +736,38 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
         }
         Ok(c.update_result(Some(result?)))
     }
+
+    fn visit_client_request_stage(
+        &mut self,
+        v: &TypedClientRequestStage<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        self.interpret_match_groups_in_stage(&v.value.match_groups, c)
+    }
+
+    fn visit_origin_request_stage(
+        &mut self,
+        v: &super::spec::TypedOriginRequestStage<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        self.interpret_match_groups_in_stage(&v.value.match_groups, c)
+    }
+
+    fn visit_client_response_stage(
+        &mut self,
+        v: &super::spec::TypedClientResponseStage<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        self.interpret_match_groups_in_stage(&v.value.match_groups, c)
+    }
+
+    fn visit_origin_response_stage(
+        &mut self,
+        v: &super::spec::TypedOriginResponseStage<PsVerificationKey>,
+        c: &PsInterpretContext,
+    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        self.interpret_match_groups_in_stage(&v.value.match_groups, c)
+    }
 }
 
 #[allow(clippy::result_large_err)]
@@ -753,9 +786,15 @@ pub fn interpret_stage(
         TypedStage::ClientRequest(typed_client_request_stage) => {
             visitor.visit_client_request_stage(typed_client_request_stage, &context)
         }
-        TypedStage::ClientResponse(_) => todo!(),
-        TypedStage::OriginRequest(_) => todo!(),
-        TypedStage::OriginResponse(_) => todo!(),
+        TypedStage::ClientResponse(typed_client_response_stage) => {
+            visitor.visit_client_response_stage(typed_client_response_stage, &context)
+        }
+        TypedStage::OriginRequest(typed_origin_request_stage) => {
+            visitor.visit_origin_request_stage(typed_origin_request_stage, &context)
+        }
+        TypedStage::OriginResponse(typed_origin_response_stage) => {
+            visitor.visit_origin_response_stage(typed_origin_response_stage, &context)
+        }
     }?
     .result
     .ok_or(PsInterpretError::AssertionFailure(

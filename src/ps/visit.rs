@@ -71,5 +71,20 @@ pub trait PsVisitor<A: Debug + Clone + Default, O, E> {
         v: &TypedClientRequestStage<A>,
         c: &O,
     ) -> PsVisitorResult<O, E>;
+    fn visit_client_response_stage(
+        &mut self,
+        v: &TypedClientResponseStage<A>,
+        c: &O,
+    ) -> PsVisitorResult<O, E>;
+    fn visit_origin_request_stage(
+        &mut self,
+        v: &TypedOriginRequestStage<A>,
+        c: &O,
+    ) -> PsVisitorResult<O, E>;
+    fn visit_origin_response_stage(
+        &mut self,
+        v: &TypedOriginResponseStage<A>,
+        c: &O,
+    ) -> PsVisitorResult<O, E>;
     fn visit_match_group(&mut self, v: &TypedMatchGroup<A>, c: &O) -> PsVisitorResult<O, E>;
 }
