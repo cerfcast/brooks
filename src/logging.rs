@@ -97,6 +97,7 @@ impl LogMsg {
 pub struct LogMsgs {
     msgs: Vec<LogMsg>,
     level: LogLevel,
+    prefix: Option<String>,
 }
 
 impl LogMsgs {
@@ -104,6 +105,15 @@ impl LogMsgs {
         LogMsgs {
             msgs: vec![],
             level,
+            prefix: None,
+        }
+    }
+
+    pub fn new_with_prefix(prefix: &str, level: LogLevel) -> Self {
+        LogMsgs {
+            msgs: vec![],
+            level,
+            prefix: Some(prefix.to_string()),
         }
     }
 
@@ -111,11 +121,21 @@ impl LogMsgs {
         LogMsgs {
             msgs: self.msgs.clone(),
             level: new_level,
+            prefix: self.prefix.clone(),
         }
     }
 
     pub fn log(&self, msg: LogMsg) -> Self {
         if msg.level >= self.level {
+            let msg = if let Some(prefix) = &self.prefix {
+                LogMsg {
+                    msg: format!("{prefix}: {}", msg.msg),
+                    location: msg.location,
+                    level: msg.level,
+                }
+            } else {
+                msg
+            };
             let mut ns = self.clone();
             ns.msgs.push(msg);
             ns
@@ -153,7 +173,7 @@ macro_rules! emit_ {
         #[allow(unused_macros)]
         macro_rules! $name {
             ($log:ident, $msg:expr ) => {
-                $log = $log.log(LogMsg::new($msg, $level));
+                $log.log(LogMsg::new($msg, $level))
             };
         }
     };
