@@ -246,14 +246,41 @@ pub fn derive_typed_generic_metadata(item: TokenStream) -> TokenStream {
 
     let (x, y, z) = ast.generics.split_for_impl();
 
+    let yy_all: Vec<_> = ast
+        .generics
+        .type_params()
+        .map(|tp| {
+            let mut ntp = tp.clone();
+            ntp.ident = format_ident!("__{}", &ntp.ident);
+            ntp.into_token_stream()
+        })
+        .collect();
+
+    let yy_names: Vec<_> = ast
+        .generics
+        .type_params()
+        .map(|tp| format_ident!("__{}", &tp.ident))
+        .collect();
+
+    let yyy_all = yy_all.iter().fold(quote! {}, |mut existing, next| {
+        existing.extend(next.into_token_stream());
+        existing.extend(quote! {,});
+        existing
+    });
+    let yyy_names = yy_names.iter().fold(quote! {}, |mut existing, next| {
+        existing.extend(next.into_token_stream());
+        existing.extend(quote! {,});
+        existing
+    });
+
     let r = quote! {
     impl #x #name #y #z {
         pub fn typed_generic_metadata_name() -> String {
             #metadata_type.to_string()
         }
 
-        pub fn typed_value<_X: Debug + Clone + Default>(sr: #untyped_name<_X>) -> #name::<_X> {
-            #name::<_X> {
+        pub fn typed_value<#yyy_all>(sr: #untyped_name<#yyy_names>) -> #name::<#yyy_names> {
+            #name::<#yyy_names> {
                 tpe: #metadata_type.to_string(),
                 value: sr,
             }
