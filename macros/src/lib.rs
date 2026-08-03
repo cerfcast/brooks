@@ -6,7 +6,7 @@ use syn::{
 };
 
 use syn::parse::Parser;
-use syn::{Path, Token};
+use syn::{ItemImpl, Path, Token};
 
 #[proc_macro_attribute]
 pub fn grammar_name(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -140,18 +140,21 @@ impl BuiltinFunction for PathElementBuiltin {
 */
 
 #[proc_macro_attribute]
-pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn builtin_function_interpreter(attr: TokenStream, item: TokenStream) -> TokenStream {
     let parser = Punctuated::<Path, Token![,]>::parse_terminated;
     let path = parser.parse(attr).unwrap();
 
-    let ast: DeriveInput = syn::parse(item).unwrap();
-    let name = &ast.ident;
+    let ast: ItemImpl = syn::parse(item).unwrap();
 
-    let builtin_name = name.to_string().replace("Builtin", "").to_lowercase();
+    let name = match &*ast.self_ty {
+        syn::Type::Path(type_path) => type_path,
+        _ => panic!("builtin_function_interpreter only applicable on impl for path-named type"),
+    };
 
     let mut path = path.iter();
 
-    let return_type = path.nth(0).expect("Missing return type");
+    // Keep, just in case.
+    let _ = path.nth(0).expect("Missing return type"); // Note: nth takes the value. Important for the map, below.
 
     let parameter_types_values: Vec<_> = path
         .map(|p| {
@@ -164,11 +167,6 @@ pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
         })
         .collect();
 
-    let parameter_types: Vec<_> = parameter_types_values
-        .clone()
-        .into_iter()
-        .map(|(t, _)| t)
-        .collect();
     let parameter_types_len = parameter_types_values.len();
 
     let type_check = parameter_types_values
@@ -201,22 +199,7 @@ pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let generated = quote! {
         #ast
-        impl #x BuiltinFunction for #name #y #z {
-            fn name(&self) -> String {
-                #builtin_name.to_string()
-            }
-
-            fn parameters(&self) -> tvs::Params {
-                tvs::Params {
-                    args: vec![#(#parameter_types),*]
-                }
-            }
-
-            fn return_type(&self) -> Type {
-                #return_type
-            }
-
-
+        impl #x BuiltinFunctionInterpreter for #name #y #z {
             fn interpw(&self, args: Value) -> BuiltinInterpResult {
                 let args = match args {
                     Value::ArgumentList(args) => args,
@@ -231,6 +214,62 @@ pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
                 self.interp(#(#interp_arguments),*)
             }
 
+        }
+        impl #x BuiltinFunction for #name #y #z { }
+    };
+
+    generated.into()
+}
+
+#[proc_macro_attribute]
+pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let parser = Punctuated::<Path, Token![,]>::parse_terminated;
+    let path = parser.parse(attr).unwrap();
+
+    let ast: DeriveInput = syn::parse(item).unwrap();
+    let name = &ast.ident;
+
+    let builtin_name = name.to_string().replace("Builtin", "").to_lowercase();
+
+    let mut path = path.iter();
+
+    let return_type = path.nth(0).expect("Missing return type"); // Note: nth takes the value. Important for the map, below.
+
+    let parameter_types_values: Vec<_> = path
+        .map(|p| {
+            let mut vp = p.clone();
+            vp.segments[0] = PathSegment {
+                ident: Ident::new("Value", p.span()),
+                arguments: syn::PathArguments::None,
+            };
+            (p, vp)
+        })
+        .collect();
+
+    let parameter_types: Vec<_> = parameter_types_values
+        .clone()
+        .into_iter()
+        .map(|(t, _)| t)
+        .collect();
+
+    let (x, y, z) = ast.generics.split_for_impl();
+
+    let generated = quote! {
+        #ast
+        impl #x BuiltinFunctionType for #name #y #z {
+            fn name(&self) -> String {
+                #builtin_name.to_string()
+            }
+
+            fn parameters(&self) -> Params {
+                Params {
+                    args: vec![#(#parameter_types),*]
+                }
+            }
+
+            fn return_type(&self) -> Type {
+                #return_type
+            }
         }
     };
 

@@ -21,6 +21,7 @@ use std::{
     sync::Arc,
 };
 
+use brooks_macros::builtin_function;
 use regex::Regex;
 
 /// Types
@@ -145,6 +146,21 @@ impl Struct {
         self.fields.get(field_name).cloned()
     }
 }
+
+pub trait BuiltinFunctionType: Debug {
+    fn name(&self) -> String;
+    fn parameters(&self) -> Params;
+    fn return_type(&self) -> Type;
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String, Type::Integer)]
+pub struct Path_ElementBuiltin {}
+
+#[derive(Debug, Clone)]
+#[builtin_function(Type::Boolean, Type::Integer)]
+pub struct BooleanBuiltin {}
 
 pub(crate) fn header_type(wild: bool) -> Struct {
     let mut ht = Struct::new("h");

@@ -20,12 +20,12 @@ use std::{
     sync::Arc,
 };
 
-use brooks_macros::builtin_function;
+use brooks_macros::builtin_function_interpreter;
 
 use crate::mel::{
-    interpreter::interpret::{TypedValue, Value},
+    interpreter::interpret::{BuiltinFunction, TypedValue, Value},
     scope::Scope,
-    tvs::{self, Type},
+    tvs::{BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin, Type},
 };
 
 #[derive(Debug, Clone)]
@@ -54,18 +54,11 @@ impl Display for BuiltinInterpError {
 
 type BuiltinInterpResult = Result<TypedValue, Box<BuiltinInterpError>>;
 
-pub trait BuiltinFunction: Debug {
-    fn name(&self) -> String;
-    fn parameters(&self) -> tvs::Params;
-    fn return_type(&self) -> Type;
+pub trait BuiltinFunctionInterpreter: Debug {
     fn interpw(&self, args: Value) -> BuiltinInterpResult;
 }
 
-#[allow(non_camel_case_types)]
-#[derive(Clone, Default, Debug)]
-#[builtin_function(Type::String, Type::String, Type::Integer)]
-pub struct Path_ElementBuiltin {}
-
+#[builtin_function_interpreter(Type::String, Type::String, Type::Integer)]
 impl Path_ElementBuiltin {
     fn interp(&self, path: &str, element: &i64) -> BuiltinInterpResult {
         let parts = path.split("/");
@@ -95,10 +88,7 @@ impl Path_ElementBuiltin {
     }
 }
 
-#[derive(Debug, Clone)]
-#[builtin_function(Type::Boolean, Type::Integer)]
-pub struct BooleanBuiltin {}
-
+#[builtin_function_interpreter(Type::Boolean, Type::Integer)]
 impl BooleanBuiltin {
     fn interp(&self, c: &i64) -> BuiltinInterpResult {
         Ok(TypedValue {

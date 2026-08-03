@@ -23,16 +23,13 @@ mod interpreter_tests {
         analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
         ast::AstVisitorDriver,
         compiler::compile,
-        interpreter::{
-            builtins::{BooleanBuiltin, BuiltinFunction, Path_ElementBuiltin},
-            interpret::{
-                MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError, StructValue,
-                TypedValue,
-                Value::{self, Struct},
-            },
+        interpreter::interpret::{
+            MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError, StructValue,
+            TypedValue,
+            Value::{self, Struct},
         },
         tvs::{
-            self,
+            self, BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin,
             Type::{self, Function},
         },
     };

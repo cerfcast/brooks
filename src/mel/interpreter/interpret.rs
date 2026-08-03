@@ -24,8 +24,11 @@ use std::{
 
 use regex::Regex;
 
-use crate::logging::{LogLevel, LogMsg, LogMsgs};
 use crate::{common::GrammarLocation, mel::interpreter::builtins::BuiltinInterpError};
+use crate::{
+    logging::{LogLevel, LogMsg, LogMsgs},
+    mel::{interpreter::builtins::BuiltinFunctionInterpreter, tvs::BuiltinFunctionType},
+};
 
 use crate::mel::{
     analysis::{Analyzed, CompiledConstant},
@@ -36,9 +39,8 @@ use crate::mel::{
         FunctionCall, IPAddressLiteral, Identifier, NumberLiteral, RegexLiteral, StringLiteral,
         TernaryExpr,
     },
-    interpreter::{
-        builtins,
-        interpret::{MelInterpAssertion::SuccessWithoutValue, MelInterpError::UnknownIdentifier},
+    interpreter::interpret::{
+        MelInterpAssertion::SuccessWithoutValue, MelInterpError::UnknownIdentifier,
     },
     scope,
     tvs::{Struct, Type},
@@ -101,6 +103,8 @@ impl Display for StructValue {
     }
 }
 
+pub trait BuiltinFunction: BuiltinFunctionType + BuiltinFunctionInterpreter {}
+
 #[derive(Default, Debug, Clone)]
 pub enum Value {
     Integer(i64),
@@ -108,7 +112,7 @@ pub enum Value {
     Boolean(bool),
     Regex(Regex),
     IPAddress(IpAddr),
-    Function(Arc<dyn builtins::BuiltinFunction>),
+    Function(Arc<dyn BuiltinFunction>),
     Struct(StructValue),
     ArgumentList(Vec<TypedValue>),
     #[default]
@@ -129,7 +133,7 @@ impl Display for TypedValue {
             Value::Boolean(b) => write!(f, "{b}"),
             Value::Regex(regex) => write!(f, "{regex}"),
             Value::IPAddress(ip_addr) => write!(f, "{ip_addr}"),
-            Value::Function(builtin_function) => write!(f, "Function: {}", builtin_function.name()),
+            Value::Function(bft) => write!(f, "Function: {}", bft.name()),
             Value::Struct(struct_value) => write!(f, "{}", struct_value),
             Value::ArgumentList(typed_values) => write!(
                 f,

@@ -20,11 +20,9 @@ use std::{collections::HashMap, fmt::Debug, ops::Add, sync::Arc};
 use http::uri::Scheme;
 
 use crate::mel::{
-    interpreter::{
-        builtins::{BooleanBuiltin, BuiltinFunction, Path_ElementBuiltin},
-        interpret::{StructValue, TypedValue, Value},
-    },
+    interpreter::interpret::{StructValue, TypedValue, Value},
     tvs::{
+        BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin,
         Type::{self, Function},
         header_type, header_type_from_req, req_type, uri_type,
     },
