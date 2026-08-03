@@ -35,13 +35,17 @@ Of course, those goals are all _very_ aspirational at this point!
 
 The library has optional features that can be enabled/disabled depending on the environment being used to host the library.
 
-In particular, Brooks can be built with support for exposing the Processing Stages interpreter to nginx. Select the `nginx`
-feature when importing this library to select that feature.
+#### Integrations
 
-#### nginx
+The library has built-in integrations with several popular web servers, and more are coming soon! If you would like to
+let us know which web servers to prioritize integrating, please open an [issue](https://github.com/cerfcast/brooks/issues)!
 
-When the nginx feature is enabled, the library will configure your environment for building an nginx module that uses
-brooks to handle HTTP requests/responses according to a Processing Stages document. To do that, the library will
+##### Nginx
+
+Brooks can be built with support for exposing the Processing Stages interpreter to nginx. Select the `nginx`
+feature when importing this library to select that feature. When the nginx feature is enabled, the library will
+configure your environment for building an nginx module that uses brooks to handle HTTP requests/responses
+according to [`HostMetadata`](https://datatracker.ietf.org/doc/html/rfc8006). To do that, the library will
 
 1. clone the nginx source code into the library's `nginx/nginx` directory.
 1. configure the nginx build system
@@ -50,7 +54,7 @@ brooks to handle HTTP requests/responses according to a Processing Stages docume
 
 The brooks nginx module source code is in `nginx/module`.
 
-Additional documentation for this feature is coming soon.
+Additional documentation for this feature is coming soon and will be located in the [`./integrations/nginx/module`](./integrations/nginx/module/) directory.
 
 ### Documentation
 

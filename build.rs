@@ -8,12 +8,12 @@ use std::{env, path};
 #[cfg(feature = "nginx")]
 fn main() {
     // First, make sure that the user has nginx source code.
-    let nginx_path = Path::new("./nginx/nginx");
+    let nginx_path = Path::new("./integrations/nginx/nginx");
     if !nginx_path.exists() {
-        let nginx_install_path = path::absolute(Path::new("./nginx/install"))
+        let nginx_install_path = path::absolute(Path::new("./integrations/nginx/install"))
             .expect("Could not get the nginx install path");
-        let nginx_module_path =
-            path::absolute("./nginx/module").expect("Could not get the nginx module path");
+        let nginx_module_path = path::absolute("./integrations/nginx/module")
+            .expect("Could not get the nginx module path");
         let url = "https://github.com/nginx/nginx.git";
         Repository::clone(url, nginx_path).expect("Could not clone nginx source code repository.");
 
@@ -46,13 +46,13 @@ fn main() {
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
         .clang_args([
-            "-F./nginx/nginx/src/core/",
-            "-F./nginx/nginx/src/http/",
-            "-F./nginx/nginx/src/http/modules/",
-            "-F./nginx/nginx/src/event/",
-            "-F./nginx/nginx/src/event/modules/",
-            "-F./nginx/nginx/objs/",
-            "-F./nginx/nginx/src/os/unix/",
+            "-F./integrations/nginx/nginx/src/core/",
+            "-F./integrations/nginx/nginx/src/http/",
+            "-F./integrations/nginx/nginx/src/http/modules/",
+            "-F./integrations/nginx/nginx/src/event/",
+            "-F./integrations/nginx/nginx/src/event/modules/",
+            "-F./integrations/nginx/nginx/objs/",
+            "-F./integrations/nginx/nginx/src/os/unix/",
         ])
         // The input header we would like to generate
         // bindings for.
