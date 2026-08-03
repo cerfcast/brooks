@@ -56,7 +56,7 @@ fn main() {
         ])
         // The input header we would like to generate
         // bindings for.
-        .header("src/ffi/nginx.h")
+        .header("src/integrations/nginx/nginx.h")
         .allowlist_item("ngx_http_request_s")
         .allowlist_item("ngx_http_headers_in_t")
         .allowlist_item("ngx_http_headers_out_t")

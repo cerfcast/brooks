@@ -27,15 +27,18 @@ use std::{
 
 use http::{HeaderName, HeaderValue, Method, Request, StatusCode, Uri};
 use libc::intptr_t;
-use reqwest::Url;
-use tokio::runtime;
+use reqwest::{Response, Url};
+use tokio::runtime::{self, Runtime};
 
 use crate::{
     cdni::{
         spec::{HostMetadata, TypedHostMetadata},
-        verify::{HostMetadataVerificationKey, verify_host_metadata},
+        verify::{
+            HostMetadataVerificationError::{self, JsonError},
+            HostMetadataVerificationKey, verify_host_metadata,
+        },
     },
-    ffi::{
+    integrations::nginx::{
         nginx_lib::{from_nginx_str, log_nginx_msgs, to_nginx_buf, to_nginx_str},
         ngx_buf_s, ngx_http_request_s, ngx_list_push, ngx_log_s, ngx_table_elt_s,
     },
@@ -83,36 +86,7 @@ pub unsafe extern "C" fn ngx_brooks_analyze(
     }
     .to_string();
 
-    let mut ps_contents: Vec<u8> = vec![];
-    let mut ps_file = match OpenOptions::new().read(true).open(path.clone()) {
-        Ok(o) => o,
-        Err(e) => {
-            log = error!(log, &format!("Could not open path: {e}"));
-            log_nginx_msgs(nlx, &log);
-            return false;
-        }
-    };
-
-    if ps_file.read_to_end(&mut ps_contents).is_err() {
-        return false;
-    }
-
-    let ps_source = &String::from_utf8_lossy(&ps_contents);
-
-    let result = match serde_json::from_str::<TypedHostMetadata<()>>(ps_source) {
-        Ok(o) => o,
-        Err(e) => {
-            log = error!(log, &format!("Error when parsing from JSON: {e}"));
-            log_nginx_msgs(nlx, &log);
-            return false;
-        }
-    };
-
-    let types_scope = Scopes::<Type> {
-        scopes: vec![minimal_core_variable_types()],
-    };
-
-    let result = match verify_host_metadata(&result.value, types_scope) {
+    let result = match safe_ngx_brooks_analyze(&path) {
         Ok(o) => o,
         Err(e) => {
             log = error!(log, &format!("Error when verifying host metadata: {e}"));
@@ -127,6 +101,31 @@ pub unsafe extern "C" fn ngx_brooks_analyze(
     }));
 
     true
+}
+
+fn safe_ngx_brooks_analyze(
+    path: &str,
+) -> Result<HostMetadata<HostMetadataVerificationKey>, Box<HostMetadataVerificationError>> {
+    let mut ps_contents: Vec<u8> = vec![];
+    let mut ps_file = OpenOptions::new()
+        .read(true)
+        .open(path)
+        .map_err(|e| JsonError(e.to_string()))?;
+
+    ps_file
+        .read_to_end(&mut ps_contents)
+        .map_err(|e| JsonError(e.to_string()))?;
+
+    let ps_source = &String::from_utf8_lossy(&ps_contents);
+
+    let result = serde_json::from_str::<TypedHostMetadata<()>>(ps_source)
+        .map_err(|e| JsonError(e.to_string()))?;
+
+    let types_scope = Scopes::<Type> {
+        scopes: vec![minimal_core_variable_types()],
+    };
+
+    verify_host_metadata(&result.value, types_scope)
 }
 
 #[derive(Debug, Clone)]
@@ -241,10 +240,11 @@ impl TryFrom<ngx_http_request_s> for Request<String> {
 }
 
 unsafe fn try_from_response(
-    response: &ProcessedResponse,
+    response: &Response,
+    status: StatusCode,
     req: *mut ngx_http_request_s,
 ) -> Result<(), Box<NginxTransformError>> {
-    for (hsh, header) in response.req.headers().iter().enumerate() {
+    for (hsh, header) in response.headers().iter().enumerate() {
         let header_name = header.0.to_string();
         let header_value = header
             .1
@@ -258,19 +258,26 @@ unsafe fn try_from_response(
         (*he).value = to_nginx_str(header_value, (*req).pool);
     }
 
-    (*req).headers_out.status = match response.new_status {
-        Some(ns) => ns.as_u16() as usize,
-        None => response.req.status().as_u16() as usize,
-    };
+    (*req).headers_out.status = status.as_u16() as usize;
 
     Ok(())
 }
 
 #[derive(Debug)]
 struct ProcessedResponse<'a> {
-    req: &'a mut reqwest::Response,
+    res: &'a mut reqwest::Response,
     requested_uri: Uri,
     new_status: Option<StatusCode>,
+}
+
+impl<'a> ProcessedResponse<'a> {
+    pub fn status(&self) -> StatusCode {
+        if let Some(new_status) = self.new_status {
+            new_status
+        } else {
+            self.res.status()
+        }
+    }
 }
 
 impl<'a> ProcessableRequestResponse for ProcessedResponse<'a> {
@@ -279,7 +286,7 @@ impl<'a> ProcessableRequestResponse for ProcessedResponse<'a> {
     }
 
     fn headers(&self) -> Vec<String> {
-        self.req.headers().keys().map(|hv| hv.to_string()).collect()
+        self.res.headers().keys().map(|hv| hv.to_string()).collect()
     }
 
     fn set_header_value(
@@ -287,7 +294,7 @@ impl<'a> ProcessableRequestResponse for ProcessedResponse<'a> {
         header: &str,
         value: &str,
     ) -> ProcessableRequestResponseResult<()> {
-        self.req.headers_mut().insert(
+        self.res.headers_mut().insert(
             HeaderName::from_str(header).map_err(|_| BadValue)?,
             HeaderValue::from_str(value).map_err(|_| BadValue)?,
         );
@@ -295,7 +302,7 @@ impl<'a> ProcessableRequestResponse for ProcessedResponse<'a> {
     }
 
     fn remove_header(&mut self, header: &str) -> ProcessableRequestResponseResult<()> {
-        self.req
+        self.res
             .headers_mut()
             .remove(HeaderName::from_str(header).map_err(|_| BadValue)?);
         Ok(())
@@ -425,7 +432,6 @@ pub unsafe extern "C" fn ngx_brooks_proxy(
     result as intptr_t
 }
 
-#[allow(unused_assignments)]
 unsafe fn do_ngx_brooks_proxy(
     cookie: *mut BrooksC,
     req: *mut ngx_http_request_s,
@@ -444,18 +450,47 @@ unsafe fn do_ngx_brooks_proxy(
         updated_uri: None,
     };
 
+    let runtime = runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| NginxProxyError::RuntimeError(e.to_string()))?;
+
+    let (status, response) =
+        safe_ngx_brooks_proxy(host_metadata, &mut processed_http_req, &runtime, &mut log)?;
+
+    try_from_response(&response, status, req).map_err(NginxProxyError::TransformError)?;
+
+    let result_body = runtime
+        .block_on(response.bytes())
+        .map_err(|e| NginxProxyError::ProxyError(e.to_string()))?;
+
+    *body = to_nginx_buf(&result_body, (*req).pool).map_err(NginxProxyError::TransformError)?;
+
+    (*req).headers_out.content_length_n = result_body.len() as i64;
+
+    log_nginx_msgs((*(*req).connection).log, &log);
+
+    Ok(())
+}
+
+fn safe_ngx_brooks_proxy(
+    hmd: &HostMetadata<HostMetadataVerificationKey>,
+    processed_http_req: &mut ProcessedRequest,
+    runtime: &Runtime,
+    log: &mut LogMsgs,
+) -> Result<(StatusCode, Response), Box<NginxProxyError>> {
     // For any of the host metadata entries that are client requests,
     // do them now.
-    for stage in &host_metadata.metadata {
+    for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         if let Some(stge) = &stage.aug.stage
             && TypedStageTypes::ClientRequest == stge.into()
         {
-            let result = interpret_stage(stge, &mut processed_http_req, PsInterpretMode::Request)
+            let result = interpret_stage(stge, processed_http_req, PsInterpretMode::Request)
                 .map_err(|e| Box::new(NginxProxyError::PsInterpretError(e)))?;
 
             if let PsInterpretValue::SyntheticResponse(_sr) = result {
-                log = debug!(log, "Got a synthetic response");
+                *log = debug!(log, "Got a synthetic response");
                 todo!("Handle Synthetic Responses")
             }
         }
@@ -468,16 +503,16 @@ unsafe fn do_ngx_brooks_proxy(
 
     // For any of the host metadata entries that are origin requests,
     // do them now.
-    for stage in &host_metadata.metadata {
+    for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         if let Some(stge) = &stage.aug.stage
             && TypedStageTypes::OriginRequest == stge.into()
         {
-            let result = interpret_stage(stge, &mut processed_http_req, PsInterpretMode::Request)
+            let result = interpret_stage(stge, processed_http_req, PsInterpretMode::Request)
                 .map_err(NginxProxyError::PsInterpretError)?;
 
             if let PsInterpretValue::SyntheticResponse(_sr) = result {
-                log = debug!(log, "Got a synthetic response");
+                *log = debug!(log, "Got a synthetic response");
                 todo!("Handle Synthetic Responses")
             }
         }
@@ -496,30 +531,29 @@ unsafe fn do_ngx_brooks_proxy(
         NginxProxyError::TransformError(Box::new(NginxTransformError::BadUrl(e.to_string())))
     })?;
 
-    let runtime = runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| NginxProxyError::RuntimeError(e.to_string()))?;
-
     let mut proxy_request = reqwest::Client::new().get(get_url.clone());
 
     for (name, value) in processed_http_req.req.headers() {
         proxy_request = proxy_request.header(name, value);
     }
 
+    let mut proxy_request = reqwest::Client::new().get(get_url.clone());
+    for (name, value) in processed_http_req.req.headers() {
+        proxy_request = proxy_request.header(name, value);
+    }
     let mut result = runtime
         .block_on(proxy_request.send())
         .map_err(|e| NginxProxyError::UpstreamError(e.to_string()))?;
 
     let mut processed_http_res = ProcessedResponse {
         requested_uri: get_uri,
-        req: &mut result,
+        res: &mut result,
         new_status: None,
     };
 
     // For any of the host metadata entries that are origin requests or origin responses,
     // do them now. Remember: The *Request metadata objects can contain response transformations, too.
-    for stage in &host_metadata.metadata {
+    for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         if let Some(stge) = &stage.aug.stage
             && (TypedStageTypes::OriginRequest == stge.into()
@@ -529,7 +563,7 @@ unsafe fn do_ngx_brooks_proxy(
                 .map_err(NginxProxyError::PsInterpretError)?;
 
             if let PsInterpretValue::SyntheticResponse(_sr) = result {
-                log = debug!(log, "Got a synthetic response");
+                *log = debug!(log, "Got a synthetic response");
                 todo!("Handle Synthetic Responses")
             }
         }
@@ -543,7 +577,7 @@ unsafe fn do_ngx_brooks_proxy(
     // For any of the host metadata entries that are client requests or client responses,
     // do them now. Remember: The *Client metadata objects can contain response transformations, too.
     // do them now.
-    for stage in &host_metadata.metadata {
+    for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         if let Some(stge) = &stage.aug.stage
             && (TypedStageTypes::ClientResponse == stge.into()
@@ -553,23 +587,108 @@ unsafe fn do_ngx_brooks_proxy(
                 .map_err(NginxProxyError::PsInterpretError)?;
 
             if let PsInterpretValue::SyntheticResponse(_sr) = result {
-                log = debug!(log, "Got a synthetic response");
+                *log = debug!(log, "Got a synthetic response");
                 todo!("Handle Synthetic Responses")
             }
         }
     }
 
-    try_from_response(&processed_http_res, req).map_err(NginxProxyError::TransformError)?;
+    Ok((processed_http_res.status(), result))
+}
 
-    let result_body = runtime
-        .block_on(result.bytes())
-        .map_err(|e| NginxProxyError::ProxyError(e.to_string()))?;
+#[cfg(test)]
+mod nginx_proxy_tests {
+    use std::str::FromStr;
 
-    *body = to_nginx_buf(&result_body, (*req).pool).map_err(NginxProxyError::TransformError)?;
+    use http::{StatusCode, Uri};
+    use tokio::runtime;
 
-    (*req).headers_out.content_length_n = result_body.len() as i64;
+    use crate::{
+        integrations::nginx::nginx_proxy::{
+            ProcessedRequest, safe_ngx_brooks_analyze, safe_ngx_brooks_proxy,
+        },
+        logging::LogMsgs,
+    };
 
-    log_nginx_msgs((*(*req).connection).log, &log);
+    #[test]
+    fn maximal_test() {
+        let analyzed_hmd = safe_ngx_brooks_analyze("./src/integrations/nginx/tests/all.json")
+            .expect("Could not analyze correct HostMetadata");
 
-    Ok(())
+        let mut req = http::Request::get(
+            Uri::from_str("http://www.google.com/").expect("Could not make Google into URL"),
+        )
+        .body("".to_string())
+        .expect("Could not make request for Google");
+
+        let mut processed_http_req = ProcessedRequest {
+            req: &mut req,
+            updated_uri: None,
+        };
+
+        let runtime = runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Could not get runtime");
+
+        let mut log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
+
+        let (status, response) =
+            safe_ngx_brooks_proxy(&analyzed_hmd, &mut processed_http_req, &runtime, &mut log)
+                .expect("Could not process valid host metadata");
+
+        assert_eq!(response.url().to_string(), "http://www.example.com/");
+
+        assert_eq!(status, StatusCode::OK);
+
+        assert!(
+            !req.headers()
+                .iter()
+                .any(|f| { f.0.as_str() == "delete-me" })
+        );
+
+        assert!(
+            req.headers()
+                .iter()
+                .any(|f| { f.0.as_str() == "request-is-new-expr" })
+        );
+
+        assert!(
+            !req.headers()
+                .iter()
+                .any(|f| { f.0.as_str() == "origin-request-is-new-expr" })
+        );
+
+        assert!(req.headers().iter().any(|f| {
+            f.0.as_str() == "overwritable"
+                && f.1
+                    .to_str()
+                    .expect("Could not convert header value to string")
+                    == "origin-request"
+        }));
+
+        assert!(response.headers().iter().any(|f| {
+            f.0.as_str() == "overwritable"
+                && f.1
+                    .to_str()
+                    .expect("Could not convert header value to string")
+                    == "overwritten"
+        }));
+
+        assert!(response.headers().iter().any(|f| {
+            f.0.as_str() == "response-is-new-expr"
+                && f.1
+                    .to_str()
+                    .expect("Could not convert header value to string")
+                    == "/"
+        }));
+
+        assert!(response.headers().iter().any(|f| {
+            f.0.as_str() == "response-is-new"
+                && f.1
+                    .to_str()
+                    .expect("Could not convert header value to string")
+                    == "something"
+        }));
+    }
 }

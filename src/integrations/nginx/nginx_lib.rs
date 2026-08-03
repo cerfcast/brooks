@@ -16,7 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    ffi::{
+    integrations::nginx::{
         nginx_proxy::NginxTransformError, ngx_buf_s, ngx_log_error_core, ngx_log_s, ngx_pcalloc,
         ngx_pool_s, ngx_str_t,
     },
