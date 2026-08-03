@@ -73,7 +73,7 @@ jobs:
         shell: sh
         run: ls -latr target/doc
       - name: Upload
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v7
         with:
           path: target/doc
       - name: Deploy Docs
