@@ -158,8 +158,8 @@ impl Display for NginxTransformError {
 
 #[derive(Debug)]
 pub enum NginxProxyError {
-    TransformError(NginxTransformError),
-    PsInterpretError(PsInterpretError),
+    TransformError(Box<NginxTransformError>),
+    PsInterpretError(Box<PsInterpretError>),
     UpstreamError(String),
     ProxyError(String),
     RuntimeError(String),
@@ -186,7 +186,7 @@ impl Display for NginxProxyError {
 }
 
 impl TryFrom<ngx_http_request_s> for Request<String> {
-    type Error = NginxTransformError;
+    type Error = Box<NginxTransformError>;
 
     fn try_from(value: ngx_http_request_s) -> Result<Self, Self::Error> {
         let mut header_part = &value.headers_in.headers.part;
@@ -236,14 +236,14 @@ impl TryFrom<ngx_http_request_s> for Request<String> {
 
         request
             .body("".to_string())
-            .map_err(|e| NginxTransformError::BadBody(e.to_string()))
+            .map_err(|e| Box::new(NginxTransformError::BadBody(e.to_string())))
     }
 }
 
 unsafe fn try_from_response(
     response: &ProcessedResponse,
     req: *mut ngx_http_request_s,
-) -> Result<(), NginxTransformError> {
+) -> Result<(), Box<NginxTransformError>> {
     for (hsh, header) in response.req.headers().iter().enumerate() {
         let header_name = header.0.to_string();
         let header_value = header
@@ -425,19 +425,19 @@ pub unsafe extern "C" fn ngx_brooks_proxy(
     result as intptr_t
 }
 
-#[allow(clippy::result_large_err, unused_assignments)]
+#[allow(unused_assignments)]
 unsafe fn do_ngx_brooks_proxy(
     cookie: *mut BrooksC,
     req: *mut ngx_http_request_s,
     body: *mut *mut ngx_buf_s,
     _log: &mut LogMsgs,
-) -> Result<(), NginxProxyError> {
+) -> Result<(), Box<NginxProxyError>> {
     let mut log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
 
     let host_metadata = &(*cookie)._data;
 
-    let mut http_req =
-        TryInto::<Request<String>>::try_into(*req).map_err(NginxProxyError::TransformError)?;
+    let mut http_req = TryInto::<Request<String>>::try_into(*req)
+        .map_err(|e| Box::new(NginxProxyError::TransformError(e)))?;
 
     let mut processed_http_req = ProcessedRequest {
         req: &mut http_req,
@@ -452,7 +452,7 @@ unsafe fn do_ngx_brooks_proxy(
             && TypedStageTypes::ClientRequest == stge.into()
         {
             let result = interpret_stage(stge, &mut processed_http_req, PsInterpretMode::Request)
-                .map_err(NginxProxyError::PsInterpretError)?;
+                .map_err(|e| Box::new(NginxProxyError::PsInterpretError(e)))?;
 
             if let PsInterpretValue::SyntheticResponse(_sr) = result {
                 log = debug!(log, "Got a synthetic response");
@@ -484,15 +484,17 @@ unsafe fn do_ngx_brooks_proxy(
     }
 
     // Now, send the request to the origin.
-    let processed_uri = processed_http_req
-        .uri()
-        .map_err(|e| NginxProxyError::TransformError(NginxTransformError::BadUri(e.to_string())))?;
+    let processed_uri = processed_http_req.uri().map_err(|e| {
+        NginxProxyError::TransformError(Box::new(NginxTransformError::BadUri(e.to_string())))
+    })?;
 
-    let get_uri = Uri::from_str(&processed_uri.to_string())
-        .map_err(|e| NginxProxyError::TransformError(NginxTransformError::BadUri(e.to_string())))?;
+    let get_uri = Uri::from_str(&processed_uri.to_string()).map_err(|e| {
+        NginxProxyError::TransformError(Box::new(NginxTransformError::BadUri(e.to_string())))
+    })?;
 
-    let get_url = Url::from_str(&get_uri.to_string())
-        .map_err(|e| NginxProxyError::TransformError(NginxTransformError::BadUrl(e.to_string())))?;
+    let get_url = Url::from_str(&get_uri.to_string()).map_err(|e| {
+        NginxProxyError::TransformError(Box::new(NginxTransformError::BadUrl(e.to_string())))
+    })?;
 
     let runtime = runtime::Builder::new_current_thread()
         .enable_all()

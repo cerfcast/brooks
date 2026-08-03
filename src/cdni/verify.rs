@@ -36,7 +36,8 @@ pub enum HostMetadataVerificationError {
     #[default]
     NoError,
     NotProcessingStage,
-    PsVerificationError(PsVerificationError),
+    JsonError(String),
+    PsVerificationError(Box<PsVerificationError>),
 }
 
 impl Display for HostMetadataVerificationError {
@@ -47,6 +48,7 @@ impl Display for HostMetadataVerificationError {
                 write!(f, "Value was not a processing stage!")
             }
             HostMetadataVerificationError::PsVerificationError(pse) => write!(f, "{pse}"),
+            HostMetadataVerificationError::JsonError(je) => write!(f, "JSON error: {je}"),
         }
     }
 }
@@ -54,12 +56,14 @@ impl Display for HostMetadataVerificationError {
 pub fn verify_host_metadata(
     metadata: &HostMetadata<()>,
     scopes: Scopes<Type>,
-) -> Result<HostMetadata<HostMetadataVerificationKey>, HostMetadataVerificationError> {
+) -> Result<HostMetadata<HostMetadataVerificationKey>, Box<HostMetadataVerificationError>> {
     let mut stages: Vec<TypedGenericMetadata<HostMetadataVerificationKey>> = vec![];
     for md in &metadata.metadata {
-        let generic_stage =
-            serde_json::from_str::<TypedGenericStage>(&serde_json::to_string(md).expect("Ahhh"))
-                .map_err(|_| HostMetadataVerificationError::NotProcessingStage)?;
+        let generic_stage = serde_json::from_value::<TypedGenericStage>(
+            serde_json::to_value(md)
+                .map_err(|e| HostMetadataVerificationError::JsonError(e.to_string()))?,
+        )
+        .map_err(|_| HostMetadataVerificationError::NotProcessingStage)?;
         let verified_generic_stage = verify_ps_request_stage(&generic_stage, scopes.clone())
             .map_err(HostMetadataVerificationError::PsVerificationError)?;
 

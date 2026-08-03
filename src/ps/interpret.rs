@@ -28,7 +28,8 @@ use crate::{
         interpreter::{
             self,
             interpret::{
-                MelInterpContext, MelInterpError, MelInterpLocatableError, TypedValue, Value,
+                MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError,
+                TypedValue, Value,
             },
         },
         scope::{Scope, Scopes},
@@ -88,7 +89,7 @@ pub trait ProcessableRequestResponse: Debug {
     fn set_response(&mut self, response: &u16) -> ProcessableRequestResponseResult<()>;
 }
 
-pub type PsInterpretResult = Result<PsInterpretValue, PsInterpretError>;
+pub type PsInterpretResult = Result<PsInterpretValue, Box<PsInterpretError>>;
 
 #[derive(Debug, Clone)]
 pub enum PsInterpretAssertionFailures {
@@ -115,13 +116,12 @@ impl Display for PsInterpretAssertionFailures {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Default)]
 pub enum PsInterpretError {
     #[default]
     NoError,
     AssertionFailure(PsInterpretAssertionFailures),
-    MelInterpreterError(MelInterpLocatableError),
+    MelInterpreterError(Box<MelInterpLocatableError>),
     InvalidRequest,
     InvalidUri(InvalidUri),
     InvalidResponse(String),
@@ -169,7 +169,6 @@ struct PsInterpreter<'a> {
 }
 
 impl<'a> PsInterpreter<'a> {
-    #[allow(clippy::result_large_err)]
     fn scopes_from_req(&self) -> Result<Scopes<TypedValue>, PsInterpretError> {
         let mel_req = http::Request::builder()
             .uri(
@@ -185,7 +184,6 @@ impl<'a> PsInterpreter<'a> {
         })
     }
 
-    #[allow(clippy::result_large_err)]
     fn evaluate_mel_expr(
         &self,
         expr: &Expr<Analyzed>,
@@ -210,19 +208,17 @@ impl<'a> PsInterpreter<'a> {
             Err(PsInterpretError::MelInterpreterError(
                 MelInterpLocatableError {
                     error: MelInterpError::Assertion(
-                        interpreter::interpret::MelInterpAssertion::TypeMismatch(
-                            expected,
-                            result.tipe,
-                        ),
-                    ),
+                        MelInterpAssertion::TypeMismatch(expected, result.tipe).into(),
+                    )
+                    .into(),
                     context: expr_context.clone(),
                     location: expr.location().clone(),
-                },
+                }
+                .into(),
             ))
         }
     }
 
-    #[allow(clippy::result_large_err)]
     fn interpret_match_groups_in_stage(
         &mut self,
         mgs: &Vec<TypedMatchGroup<PsVerificationKey>>,
@@ -770,7 +766,6 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     }
 }
 
-#[allow(clippy::result_large_err)]
 pub fn interpret_stage(
     ts: &TypedStage<PsVerificationKey>,
     req: &mut dyn ProcessableRequestResponse,
@@ -797,9 +792,9 @@ pub fn interpret_stage(
         }
     }?
     .result
-    .ok_or(PsInterpretError::AssertionFailure(
+    .ok_or(Box::new(PsInterpretError::AssertionFailure(
         PsInterpretAssertionFailures::MissingResult,
-    ))
+    )))
 }
 
 #[derive(Debug)]

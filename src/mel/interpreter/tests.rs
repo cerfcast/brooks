@@ -26,8 +26,8 @@ mod interpreter_tests {
         interpreter::{
             builtins::{BooleanBuiltin, BuiltinFunction, Path_ElementBuiltin},
             interpret::{
-                MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError,
-                MelInterpLocatableError, StructValue, TypedValue,
+                MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError, StructValue,
+                TypedValue,
                 Value::{self, Struct},
             },
         },
@@ -451,17 +451,13 @@ mod interpreter_tests {
             .visit(&expr, &visitor, context)
             .expect_err("Could interpret");
 
-        assert_matches!(
-            result,
-            MelInterpLocatableError {
-                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                    Type::Boolean,
-                    Type::String
-                )),
-                location: _,
-                context: _
-            }
-        );
+        match *result.error {
+            MelInterpError::Assertion(e) => assert_matches!(
+                *e,
+                MelInterpAssertion::TypeMismatch(Type::Boolean, Type::String)
+            ),
+            _ => panic!("Expected to find an assertion error, but did not"),
+        }
     }
 }
 
@@ -632,19 +628,19 @@ mod interpreter_value_tests {
 
         let mut sv = StructValue::new(st);
 
-        assert_matches!(
-            sv.insert_field(
+        let result = sv
+            .insert_field(
                 "field1",
                 TypedValue {
                     value: Value::Boolean(false),
                     tipe: Type::Boolean,
                 },
-            ),
-            Err(MelInterpError::MistypedField(
-                _,
-                Type::Integer,
-                Type::Boolean
-            ))
+            )
+            .expect_err("Could insert mistyped value into field");
+
+        assert_matches!(
+            *result,
+            MelInterpError::MistypedField(_, Type::Integer, Type::Boolean)
         )
     }
 }

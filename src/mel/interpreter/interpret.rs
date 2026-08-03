@@ -24,8 +24,8 @@ use std::{
 
 use regex::Regex;
 
-use crate::common::GrammarLocation;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
+use crate::{common::GrammarLocation, mel::interpreter::builtins::BuiltinInterpError};
 
 use crate::mel::{
     analysis::{Analyzed, CompiledConstant},
@@ -58,19 +58,20 @@ impl StructValue {
         }
     }
 
-    #[allow(clippy::result_large_err)]
-    pub fn insert_field(&mut self, name: &str, value: TypedValue) -> Result<(), MelInterpError> {
+    pub fn insert_field(
+        &mut self,
+        name: &str,
+        value: TypedValue,
+    ) -> Result<(), Box<MelInterpError>> {
         let ft = self
             .tpe
             .get_field(name)
             .ok_or(MelInterpError::UnknownField(name.to_string()))?;
 
         if ft != value.tipe {
-            return Err(MelInterpError::MistypedField(
-                name.to_string(),
-                ft.clone(),
-                value.tipe,
-            ));
+            return Err(
+                MelInterpError::MistypedField(name.to_string(), ft.clone(), value.tipe).into(),
+            );
         }
 
         self.fields.insert(name.to_string(), value);
@@ -203,11 +204,11 @@ impl Display for MelInterpPreconditions {
 
 #[derive(Debug, Clone)]
 pub enum MelInterpError {
-    Assertion(MelInterpAssertion),
+    Assertion(Box<MelInterpAssertion>),
     UnknownIdentifier(String),
     UnknownField(String),
     MistypedField(String, Type, Type),
-    BuiltinError(builtins::BuiltinInterpError),
+    BuiltinError(Box<BuiltinInterpError>),
 }
 
 impl Display for MelInterpError {
@@ -238,7 +239,7 @@ impl Display for MelInterpError {
 
 #[derive(Debug, Clone)]
 pub struct MelInterpLocatableError {
-    pub error: MelInterpError,
+    pub error: Box<MelInterpError>,
     pub location: GrammarLocation,
     pub context: MelInterpContext,
 }
@@ -249,7 +250,7 @@ impl Display for MelInterpLocatableError {
     }
 }
 
-pub type MelInterpResult = Result<MelInterpContext, MelInterpLocatableError>;
+pub type MelInterpResult = Result<MelInterpContext, Box<MelInterpLocatableError>>;
 
 #[derive(Clone, Debug, Default)]
 pub struct MelInterpContext {
@@ -285,30 +286,29 @@ impl MelInterpContext {
 
 pub struct MelInterp {}
 
-#[allow(clippy::result_large_err)]
 impl MelInterp {
     pub fn interp_binary_expr(
         op: &BinaryInfixOperator,
         left: &TypedValue,
         right: &TypedValue,
-    ) -> Result<TypedValue, MelInterpError> {
+    ) -> Result<TypedValue, Box<MelInterpError>> {
         match op {
             ast::BinaryInfixOperator::Logic(logic_operator) => {
                 let left = if let Value::Boolean(l) = left.value {
                     l
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::Boolean,
-                        left.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::Boolean, left.tipe.clone()).into(),
+                    )
+                    .into());
                 };
                 let right = if let Value::Boolean(r) = right.value {
                     r
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::Boolean,
-                        right.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::Boolean, right.tipe.clone()).into(),
+                    )
+                    .into());
                 };
                 match logic_operator {
                     ast::LogicOperator::And => Ok(TypedValue {
@@ -325,18 +325,18 @@ impl MelInterp {
                 let left = if let Value::Integer(l) = left.value {
                     l
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::Integer,
-                        left.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::Integer, left.tipe.clone()).into(),
+                    )
+                    .into());
                 };
                 let right = if let Value::Integer(r) = right.value {
                     r
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::Integer,
-                        right.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::Integer, right.tipe.clone()).into(),
+                    )
+                    .into());
                 };
                 match math_operator {
                     ast::MathOperator::Plus => Ok(TypedValue {
@@ -365,18 +365,18 @@ impl MelInterp {
                 let left = if let Value::String(l) = &left.value {
                     l
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::String,
-                        left.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::String, left.tipe.clone()).into(),
+                    )
+                    .into());
                 };
                 let right = if let Value::String(r) = &right.value {
                     r
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::String,
-                        right.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::String, right.tipe.clone()).into(),
+                    )
+                    .into());
                 };
                 Ok(TypedValue {
                     value: Value::String(left.clone() + right),
@@ -387,18 +387,19 @@ impl MelInterp {
                 let left = if let Value::IPAddress(l) = left.value {
                     l
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::IPAddress,
-                        left.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::IPAddress, left.tipe.clone()).into(),
+                    )
+                    .into());
                 };
                 let right = if let Value::IPAddress(r) = right.value {
                     r
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::IPAddress,
-                        right.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::IPAddress, right.tipe.clone())
+                            .into(),
+                    )
+                    .into());
                 };
                 Ok(TypedValue {
                     value: Value::Boolean(left == right),
@@ -409,154 +410,165 @@ impl MelInterp {
                 let left = if let Value::String(l) = &left.value {
                     l
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::String,
-                        left.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::String, left.tipe.clone()).into(),
+                    )
+                    .into());
                 };
                 let right = if let Value::Regex(r) = &right.value {
                     r
                 } else {
-                    return Err(MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::Regex,
-                        right.tipe.clone(),
-                    )));
+                    return Err(MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::Regex, right.tipe.clone()).into(),
+                    )
+                    .into());
                 };
                 Ok(TypedValue {
                     value: Value::Boolean(right.is_match(left)),
                     tipe: Type::String,
                 })
             }
-            ast::BinaryInfixOperator::Comparison(cop) => {
-                match left.tipe {
-                    Type::Boolean => {
-                        let left = if let Value::Boolean(l) = left.value {
-                            l
-                        } else {
-                            return Err(MelInterpError::Assertion(
-                                MelInterpAssertion::TypeMismatch(Type::Boolean, left.tipe.clone()),
-                            ));
-                        };
-                        let right = if let Value::Boolean(r) = right.value {
-                            r
-                        } else {
-                            return Err(MelInterpError::Assertion(
-                                MelInterpAssertion::TypeMismatch(Type::Boolean, right.tipe.clone()),
-                            ));
-                        };
+            ast::BinaryInfixOperator::Comparison(cop) => match left.tipe {
+                Type::Boolean => {
+                    let left = if let Value::Boolean(l) = left.value {
+                        l
+                    } else {
+                        return Err(MelInterpError::Assertion(
+                            MelInterpAssertion::TypeMismatch(Type::Boolean, left.tipe.clone())
+                                .into(),
+                        )
+                        .into());
+                    };
+                    let right = if let Value::Boolean(r) = right.value {
+                        r
+                    } else {
+                        return Err(MelInterpError::Assertion(
+                            MelInterpAssertion::TypeMismatch(Type::Boolean, right.tipe.clone())
+                                .into(),
+                        )
+                        .into());
+                    };
 
-                        match cop {
-                            ComparisonOperator::Eq => Ok(TypedValue {
-                                value: Value::Boolean(left == right),
-                                tipe: Type::Boolean,
-                            }),
-                            #[allow(clippy::bool_comparison)]
-                            ComparisonOperator::Lt => Ok(TypedValue {
-                                value: Value::Boolean(left < right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Lte => Ok(TypedValue {
-                                value: Value::Boolean(left <= right),
-                                tipe: Type::Boolean,
-                            }),
-                            #[allow(clippy::bool_comparison)]
-                            ComparisonOperator::Gt => Ok(TypedValue {
-                                value: Value::Boolean(left > right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Gte => Ok(TypedValue {
-                                value: Value::Boolean(left >= right),
-                                tipe: Type::Boolean,
-                            }),
-                            _ => todo!(),
-                        }
+                    match cop {
+                        ComparisonOperator::Eq => Ok(TypedValue {
+                            value: Value::Boolean(left == right),
+                            tipe: Type::Boolean,
+                        }),
+                        #[allow(clippy::bool_comparison)]
+                        ComparisonOperator::Lt => Ok(TypedValue {
+                            value: Value::Boolean(left < right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Lte => Ok(TypedValue {
+                            value: Value::Boolean(left <= right),
+                            tipe: Type::Boolean,
+                        }),
+                        #[allow(clippy::bool_comparison)]
+                        ComparisonOperator::Gt => Ok(TypedValue {
+                            value: Value::Boolean(left > right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Gte => Ok(TypedValue {
+                            value: Value::Boolean(left >= right),
+                            tipe: Type::Boolean,
+                        }),
+                        _ => todo!(),
                     }
-                    Type::Integer => {
-                        let left = if let Value::Integer(l) = left.value {
-                            l
-                        } else {
-                            return Err(MelInterpError::Assertion(
-                                MelInterpAssertion::TypeMismatch(Type::Integer, left.tipe.clone()),
-                            ));
-                        };
-                        let right = if let Value::Integer(r) = right.value {
-                            r
-                        } else {
-                            return Err(MelInterpError::Assertion(
-                                MelInterpAssertion::TypeMismatch(Type::Integer, right.tipe.clone()),
-                            ));
-                        };
-
-                        match cop {
-                            ComparisonOperator::Eq => Ok(TypedValue {
-                                value: Value::Boolean(left == right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Lt => Ok(TypedValue {
-                                value: Value::Boolean(left < right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Lte => Ok(TypedValue {
-                                value: Value::Boolean(left <= right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Gt => Ok(TypedValue {
-                                value: Value::Boolean(left > right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Gte => Ok(TypedValue {
-                                value: Value::Boolean(left >= right),
-                                tipe: Type::Boolean,
-                            }),
-                            _ => todo!(),
-                        }
-                    }
-                    Type::String => {
-                        let left = if let Value::String(l) = &left.value {
-                            l
-                        } else {
-                            return Err(MelInterpError::Assertion(
-                                MelInterpAssertion::TypeMismatch(Type::String, left.tipe.clone()),
-                            ));
-                        };
-                        let right = if let Value::String(r) = &right.value {
-                            r
-                        } else {
-                            return Err(MelInterpError::Assertion(
-                                MelInterpAssertion::TypeMismatch(Type::String, right.tipe.clone()),
-                            ));
-                        };
-
-                        match cop {
-                            ComparisonOperator::Eq => Ok(TypedValue {
-                                value: Value::Boolean(left == right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Lt => Ok(TypedValue {
-                                value: Value::Boolean(left < right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Lte => Ok(TypedValue {
-                                value: Value::Boolean(left <= right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Gt => Ok(TypedValue {
-                                value: Value::Boolean(left > right),
-                                tipe: Type::Boolean,
-                            }),
-                            ComparisonOperator::Gte => Ok(TypedValue {
-                                value: Value::Boolean(left >= right),
-                                tipe: Type::Boolean,
-                            }),
-                            _ => todo!(),
-                        }
-                    }
-                    _ => todo!(),
                 }
-            }
+                Type::Integer => {
+                    let left = if let Value::Integer(l) = left.value {
+                        l
+                    } else {
+                        return Err(MelInterpError::Assertion(
+                            MelInterpAssertion::TypeMismatch(Type::Integer, left.tipe.clone())
+                                .into(),
+                        )
+                        .into());
+                    };
+                    let right = if let Value::Integer(r) = right.value {
+                        r
+                    } else {
+                        return Err(MelInterpError::Assertion(
+                            MelInterpAssertion::TypeMismatch(Type::Integer, right.tipe.clone())
+                                .into(),
+                        )
+                        .into());
+                    };
+
+                    match cop {
+                        ComparisonOperator::Eq => Ok(TypedValue {
+                            value: Value::Boolean(left == right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Lt => Ok(TypedValue {
+                            value: Value::Boolean(left < right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Lte => Ok(TypedValue {
+                            value: Value::Boolean(left <= right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Gt => Ok(TypedValue {
+                            value: Value::Boolean(left > right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Gte => Ok(TypedValue {
+                            value: Value::Boolean(left >= right),
+                            tipe: Type::Boolean,
+                        }),
+                        _ => todo!(),
+                    }
+                }
+                Type::String => {
+                    let left = if let Value::String(l) = &left.value {
+                        l
+                    } else {
+                        return Err(MelInterpError::Assertion(
+                            MelInterpAssertion::TypeMismatch(Type::String, left.tipe.clone())
+                                .into(),
+                        )
+                        .into());
+                    };
+                    let right = if let Value::String(r) = &right.value {
+                        r
+                    } else {
+                        return Err(MelInterpError::Assertion(
+                            MelInterpAssertion::TypeMismatch(Type::String, right.tipe.clone())
+                                .into(),
+                        )
+                        .into());
+                    };
+
+                    match cop {
+                        ComparisonOperator::Eq => Ok(TypedValue {
+                            value: Value::Boolean(left == right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Lt => Ok(TypedValue {
+                            value: Value::Boolean(left < right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Lte => Ok(TypedValue {
+                            value: Value::Boolean(left <= right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Gt => Ok(TypedValue {
+                            value: Value::Boolean(left > right),
+                            tipe: Type::Boolean,
+                        }),
+                        ComparisonOperator::Gte => Ok(TypedValue {
+                            value: Value::Boolean(left >= right),
+                            tipe: Type::Boolean,
+                        }),
+                        _ => todo!(),
+                    }
+                }
+                _ => todo!(),
+            },
             ast::BinaryInfixOperator::MemberAccess(_) => Err(MelInterpError::Assertion(
-                MelInterpAssertion::UnexpectedOperator(op.clone()),
-            )),
+                MelInterpAssertion::UnexpectedOperator(op.clone()).into(),
+            )
+            .into()),
         }
     }
 }
@@ -576,13 +588,13 @@ macro_rules! use_constant {
     };
 }
 
-impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInterp {
+impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for MelInterp {
     fn visit_function_call(
         &self,
         ast: &FunctionCall<Analyzed>,
         context: MelInterpContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+    ) -> AstVisitorResult<MelInterpContext, Box<MelInterpLocatableError>> {
         let mut context = context.update_log(trace_with_loc!(
             context.log,
             ast.location.clone(),
@@ -598,10 +610,11 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             .val
             .as_ref()
             .ok_or(MelInterpLocatableError {
-                error: MelInterpError::Assertion(SuccessWithoutValue(
-                    "callee".to_string(),
-                    "visit_function_call".to_string(),
-                )),
+                error: MelInterpError::Assertion(
+                    SuccessWithoutValue("callee".to_string(), "visit_function_call".to_string())
+                        .into(),
+                )
+                .into(),
                 location: ast.callee.location(),
                 context: context.clone(),
             })?
@@ -614,13 +627,14 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             } => f,
             TypedValue { value: _, tipe: t } => {
                 return Err(MelInterpLocatableError {
-                    error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        ast.callee.tipe(),
-                        t.clone(),
-                    )),
+                    error: MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(ast.callee.tipe(), t.clone()).into(),
+                    )
+                    .into(),
                     location: ast.callee.location(),
                     context: context.clone(),
-                });
+                }
+                .into());
             }
         };
 
@@ -628,10 +642,11 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context = self.visit_argument_list(&ast.arguments, context, driver)?;
 
         let argument_list_values = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Assertion(SuccessWithoutValue(
-                "arguments".to_string(),
-                "visit_function_call".to_string(),
-            )),
+            error: MelInterpError::Assertion(
+                SuccessWithoutValue("arguments".to_string(), "visit_function_call".to_string())
+                    .into(),
+            )
+            .into(),
             location: ast.callee.location(),
             context: context.clone(),
         })?;
@@ -643,20 +658,21 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             } => f,
             TypedValue { value: _, tipe: t } => {
                 return Err(MelInterpLocatableError {
-                    error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        ast.callee.tipe(),
-                        t.clone(),
-                    )),
+                    error: MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(ast.callee.tipe(), t.clone()).into(),
+                    )
+                    .into(),
                     location: ast.callee.location(),
                     context,
-                });
+                }
+                .into());
             }
         };
 
         let res = (*callee_value)
             .interpw(argument_list_values.clone())
             .map_err(|e| MelInterpLocatableError {
-                error: MelInterpError::BuiltinError(e),
+                error: MelInterpError::BuiltinError(e).into(),
                 location: ast.location.clone(),
                 context: context.clone(),
             })?;
@@ -668,7 +684,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         ast: &Identifier<Analyzed>,
         context: MelInterpContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+    ) -> AstVisitorResult<MelInterpContext, Box<MelInterpLocatableError>> {
         let context = context.update_log(trace_with_loc!(
             context.log,
             ast.location.clone(),
@@ -680,7 +696,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             .lookup(&ast.identifier)
             .as_ref()
             .ok_or(MelInterpLocatableError {
-                error: UnknownIdentifier(ast.identifier.clone()),
+                error: UnknownIdentifier(ast.identifier.clone()).into(),
                 location: ast.location.clone(),
                 context: context.clone(),
             })?
@@ -694,7 +710,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         ast: &ArgumentList<Analyzed>,
         context: MelInterpContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+    ) -> AstVisitorResult<MelInterpContext, Box<MelInterpLocatableError>> {
         let mut context = context.update_log(trace_with_loc!(
             context.log,
             ast.location.clone(),
@@ -710,10 +726,11 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             let context = self.visit_argument(arg, context.clone(), driver)?;
 
             let arg_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-                error: MelInterpError::Assertion(SuccessWithoutValue(
-                    "argument".to_string(),
-                    "visit_argument_list".to_string(),
-                )),
+                error: MelInterpError::Assertion(
+                    SuccessWithoutValue("argument".to_string(), "visit_argument_list".to_string())
+                        .into(),
+                )
+                .into(),
                 location: arg.location.clone(),
                 context: context.clone(),
             })?;
@@ -732,7 +749,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         ast: &Argument<Analyzed>,
         context: MelInterpContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+    ) -> AstVisitorResult<MelInterpContext, Box<MelInterpLocatableError>> {
         let mut context = context.update_log(trace_with_loc!(
             context.log,
             ast.location.clone(),
@@ -745,23 +762,28 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context = driver.visit(&ast.expr, self, context)?;
 
         let argument_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Assertion(SuccessWithoutValue(
-                "argument".to_string(),
-                "visit_argument".to_string(),
-            )),
+            error: MelInterpError::Assertion(
+                SuccessWithoutValue("argument".to_string(), "visit_argument".to_string()).into(),
+            )
+            .into(),
             location: ast.expr.location(),
             context: context.clone(),
         })?;
 
         if argument_value.tipe != ast.aug.tipe {
             return Err(MelInterpLocatableError {
-                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                    ast.aug.tipe.clone(),
-                    argument_value.tipe.clone(),
-                )),
+                error: MelInterpError::Assertion(
+                    MelInterpAssertion::TypeMismatch(
+                        ast.aug.tipe.clone(),
+                        argument_value.tipe.clone(),
+                    )
+                    .into(),
+                )
+                .into(),
                 location: ast.location.clone(),
                 context: context.clone(),
-            });
+            }
+            .into());
         }
 
         Ok(context.update_val(Some(argument_value.clone())))
@@ -772,7 +794,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         ast: &BinaryExpr<Analyzed>,
         context: MelInterpContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+    ) -> AstVisitorResult<MelInterpContext, Box<MelInterpLocatableError>> {
         let mut context = context.update_log(trace_with_loc!(
             context.log,
             ast.location.clone(),
@@ -788,10 +810,14 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             .val
             .as_ref()
             .ok_or(MelInterpLocatableError {
-                error: MelInterpError::Assertion(SuccessWithoutValue(
-                    "left operand".to_string(),
-                    "visit_binary_expr".to_string(),
-                )),
+                error: MelInterpError::Assertion(
+                    SuccessWithoutValue(
+                        "left operand".to_string(),
+                        "visit_binary_expr".to_string(),
+                    )
+                    .into(),
+                )
+                .into(),
                 location: ast.left.location(),
                 context: context.clone(),
             })?
@@ -804,10 +830,14 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             .val
             .as_ref()
             .ok_or(MelInterpLocatableError {
-                error: MelInterpError::Assertion(SuccessWithoutValue(
-                    "right operand".to_string(),
-                    "visit_binary_expr".to_string(),
-                )),
+                error: MelInterpError::Assertion(
+                    SuccessWithoutValue(
+                        "right operand".to_string(),
+                        "visit_binary_expr".to_string(),
+                    )
+                    .into(),
+                )
+                .into(),
                 location: ast.right.location(),
                 context: context.clone(),
             })?
@@ -829,7 +859,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         ast: (&ast::Literal, &GrammarLocation, &Analyzed),
         context: MelInterpContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+    ) -> AstVisitorResult<MelInterpContext, Box<MelInterpLocatableError>> {
         let context = context.update_log(trace_with_loc!(
             context.log,
             ast.1.clone(),
@@ -872,7 +902,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         ast: &TernaryExpr<Analyzed>,
         context: MelInterpContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+    ) -> AstVisitorResult<MelInterpContext, Box<MelInterpLocatableError>> {
         let mut context = context.update_log(trace_with_loc!(
             context.log,
             ast.location.clone(),
@@ -885,10 +915,11 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         context = driver.visit(&ast.condition, self, context)?;
 
         let condition_value = context.val.as_ref().ok_or(MelInterpLocatableError {
-            error: MelInterpError::Assertion(SuccessWithoutValue(
-                "condition".to_string(),
-                "visit_ternary_expr".to_string(),
-            )),
+            error: MelInterpError::Assertion(
+                SuccessWithoutValue("condition".to_string(), "visit_ternary_expr".to_string())
+                    .into(),
+            )
+            .into(),
             location: ast.condition.location(),
             context: context.clone(),
         })?;
@@ -900,13 +931,14 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             } => b,
             e => {
                 return Err(MelInterpLocatableError {
-                    error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        Type::Boolean,
-                        e.tipe.clone(),
-                    )),
+                    error: MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(Type::Boolean, e.tipe.clone()).into(),
+                    )
+                    .into(),
                     location: ast.location.clone(),
                     context: context.clone(),
-                });
+                }
+                .into());
             }
         };
 
@@ -918,10 +950,14 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                 .val
                 .as_ref()
                 .ok_or(MelInterpLocatableError {
-                    error: MelInterpError::Assertion(SuccessWithoutValue(
-                        "true branch".to_string(),
-                        "visit_ternary_expr".to_string(),
-                    )),
+                    error: MelInterpError::Assertion(
+                        SuccessWithoutValue(
+                            "true branch".to_string(),
+                            "visit_ternary_expr".to_string(),
+                        )
+                        .into(),
+                    )
+                    .into(),
                     location: ast.condition.location(),
                     context: context.clone(),
                 })?
@@ -932,10 +968,14 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                 .val
                 .as_ref()
                 .ok_or(MelInterpLocatableError {
-                    error: MelInterpError::Assertion(SuccessWithoutValue(
-                        "false branch".to_string(),
-                        "visit_ternary_expr".to_string(),
-                    )),
+                    error: MelInterpError::Assertion(
+                        SuccessWithoutValue(
+                            "false branch".to_string(),
+                            "visit_ternary_expr".to_string(),
+                        )
+                        .into(),
+                    )
+                    .into(),
                     location: ast.condition.location(),
                     context: context.clone(),
                 })?
@@ -944,13 +984,15 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
 
         if result.tipe != ast.aug.tipe {
             return Err(MelInterpLocatableError {
-                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                    ast.aug.tipe.clone(),
-                    result.tipe.clone(),
-                )),
+                error: MelInterpError::Assertion(
+                    MelInterpAssertion::TypeMismatch(ast.aug.tipe.clone(), result.tipe.clone())
+                        .into(),
+                )
+                .into(),
                 location: ast.location.clone(),
                 context: context.clone(),
-            });
+            }
+            .into());
         }
 
         Ok(context.update_val(Some(result.clone())))
@@ -961,7 +1003,7 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
         ast: &ast::MemberAccessExpression<Analyzed>,
         context: MelInterpContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelInterpContext, MelInterpLocatableError> {
+    ) -> AstVisitorResult<MelInterpContext, Box<MelInterpLocatableError>> {
         let mut context = context.update_log(trace_with_loc!(
             context.log,
             ast.location.clone(),
@@ -976,10 +1018,11 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             .val
             .as_ref()
             .ok_or(MelInterpLocatableError {
-                error: MelInterpError::Assertion(SuccessWithoutValue(
-                    "base".to_string(),
-                    "visit_member_access_expr".to_string(),
-                )),
+                error: MelInterpError::Assertion(
+                    SuccessWithoutValue("base".to_string(), "visit_member_access_expr".to_string())
+                        .into(),
+                )
+                .into(),
                 location: ast.base.location(),
                 context: context.clone(),
             })?
@@ -992,33 +1035,36 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
             } => (sv, st),
             t => {
                 return Err(MelInterpLocatableError {
-                    error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                        ast.base.tipe(),
-                        t.tipe,
-                    )),
+                    error: MelInterpError::Assertion(
+                        MelInterpAssertion::TypeMismatch(ast.base.tipe(), t.tipe).into(),
+                    )
+                    .into(),
                     location: ast.base.location(),
                     context: context.clone(),
-                });
+                }
+                .into());
             }
         };
 
         // Make sure that the evaluated type and the analyzed type are the same.
         if Type::Struct(base_type.clone()) != ast.base.tipe() {
             return Err(MelInterpLocatableError {
-                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                    ast.base.tipe(),
-                    Type::Struct(base_type),
-                )),
+                error: MelInterpError::Assertion(
+                    MelInterpAssertion::TypeMismatch(ast.base.tipe(), Type::Struct(base_type))
+                        .into(),
+                )
+                .into(),
                 location: ast.base.location(),
                 context: context.clone(),
-            });
+            }
+            .into());
         }
 
         let member_type =
             base_type
                 .get_field(&ast.member.identifier)
                 .ok_or(MelInterpLocatableError {
-                    error: MelInterpError::UnknownField(ast.member.identifier.clone()),
+                    error: MelInterpError::UnknownField(ast.member.identifier.clone()).into(),
                     location: ast.member.location.clone(),
                     context: context.clone(),
                 })?;
@@ -1028,20 +1074,25 @@ impl AstVisitor<MelInterpContext, Analyzed, MelInterpLocatableError> for MelInte
                 .fields
                 .get(&ast.member.identifier)
                 .ok_or(MelInterpLocatableError {
-                    error: MelInterpError::UnknownField(ast.member.identifier.clone()),
+                    error: MelInterpError::UnknownField(ast.member.identifier.clone()).into(),
                     location: ast.member.location.clone(),
                     context: context.clone(),
                 })?;
 
         if member_type != member_value.tipe {
             return Err(MelInterpLocatableError {
-                error: MelInterpError::Assertion(MelInterpAssertion::TypeMismatch(
-                    member_type.clone(),
-                    member_value.tipe.clone(),
-                )),
+                error: MelInterpError::Assertion(
+                    MelInterpAssertion::TypeMismatch(
+                        member_type.clone(),
+                        member_value.tipe.clone(),
+                    )
+                    .into(),
+                )
+                .into(),
                 location: ast.member.location.clone(),
                 context: context.clone(),
-            });
+            }
+            .into());
         }
 
         Ok(context.update_val(Some(member_value.clone())))

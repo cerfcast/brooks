@@ -200,7 +200,7 @@ impl Display for MelAnalysisError {
 
 #[derive(Debug, Clone)]
 pub struct MelAnalysisLocatableError {
-    pub error: MelAnalysisError,
+    pub error: Box<MelAnalysisError>,
     pub location: GrammarLocation,
 }
 
@@ -258,7 +258,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             return Err(MelAnalysisLocatableError {
                 error: AssertionFailure(MelAnalysisAssertions::ContextMissingExpr(
                     "visit_function_call".to_string(),
-                )),
+                ))
+                .into(),
                 location: ast.location.clone(),
             });
         };
@@ -270,7 +271,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                     error: Mismatch(
                         Function(Arc::new(Type::None), tvs::Params { args: vec![] }),
                         t,
-                    ),
+                    )
+                    .into(),
                     location: ast.location.clone(),
                 });
             }
@@ -284,7 +286,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 "ArgumentList".to_string(),
                 e.to_string(),
                 "visit_function_call".to_string(),
-            ))),
+            ))
+            .into()),
         }
         .map_err(|e| MelAnalysisLocatableError {
             error: e,
@@ -314,7 +317,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             .scopes
             .lookup(&ast.identifier)
             .ok_or(MelAnalysisLocatableError {
-                error: UnknownIdentifier(ast.identifier.clone()),
+                error: UnknownIdentifier(ast.identifier.clone()).into(),
                 location: ast.location.clone(),
             })?;
 
@@ -335,13 +338,13 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
         let params = context.params.as_ref().ok_or(MelAnalysisLocatableError {
-            error: AssertionFailure(ContextMissingParams),
+            error: AssertionFailure(ContextMissingParams).into(),
             location: ast.location.clone(),
         })?;
 
         if params.len() != ast.arguments.len() {
             return Err(MelAnalysisLocatableError {
-                error: MelAnalysisError::Miscount(params.len(), ast.arguments.len()),
+                error: MelAnalysisError::Miscount(params.len(), ast.arguments.len()).into(),
                 location: ast.location.clone(),
             });
         }
@@ -354,7 +357,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 .ok_or(MelAnalysisLocatableError {
                     error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                         "visit_argument_list".into(),
-                    )),
+                    ))
+                    .into(),
                     location: arg.0.location.clone(),
                 })?;
             let arg = match arg {
@@ -366,7 +370,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 ))),
             }
             .map_err(|e| MelAnalysisLocatableError {
-                error: e,
+                error: e.into(),
                 location: ast.location.clone(),
             })?;
             arg_types.push((*arg).clone());
@@ -391,7 +395,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
         let params = context.params.as_ref().ok_or(MelAnalysisLocatableError {
-            error: AssertionFailure(ContextMissingParams),
+            error: AssertionFailure(ContextMissingParams).into(),
             location: ast.location.clone(),
         })?;
 
@@ -399,7 +403,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_argument".into(),
-                )),
+                ))
+                .into(),
                 location: ast.location.clone(),
             },
         )?;
@@ -407,7 +412,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         let arg_type = arg.tipe();
         if arg_type != params[0] {
             return Err(MelAnalysisLocatableError {
-                error: Mismatch(params[0].clone(), arg_type),
+                error: Mismatch(params[0].clone(), arg_type).into(),
                 location: arg.location(),
             });
         }
@@ -431,7 +436,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_binary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.left.location(),
             },
         )?;
@@ -441,7 +447,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             .ok_or(MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_binary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.right.location(),
             })?;
 
@@ -465,7 +472,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                             e.to_string(),
                             "visit_binary_expr".to_string(),
                         ),
-                    ),
+                    )
+                    .into(),
                     location: ast.right.location(),
                 });
             }
@@ -473,13 +481,13 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 
         if !valid_types.contains(&left_type) {
             return Err(MelAnalysisLocatableError {
-                error: InvalidType(valid_types, left_type),
+                error: InvalidType(valid_types, left_type).into(),
                 location: left.location(),
             });
         }
         if !valid_types.contains(&right_type) {
             return Err(MelAnalysisLocatableError {
-                error: InvalidType(valid_types, right_type),
+                error: InvalidType(valid_types, right_type).into(),
                 location: right.location(),
             });
         }
@@ -488,13 +496,13 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         if let BinaryInfixOperator::Comparison(Re) = ast.op {
             if left_type != Type::String {
                 return Err(MelAnalysisLocatableError {
-                    error: Mismatch(Type::String, left_type),
+                    error: Mismatch(Type::String, left_type).into(),
                     location: left.location(),
                 });
             }
             if right_type != Type::Regex {
                 return Err(MelAnalysisLocatableError {
-                    error: Mismatch(Type::Regex, right_type),
+                    error: Mismatch(Type::Regex, right_type).into(),
                     location: right.location(),
                 });
             }
@@ -513,7 +521,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         // Otherwise, the types just need to be equal!
         if left_type != right_type {
             return Err(MelAnalysisLocatableError {
-                error: Mismatch(left_type, right_type),
+                error: Mismatch(left_type, right_type).into(),
                 location: right.location(),
             });
         }
@@ -594,14 +602,16 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             .ok_or(MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.condition.location(),
             })?;
         let yes = driver.visit(&ast.yes, self, context.clone())?.expr.ok_or(
             MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.yes.location(),
             },
         )?;
@@ -610,7 +620,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.no.location(),
             },
         )?;
@@ -621,14 +632,14 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 
         if condition_type != Type::Boolean {
             return Err(MelAnalysisLocatableError {
-                error: Mismatch(Type::Boolean, condition_type),
+                error: Mismatch(Type::Boolean, condition_type).into(),
                 location: ast.location.clone(),
             });
         }
 
         if yes_type != no_type {
             return Err(MelAnalysisLocatableError {
-                error: Mismatch(yes_type, no_type),
+                error: Mismatch(yes_type, no_type).into(),
                 location: ast.location.clone(),
             });
         }
@@ -655,7 +666,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_member_access_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.base.location(),
             },
         )?;
@@ -664,7 +676,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             Type::Struct(struct_type) => struct_type,
             t => {
                 return Err(MelAnalysisLocatableError {
-                    error: MelAnalysisError::Mismatch(Struct(tvs::Struct::new("TODO")), t),
+                    error: MelAnalysisError::Mismatch(Struct(tvs::Struct::new("TODO")), t).into(),
                     location: ast.base.location(),
                 });
             }
@@ -675,7 +687,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 error: MelAnalysisError::UnknownField(
                     struct_type.name,
                     ast.member.identifier.clone(),
-                ),
+                )
+                .into(),
                 location: ast.base.location(),
             },
         )?;
@@ -706,10 +719,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 mod type_check_tests {
     use crate::common::GrammarLocation;
     use crate::mel::{
-        analysis::{
-            Analyzed, MelAnalysisContext, MelAnalysisError, MelAnalysisLocatableError,
-            MelTypeChecker,
-        },
+        analysis::{Analyzed, MelAnalysisContext, MelAnalysisError, MelTypeChecker},
         ast::{AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier},
         compiler::compile,
         tvs::{
@@ -806,15 +816,17 @@ mod type_check_tests {
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
 
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 0,
+                extent: 1
+            }
+        );
         assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::InvalidType(i, Integer),
-                location: GrammarLocation {
-                    start: 0,
-                    extent: 1
-                }
-            } if i == vec![Type::Regex, Type::String]
+            *result.error,
+            MelAnalysisError::InvalidType(i, Integer)
+            if i == vec![Type::Regex, Type::String]
         )
     }
 
@@ -832,15 +844,16 @@ mod type_check_tests {
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
 
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::InvalidType(i, Boolean),
-                location: GrammarLocation {
-                    start: 15,
-                    extent: 5
-                }
-            } if i == vec![Type::Regex, Type::String]
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 15,
+                extent: 5
+            }
+        );
+        assert_matches!(*result.error,
+            MelAnalysisError::InvalidType(i, Boolean)
+            if i == vec![Type::Regex, Type::String]
         )
     }
 
@@ -857,16 +870,16 @@ mod type_check_tests {
         let result = driver
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
-
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::Mismatch(Type::String, Type::Regex),
-                location: GrammarLocation {
-                    start: 0,
-                    extent: 9
-                }
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 0,
+                extent: 9
             }
+        );
+        assert_matches!(
+            *result.error,
+            MelAnalysisError::Mismatch(Type::String, Type::Regex)
         )
     }
 
@@ -884,15 +897,16 @@ mod type_check_tests {
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
 
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::Mismatch(Type::Regex, Type::String),
-                location: GrammarLocation {
-                    start: 13,
-                    extent: 7
-                }
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 13,
+                extent: 7
             }
+        );
+        assert_matches!(
+            *result.error,
+            MelAnalysisError::Mismatch(Type::Regex, Type::String)
         )
     }
 
@@ -976,18 +990,22 @@ mod type_check_tests {
         let driver = AstVisitorDriver {};
         let visitor = MelTypeChecker {};
         let context = MelAnalysisContext::default();
-        let result = driver.visit(&ast, &visitor, context);
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with invalid types");
 
-        assert_matches!(
-            result,
-            Err(MelAnalysisLocatableError {
-                error: MelAnalysisError::InvalidType(x, tvs::Type::String),
-                location: GrammarLocation {
-                    start: 4,
-                    extent: 9
-                }
-            }) if x == vec![Integer]
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 4,
+                extent: 9
+            }
         );
+        assert_matches!(
+            *result.error,
+                MelAnalysisError::InvalidType(x, tvs::Type::String)
+            if x == vec![Integer]
+        )
     }
 
     #[test]
@@ -1004,10 +1022,18 @@ mod type_check_tests {
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with missing identifier");
 
-        assert_matches!(result, MelAnalysisLocatableError {
-            error: MelAnalysisError::UnknownIdentifier(a),
-            location: GrammarLocation { start: 0, extent: 1},
-        } if a == "a");
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 0,
+                extent: 1
+            }
+        );
+        assert_matches!(
+            *result.error,
+            MelAnalysisError::UnknownIdentifier(a)
+            if a == "a"
+        )
     }
 
     #[test]
@@ -1065,10 +1091,18 @@ mod type_check_tests {
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
 
-        assert_matches!(result, MelAnalysisLocatableError {
-            error: MelAnalysisError::InvalidType(a, Boolean),
-            location: GrammarLocation { start: 0, extent: 5},
-        } if a == vec![Integer]);
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 0,
+                extent: 5
+            }
+        );
+        assert_matches!(
+            *result.error,
+            MelAnalysisError::InvalidType(a, Boolean)
+        if a == vec![Integer]
+        )
     }
 
     #[test]
@@ -1088,10 +1122,18 @@ mod type_check_tests {
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
 
-        assert_matches!(result, MelAnalysisLocatableError {
-            error: MelAnalysisError::InvalidType(a, Boolean),
-            location: GrammarLocation { start: 4, extent: 4},
-        } if a == vec![Integer]);
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 4,
+                extent: 4
+            }
+        );
+        assert_matches!(
+            *result.error,
+            MelAnalysisError::InvalidType(a, Boolean)
+        if a == vec![Integer]
+        )
     }
 
     #[test]
@@ -1199,10 +1241,11 @@ mod type_check_tests {
         let result = driver
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with missing identifier");
-        assert_matches!(result, MelAnalysisLocatableError {
-            error: MelAnalysisError::UnknownIdentifier(a),
-            location: _,
-        } if a == "use_me");
+
+        assert_matches!(
+            *result.error, MelAnalysisError::UnknownIdentifier(a)
+            if a == "use_me"
+        )
     }
 
     #[test]
@@ -1229,13 +1272,8 @@ mod type_check_tests {
         let result = driver
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with miscounted params/args");
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::Miscount(2, 1),
-                location: _,
-            }
-        )
+
+        assert_matches!(*result.error, MelAnalysisError::Miscount(2, 1))
     }
 
     #[test]
@@ -1353,16 +1391,17 @@ mod type_check_tests {
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
 
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::Mismatch(Integer, Type::String),
-                location: GrammarLocation {
-                    start: 10,
-                    extent: 9
-                }
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 10,
+                extent: 9
             }
         );
+        assert_matches!(
+            *result.error,
+            MelAnalysisError::Mismatch(Integer, Type::String),
+        )
     }
 
     #[test]
@@ -1436,16 +1475,18 @@ mod type_check_tests {
         let result = driver
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::InvalidType(i, Boolean),
-                location: GrammarLocation {
-                    start: 5,
-                    extent: 9
-                }
-            } if i == vec![Integer]
+
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 5,
+                extent: 9
+            }
         );
+        assert_matches!(
+            *result.error, MelAnalysisError::InvalidType(i, Boolean)
+            if i == vec![Integer]
+        )
     }
 
     #[test]
@@ -1497,16 +1538,18 @@ mod type_check_tests {
         let result = driver
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::InvalidType(i, Boolean),
-                location: GrammarLocation {
-                    start: 1,
-                    extent: 5
-                }
-            } if i == vec![Integer]
+
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 1,
+                extent: 5
+            }
         );
+        assert_matches!(
+            *result.error,
+            MelAnalysisError::InvalidType(i, Boolean) if i == vec![Integer]
+        )
     }
 
     #[test]
@@ -1709,16 +1752,19 @@ mod type_check_tests {
         let result = driver
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::InvalidType(i, Integer),
-                location: GrammarLocation {
-                    start: 48,
-                    extent: 1
-                }
-            } if i == vec![IPAddress]
+
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 48,
+                extent: 1
+            }
         );
+        assert_matches!(
+            *result.error,
+                MelAnalysisError::InvalidType(i, Integer)
+            if i == vec![IPAddress]
+        )
     }
 
     #[test]
@@ -1737,16 +1783,19 @@ mod type_check_tests {
         let result = driver
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::InvalidType(i, Type::String),
-                location: GrammarLocation {
-                    start: 48,
-                    extent: 1
-                }
-            } if i == vec![IPAddress]
+
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 48,
+                extent: 1
+            }
         );
+        assert_matches!(
+            *result.error,
+                MelAnalysisError::InvalidType(i, Type::String)
+            if i == vec![IPAddress]
+        )
     }
 
     #[test]
@@ -1767,16 +1816,19 @@ mod type_check_tests {
         let result = driver
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with type error");
-        assert_matches!(
-            result,
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::InvalidType(i, Type::String),
-                location: GrammarLocation {
-                    start: 10,
-                    extent: 1
-                }
-            } if i == vec![IPAddress]
+
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 10,
+                extent: 1
+            }
         );
+        assert_matches!(
+            *result.error,
+                MelAnalysisError::InvalidType(i, Type::String)
+            if i == vec![IPAddress]
+        )
     }
 }
 
@@ -1809,41 +1861,40 @@ impl ConstEvaluator {
             || !matches!(op, ast::BinaryInfixOperator::Comparison(_))
     }
 
-    #[allow(clippy::result_large_err)]
     fn evaluate_binary_expr(
         left: &CompiledConstant,
         left_type: Type,
         right: &CompiledConstant,
         right_type: Type,
         op: ast::BinaryInfixOperator,
-    ) -> Result<CompiledConstant, MelAnalysisError> {
+    ) -> Result<CompiledConstant, Box<MelAnalysisError>> {
         match op {
             ast::BinaryInfixOperator::Comparison(IP) => {
                 let left = if let CompiledConstant::IPAddress(l) = left {
                     l
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::IPAddress, left_type));
+                    return Err(MelAnalysisError::Mismatch(Type::IPAddress, left_type).into());
                 };
                 let right = if let CompiledConstant::IPAddress(r) = right {
                     r
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::IPAddress, right_type));
+                    return Err(MelAnalysisError::Mismatch(Type::IPAddress, right_type).into());
                 };
                 Ok(CompiledConstant::Boolean(left == right))
             }
-            ast::BinaryInfixOperator::Comparison(_) => Err(
-                MelAnalysisError::OptimizationNotSupported("Comparison operator".into()),
-            ),
+            ast::BinaryInfixOperator::Comparison(_) => {
+                Err(MelAnalysisError::OptimizationNotSupported("Comparison operator".into()).into())
+            }
             ast::BinaryInfixOperator::Logic(logic_operator) => {
                 let left = if let CompiledConstant::Boolean(l) = left {
                     l
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::Boolean, left_type));
+                    return Err(MelAnalysisError::Mismatch(Type::Boolean, left_type).into());
                 };
                 let right = if let CompiledConstant::Boolean(r) = right {
                     r
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::Boolean, right_type));
+                    return Err(MelAnalysisError::Mismatch(Type::Boolean, right_type).into());
                 };
                 match logic_operator {
                     ast::LogicOperator::And => Ok(CompiledConstant::Boolean(*left && *right)),
@@ -1854,12 +1905,12 @@ impl ConstEvaluator {
                 let left = if let CompiledConstant::Integer(l) = left {
                     l
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::Integer, left_type));
+                    return Err(MelAnalysisError::Mismatch(Type::Integer, left_type).into());
                 };
                 let right = if let CompiledConstant::Integer(r) = right {
                     r
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::Integer, right_type));
+                    return Err(MelAnalysisError::Mismatch(Type::Integer, right_type).into());
                 };
                 match math_operator {
                     ast::MathOperator::Plus => Ok(CompiledConstant::Integer(left + right)),
@@ -1873,12 +1924,12 @@ impl ConstEvaluator {
                 let left = if let CompiledConstant::String(l) = left {
                     l
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::String, left_type));
+                    return Err(MelAnalysisError::Mismatch(Type::String, left_type).into());
                 };
                 let right = if let CompiledConstant::String(r) = right {
                     r
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::String, right_type));
+                    return Err(MelAnalysisError::Mismatch(Type::String, right_type).into());
                 };
                 Ok(CompiledConstant::String(left.to_owned() + right))
             }
@@ -1887,7 +1938,8 @@ impl ConstEvaluator {
                     c.to_string(),
                     "evaluate_binary_expr".to_string(),
                 ),
-            )),
+            )
+            .into()),
         }
     }
 }
@@ -1939,7 +1991,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         let expr = context.expr.as_ref().ok_or(MelAnalysisLocatableError {
             error: MelAnalysisError::PreconditionFailure(
                 MelAnalysisPreconditions::ContextMissingExpr("visit_binary_expr".into()),
-            ),
+            )
+            .into(),
             location: ast.location.clone(),
         })?;
 
@@ -1958,7 +2011,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
             .ok_or(MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_binary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.location.clone(),
             })?;
 
@@ -1972,7 +2026,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
             .ok_or(MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_binary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.location.clone(),
             })?;
 
@@ -2076,7 +2131,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         let expr = context.expr.as_ref().ok_or(MelAnalysisLocatableError {
             error: MelAnalysisError::PreconditionFailure(
                 MelAnalysisPreconditions::ContextMissingExpr("visit_ternary_expr".into()),
-            ),
+            )
+            .into(),
             location: ast.location.clone(),
         })?;
 
@@ -2095,7 +2151,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
             .ok_or(MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.location.clone(),
             })?;
         let yes = driver
@@ -2108,7 +2165,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
             .ok_or(MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.location.clone(),
             })?;
 
@@ -2118,7 +2176,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
             .ok_or(MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
-                )),
+                ))
+                .into(),
                 location: ast.location.clone(),
             })?;
 
@@ -2150,7 +2209,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                             e.to_string(),
                             "visit_ternary_expr".to_string(),
                         ),
-                    ),
+                    )
+                    .into(),
                     location: ast.location.clone(),
                 });
             }
@@ -2731,10 +2791,7 @@ mod optimizer_tests {
 #[cfg(test)]
 mod analysis_error_tests {
     use crate::mel::{
-        analysis::{
-            MelAnalysisContext, MelAnalysisError, MelAnalysisLocatableError,
-            MelAnalysisPreconditions, MelOptimizer,
-        },
+        analysis::{MelAnalysisContext, MelAnalysisError, MelAnalysisPreconditions, MelOptimizer},
         ast::AstVisitorDriver,
         compiler::compile,
     };
@@ -2751,20 +2808,17 @@ mod analysis_error_tests {
         let driver = AstVisitorDriver {};
         let visitor = MelOptimizer {};
 
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect_err("Could analyze expression with no context");
         assert_matches!(
-            driver.visit(&ast, &visitor, context),
-            Err(MelAnalysisLocatableError {
-                error: MelAnalysisError::PreconditionFailure(
-                    MelAnalysisPreconditions::ContextMissingExpr(_)
-                ),
-                location: _
-            })
+            *result.error,
+            MelAnalysisError::PreconditionFailure(MelAnalysisPreconditions::ContextMissingExpr(_))
         );
     }
 }
 
-pub type MelAnalysisResult = Result<Expr<Analyzed>, MelAnalysisLocatableError>;
-#[allow(clippy::result_large_err)]
+pub type MelAnalysisResult = Result<Expr<Analyzed>, Box<MelAnalysisLocatableError>>;
 pub fn analyze(expr: &Expr<()>, scopes: &Scopes<Type>) -> MelAnalysisResult {
     let driver = AstVisitorDriver {};
     let visitor = MelTypeChecker {};
@@ -2778,7 +2832,7 @@ pub fn analyze(expr: &Expr<()>, scopes: &Scopes<Type>) -> MelAnalysisResult {
     let result = driver.visit(expr, &visitor, result)?;
 
     let result = result.expr.ok_or(MelAnalysisLocatableError {
-        error: MelAnalysisError::Incalculable,
+        error: MelAnalysisError::Incalculable.into(),
         location: GrammarLocation {
             start: 0,
             extent: 0,

@@ -20,7 +20,7 @@ use std::fmt::Display;
 #[cfg(feature = "json")]
 use serde::Serialize;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 #[cfg(feature = "json")]
 #[derive(Serialize)]
 pub struct GrammarLocation {

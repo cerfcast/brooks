@@ -52,9 +52,8 @@ impl Display for BuiltinInterpError {
     }
 }
 
-type BuiltinInterpResult = Result<TypedValue, BuiltinInterpError>;
+type BuiltinInterpResult = Result<TypedValue, Box<BuiltinInterpError>>;
 
-#[allow(clippy::result_large_err)]
 pub trait BuiltinFunction: Debug {
     fn name(&self) -> String;
     fn parameters(&self) -> tvs::Params;
@@ -67,7 +66,6 @@ pub trait BuiltinFunction: Debug {
 #[builtin_function(Type::String, Type::String, Type::Integer)]
 pub struct Path_ElementBuiltin {}
 
-#[allow(clippy::result_large_err)]
 impl Path_ElementBuiltin {
     fn interp(&self, path: &str, element: &i64) -> BuiltinInterpResult {
         let parts = path.split("/");
@@ -91,7 +89,8 @@ impl Path_ElementBuiltin {
                 "Index {} is out of bounds (max {})",
                 element,
                 parts.count()
-            )))
+            ))
+            .into())
         }
     }
 }
@@ -100,7 +99,6 @@ impl Path_ElementBuiltin {
 #[builtin_function(Type::Boolean, Type::Integer)]
 pub struct BooleanBuiltin {}
 
-#[allow(clippy::result_large_err)]
 impl BooleanBuiltin {
     fn interp(&self, c: &i64) -> BuiltinInterpResult {
         Ok(TypedValue {

@@ -187,7 +187,7 @@ pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
                                 #i,
                                 #t,
                                 t.clone(),
-                            ));
+                            ).into());
                         }
                     };
             }
@@ -220,11 +220,11 @@ pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
             fn interpw(&self, args: Value) -> BuiltinInterpResult {
                 let args = match args {
                     Value::ArgumentList(args) => args,
-                    _ => return Err(BuiltinInterpError::ArgumentsInvalid),
+                    _ => return Err(BuiltinInterpError::ArgumentsInvalid.into()),
                 };
 
                 if args.len() != #parameter_types_len {
-                    return Err(BuiltinInterpError::ArgumentMiscount(#parameter_types_len, args.len()));
+                    return Err(BuiltinInterpError::ArgumentMiscount(#parameter_types_len, args.len()).into());
                 }
 
                 #(#type_check)*

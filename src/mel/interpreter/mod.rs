@@ -27,7 +27,6 @@ use crate::mel::{
     interpreter::interpret::{MelInterp, MelInterpContext, MelInterpResult},
 };
 
-#[allow(clippy::result_large_err)]
 pub fn interpret(expr: &Expr<Analyzed>, context: MelInterpContext) -> MelInterpResult {
     let driver = AstVisitorDriver {};
     let visitor = MelInterp {};

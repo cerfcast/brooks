@@ -68,7 +68,7 @@ pub(crate) unsafe fn copy_to_pool(s: &[u8], pool: *mut ngx_pool_s) -> (*mut u8, 
 pub(crate) unsafe fn to_nginx_buf(
     s: &[u8],
     pool: *mut ngx_pool_s,
-) -> Result<*mut ngx_buf_s, NginxTransformError> {
+) -> Result<*mut ngx_buf_s, Box<NginxTransformError>> {
     let buf = ngx_pcalloc(pool, size_of::<ngx_buf_s>()) as *mut ngx_buf_s;
     let buf = buf.as_mut().ok_or(NginxTransformError::BadMemory)?;
 
