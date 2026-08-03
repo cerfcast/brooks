@@ -172,7 +172,7 @@ macro_rules! emit_ {
 
         #[allow(unused_macros)]
         macro_rules! $name {
-            ($log:ident, $msg:expr ) => {
+            ($log:expr, $msg:expr ) => {
                 $log.log(LogMsg::new($msg, $level))
             };
         }
