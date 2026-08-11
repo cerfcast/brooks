@@ -16,31 +16,26 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    ffi::{CStr, c_char},
-    fmt::Display,
-    fs::OpenOptions,
-    io::Read,
-    marker::PhantomData,
-    ptr::null,
-    str::FromStr,
+    collections::HashMap, fmt::Display, marker::PhantomData, path::PathBuf, ptr::null, str::FromStr,
 };
 
-use http::{HeaderName, HeaderValue, Method, Request, StatusCode, Uri};
+use chrono::Utc;
+use http::{HeaderName, HeaderValue, Method, Request, StatusCode, Uri, header::HOST};
 use libc::intptr_t;
 use reqwest::{Response, Url};
-use tokio::runtime::{self, Runtime};
+use tokio::runtime;
 
 use crate::{
     cdni::{
         spec::{HostMetadata, TypedHostMetadata},
-        verify::{
-            HostMetadataVerificationError::{self, JsonError},
-            HostMetadataVerificationKey, verify_host_metadata,
-        },
+        verify::{HostMetadataVerificationKey, verify_host_metadata},
     },
-    integrations::nginx::{
-        nginx_lib::{from_nginx_str, log_nginx_msgs, to_nginx_buf, to_nginx_str},
-        ngx_buf_s, ngx_http_request_s, ngx_list_push, ngx_log_s, ngx_table_elt_s,
+    integrations::{
+        hmds::query_hmds,
+        nginx::{
+            nginx_lib::{from_nginx_str, log_nginx_msgs, to_nginx_buf, to_nginx_str},
+            ngx_buf_s, ngx_http_request_s, ngx_list_push, ngx_log_s, ngx_str_t, ngx_table_elt_s,
+        },
     },
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
@@ -60,72 +55,35 @@ use crate::{
 
 #[repr(C)]
 pub struct BrooksC {
-    _data: HostMetadata<HostMetadataVerificationKey>,
-    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+    hmds_path: PathBuf,
+    hmds_cache: HashMap<
+        String,
+        (
+            chrono::DateTime<Utc>,
+            HostMetadata<HostMetadataVerificationKey>,
+        ),
+    >,
+    _marker: core::marker::PhantomData<*mut u8>,
 }
 
 #[allow(clippy::missing_safety_doc)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn ngx_brooks_analyze(
-    path: *const c_char,
+pub unsafe extern "C" fn ngx_brooks_configure(
     cookie: *mut *const BrooksC,
+    hmds_path: ngx_str_t,
     nlx: *mut ngx_log_s,
 ) -> bool {
-    let mut log = LogMsgs::new_with_prefix("brooks analysis", crate::logging::LogLevel::Debug);
-
-    let path = match CStr::from_ptr(path).to_str() {
-        Ok(o) => o,
-        Err(e) => {
-            log = error!(
-                log,
-                &format!("Could not turn given path into Rust string: {e}")
-            );
-            log_nginx_msgs(nlx, &log);
-            return false;
-        }
-    }
-    .to_string();
-
-    let result = match safe_ngx_brooks_analyze(&path) {
-        Ok(o) => o,
-        Err(e) => {
-            log = error!(log, &format!("Error when verifying host metadata: {e}"));
-            log_nginx_msgs(nlx, &log);
-            return false;
-        }
-    };
+    let log = LogMsgs::new_with_prefix("brooks analysis", crate::logging::LogLevel::Debug);
 
     *cookie = Box::into_raw(Box::new(BrooksC {
-        _data: result,
+        hmds_path: PathBuf::from(from_nginx_str(hmds_path)),
+        hmds_cache: HashMap::new(),
         _marker: PhantomData {},
     }));
 
+    log_nginx_msgs(nlx, &log);
+
     true
-}
-
-fn safe_ngx_brooks_analyze(
-    path: &str,
-) -> Result<HostMetadata<HostMetadataVerificationKey>, Box<HostMetadataVerificationError>> {
-    let mut ps_contents: Vec<u8> = vec![];
-    let mut ps_file = OpenOptions::new()
-        .read(true)
-        .open(path)
-        .map_err(|e| JsonError(e.to_string()))?;
-
-    ps_file
-        .read_to_end(&mut ps_contents)
-        .map_err(|e| JsonError(e.to_string()))?;
-
-    let ps_source = &String::from_utf8_lossy(&ps_contents);
-
-    let result = serde_json::from_str::<TypedHostMetadata<()>>(ps_source)
-        .map_err(|e| JsonError(e.to_string()))?;
-
-    let types_scope = Scopes::<Type> {
-        scopes: vec![minimal_core_variable_types()],
-    };
-
-    verify_host_metadata(&result.value, types_scope)
 }
 
 #[derive(Debug, Clone)]
@@ -160,6 +118,7 @@ pub enum NginxProxyError {
     TransformError(Box<NginxTransformError>),
     PsInterpretError(Box<PsInterpretError>),
     UpstreamError(String),
+    MissingConfiguration(String),
     ProxyError(String),
     RuntimeError(String),
     BadMemory,
@@ -177,6 +136,9 @@ impl Display for NginxProxyError {
             NginxProxyError::UpstreamError(ue) => write!(f, "Brooks Proxy Error: {ue}"),
             NginxProxyError::ProxyError(pe) => write!(f, "Brooks Proxy Error: {pe}"),
             NginxProxyError::RuntimeError(re) => write!(f, "Brooks Proxy Error: {re}"),
+            NginxProxyError::MissingConfiguration(query) => {
+                write!(f, "Brooks Proxy Error: Missing configuration for {query}")
+            }
             NginxProxyError::BadMemory => {
                 write!(f, "Brooks Proxy Error: Pool memory allocation failed")
             }
@@ -409,7 +371,7 @@ pub unsafe extern "C" fn ngx_brooks_proxy(
             log = error!(log, "Successful proxy");
         }
         Err(e) => {
-            error!(log, &e.to_string());
+            log = error!(log, &e.to_string());
             (*req).headers_out.content_length_n = e.to_string().len() as i64;
             (*req).headers_out.status = 500;
             *body = match to_nginx_buf(&e.to_string().into_bytes(), (*req).pool) {
@@ -436,27 +398,89 @@ unsafe fn do_ngx_brooks_proxy(
     cookie: *mut BrooksC,
     req: *mut ngx_http_request_s,
     body: *mut *mut ngx_buf_s,
-    _log: &mut LogMsgs,
+    log: &mut LogMsgs,
 ) -> Result<(), Box<NginxProxyError>> {
-    let mut log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
-
-    let host_metadata = &(*cookie)._data;
-
     let mut http_req = TryInto::<Request<String>>::try_into(*req)
         .map_err(|e| Box::new(NginxProxyError::TransformError(e)))?;
 
-    let mut processed_http_req = ProcessedRequest {
-        req: &mut http_req,
-        updated_uri: None,
-    };
+    let host = http_req
+        .headers()
+        .get(HOST)
+        .ok_or(NginxProxyError::ProxyError(
+            "Could not get host from request".to_string(),
+        ))?
+        .to_str()
+        .map_err(|e| NginxProxyError::ProxyError(e.to_string()))?;
 
     let runtime = runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| NginxProxyError::RuntimeError(e.to_string()))?;
 
-    let (status, response) =
-        safe_ngx_brooks_proxy(host_metadata, &mut processed_http_req, &runtime, &mut log)?;
+    // First, try to find the query in the cache.
+    *log = debug!(
+        log,
+        &format!("Looking for {host} in the host metadata cache.")
+    );
+
+    let found = match (*cookie).hmds_cache.get(host) {
+        Some((timeout, found)) => {
+            *log = debug!(
+                log,
+                &format!("Found {host} in the host metadata cache -- it is valid until {timeout}.")
+            );
+            if Utc::now() > *timeout {
+                *log = debug!(
+                    log,
+                    &format!("{host} in the host metadata cache timed out.")
+                );
+                (*cookie).hmds_cache.remove(host);
+                None
+            } else {
+                Some(found.clone())
+            }
+        }
+        None => None,
+    };
+
+    let found = match found {
+        Some(found) => found,
+        None => {
+            let (expiry, query_result) = match runtime
+                .block_on(query_hmds(host, &(*cookie).hmds_path))
+                .map_err(|e| NginxProxyError::ProxyError(e.to_string()))?
+            {
+                Some((timeout, query_result)) => (timeout, query_result),
+                None => return Err(NginxProxyError::MissingConfiguration(host.to_string()).into()),
+            };
+
+            let metadata = serde_json::from_value::<TypedHostMetadata<()>>(query_result)
+                .map_err(|e| NginxProxyError::ProxyError(e.to_string()))?;
+
+            let types_scope = Scopes::<Type> {
+                scopes: vec![minimal_core_variable_types()],
+            };
+            let found = verify_host_metadata(&metadata.value, types_scope)
+                .map_err(|e| NginxProxyError::ProxyError(e.to_string()))?;
+
+            *log = debug!(
+                log,
+                &format!("Put {host} in the host metadata cache to expire at {expiry}.")
+            );
+            (*cookie)
+                .hmds_cache
+                .insert(host.to_string(), (expiry, found.clone()));
+
+            found
+        }
+    };
+
+    let mut processed_http_req = ProcessedRequest {
+        req: &mut http_req,
+        updated_uri: None,
+    };
+
+    let (status, response) = safe_ngx_brooks_proxy(&found, &mut processed_http_req, &runtime, log)?;
 
     try_from_response(&response, status, req).map_err(NginxProxyError::TransformError)?;
 
@@ -468,15 +492,13 @@ unsafe fn do_ngx_brooks_proxy(
 
     (*req).headers_out.content_length_n = result_body.len() as i64;
 
-    log_nginx_msgs((*(*req).connection).log, &log);
-
     Ok(())
 }
 
 fn safe_ngx_brooks_proxy(
     hmd: &HostMetadata<HostMetadataVerificationKey>,
     processed_http_req: &mut ProcessedRequest,
-    runtime: &Runtime,
+    runtime: &tokio::runtime::Runtime,
     log: &mut LogMsgs,
 ) -> Result<(StatusCode, Response), Box<NginxProxyError>> {
     // For any of the host metadata entries that are client requests,
@@ -594,101 +616,4 @@ fn safe_ngx_brooks_proxy(
     }
 
     Ok((processed_http_res.status(), result))
-}
-
-#[cfg(test)]
-mod nginx_proxy_tests {
-    use std::str::FromStr;
-
-    use http::{StatusCode, Uri};
-    use tokio::runtime;
-
-    use crate::{
-        integrations::nginx::nginx_proxy::{
-            ProcessedRequest, safe_ngx_brooks_analyze, safe_ngx_brooks_proxy,
-        },
-        logging::LogMsgs,
-    };
-
-    #[test]
-    fn maximal_test() {
-        let analyzed_hmd = safe_ngx_brooks_analyze("./src/integrations/nginx/tests/all.json")
-            .expect("Could not analyze correct HostMetadata");
-
-        let mut req = http::Request::get(
-            Uri::from_str("http://www.google.com/").expect("Could not make Google into URL"),
-        )
-        .body("".to_string())
-        .expect("Could not make request for Google");
-
-        let mut processed_http_req = ProcessedRequest {
-            req: &mut req,
-            updated_uri: None,
-        };
-
-        let runtime = runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("Could not get runtime");
-
-        let mut log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
-
-        let (status, response) =
-            safe_ngx_brooks_proxy(&analyzed_hmd, &mut processed_http_req, &runtime, &mut log)
-                .expect("Could not process valid host metadata");
-
-        assert_eq!(response.url().to_string(), "http://www.example.com/");
-
-        assert_eq!(status, StatusCode::OK);
-
-        assert!(
-            !req.headers()
-                .iter()
-                .any(|f| { f.0.as_str() == "delete-me" })
-        );
-
-        assert!(
-            req.headers()
-                .iter()
-                .any(|f| { f.0.as_str() == "request-is-new-expr" })
-        );
-
-        assert!(
-            !req.headers()
-                .iter()
-                .any(|f| { f.0.as_str() == "origin-request-is-new-expr" })
-        );
-
-        assert!(req.headers().iter().any(|f| {
-            f.0.as_str() == "overwritable"
-                && f.1
-                    .to_str()
-                    .expect("Could not convert header value to string")
-                    == "origin-request"
-        }));
-
-        assert!(response.headers().iter().any(|f| {
-            f.0.as_str() == "overwritable"
-                && f.1
-                    .to_str()
-                    .expect("Could not convert header value to string")
-                    == "overwritten"
-        }));
-
-        assert!(response.headers().iter().any(|f| {
-            f.0.as_str() == "response-is-new-expr"
-                && f.1
-                    .to_str()
-                    .expect("Could not convert header value to string")
-                    == "/"
-        }));
-
-        assert!(response.headers().iter().any(|f| {
-            f.0.as_str() == "response-is-new"
-                && f.1
-                    .to_str()
-                    .expect("Could not convert header value to string")
-                    == "something"
-        }));
-    }
 }

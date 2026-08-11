@@ -256,7 +256,6 @@ static char *ngx_http_brooks_enable(ngx_conf_t *cf, ngx_command_t *cmd,
   ngx_str_t *value;
   value = cf->args->elts;
   rlcf->path = value[1];
-  u_char pathstr[NGX_MAX_PATH] = {0, };
 
 	if (rlcf->path.len >= NGX_MAX_PATH) {
     ngx_log_error(
@@ -265,9 +264,7 @@ static char *ngx_http_brooks_enable(ngx_conf_t *cf, ngx_command_t *cmd,
     return NGX_CONF_ERROR;
 	}
 
-	ngx_memcpy(pathstr, rlcf->path.data, rlcf->path.len);
-
-	if (!ngx_brooks_analyze((const char*)pathstr, &rlcf->bc, cf->log)) {
+	if (!ngx_brooks_configure(&rlcf->bc, rlcf->path, cf->log)) {
     ngx_log_error(
         NGX_LOG_CRIT, cf->log, 0,
         "brooks: path to processing stages JSON document could not be verified");

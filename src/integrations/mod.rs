@@ -18,3 +18,6 @@
 #[allow(dead_code)]
 #[cfg(feature = "nginx")]
 pub mod nginx;
+
+#[cfg(feature = "hmds")]
+pub mod hmds;

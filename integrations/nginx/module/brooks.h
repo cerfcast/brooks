@@ -27,7 +27,7 @@ struct BrooksC;
 int ngx_brooks_proxy(struct BrooksC *context, ngx_http_request_t *req, ngx_buf_t **res_body);
 
 /**
- * Analyze (parse/verify) a processing stages document.
+ * Configure the brooks library.
  */
-bool ngx_brooks_analyze(const char *path, struct BrooksC **, ngx_log_t *log);
+bool ngx_brooks_configure(struct BrooksC **, ngx_str_t path, ngx_log_t *log);
 #endif
