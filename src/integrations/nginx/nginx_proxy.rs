@@ -518,13 +518,10 @@ fn safe_ngx_brooks_proxy(
         if let Some(stge) = &stage.aug.stage
             && TypedStageTypes::ClientRequest == stge.into()
         {
-            let result = interpret_stage(stge, processed_http_req, PsInterpretMode::Request)
+            interpret_stage(stge, processed_http_req, PsInterpretMode::Request)
                 .map_err(|e| Box::new(NginxProxyError::PsInterpretError(e)))?;
 
-            if let PsInterpretValue::SyntheticResponse(_sr) = result {
-                *log = debug!(log, "Got a synthetic response");
-                todo!("Handle Synthetic Responses")
-            }
+            // There are no synthetic responses at this stage.
         }
     }
 
@@ -540,13 +537,10 @@ fn safe_ngx_brooks_proxy(
         if let Some(stge) = &stage.aug.stage
             && TypedStageTypes::OriginRequest == stge.into()
         {
-            let result = interpret_stage(stge, processed_http_req, PsInterpretMode::Request)
+            interpret_stage(stge, processed_http_req, PsInterpretMode::Request)
                 .map_err(NginxProxyError::PsInterpretError)?;
 
-            if let PsInterpretValue::SyntheticResponse(_sr) = result {
-                *log = debug!(log, "Got a synthetic response");
-                todo!("Handle Synthetic Responses")
-            }
+            // There are no synthetic responses at this stage.
         }
     }
 
@@ -594,9 +588,15 @@ fn safe_ngx_brooks_proxy(
             let result = interpret_stage(stge, &mut processed_http_res, PsInterpretMode::Response)
                 .map_err(NginxProxyError::PsInterpretError)?;
 
-            if let PsInterpretValue::SyntheticResponse(_sr) = result {
-                *log = debug!(log, "Got a synthetic response");
-                todo!("Handle Synthetic Responses")
+            if let PsInterpretValue::SyntheticResponse(sr) = result {
+                *log = debug!(
+                    log,
+                    "Got a synthetic response from an origin response stage."
+                );
+                return Ok((
+                    processed_http_res.status(),
+                    sr.clone().map(reqwest::Body::from).into(),
+                ));
             }
         }
     }
@@ -618,9 +618,15 @@ fn safe_ngx_brooks_proxy(
             let result = interpret_stage(stge, &mut processed_http_res, PsInterpretMode::Response)
                 .map_err(NginxProxyError::PsInterpretError)?;
 
-            if let PsInterpretValue::SyntheticResponse(_sr) = result {
-                *log = debug!(log, "Got a synthetic response");
-                todo!("Handle Synthetic Responses")
+            if let PsInterpretValue::SyntheticResponse(sr) = result {
+                *log = debug!(
+                    log,
+                    "Got a synthetic response from an client response stage."
+                );
+                return Ok((
+                    processed_http_res.status(),
+                    sr.clone().map(reqwest::Body::from).into(),
+                ));
             }
         }
     }
