@@ -80,6 +80,7 @@ pub trait ProcessableRequestResponse: Debug {
         header: &str,
         value: &str,
     ) -> ProcessableRequestResponseResult<()>;
+    fn clear_headers(&mut self) -> ProcessableRequestResponseResult<()>;
     fn remove_header(&mut self, header: &str) -> ProcessableRequestResponseResult<()>;
     fn add_header(&mut self, header: &str, value: &str) -> ProcessableRequestResponseResult<()>;
 
@@ -801,6 +802,7 @@ pub fn interpret_stage(
 enum EffectfulRequestActions {
     DeleteHeader(String),
     AddHeader(String, String),
+    ClearHeaders,
     SetUri(String),
     SetResponse(u16),
 }
@@ -824,6 +826,11 @@ impl ProcessableRequestResponse for EffectfulProcessableRequestResponse {
         _header: &str,
         _value: &str,
     ) -> Result<(), ProcessableRequestResponseError> {
+        Ok(())
+    }
+
+    fn clear_headers(&mut self) -> ProcessableRequestResponseResult<()> {
+        self.log.push(EffectfulRequestActions::ClearHeaders);
         Ok(())
     }
 

@@ -286,6 +286,11 @@ impl<'a> ProcessableRequestResponse for ProcessedResponse<'a> {
         self.new_status = Some(StatusCode::from_u16(*response).map_err(|_| BadValue)?);
         Ok(())
     }
+
+    fn clear_headers(&mut self) -> ProcessableRequestResponseResult<()> {
+        self.res.headers_mut().clear();
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -348,6 +353,11 @@ impl<'a> ProcessableRequestResponse for ProcessedRequest<'a> {
 
     fn set_response(&mut self, _response: &u16) -> ProcessableRequestResponseResult<()> {
         Err(InvalidMode)
+    }
+
+    fn clear_headers(&mut self) -> ProcessableRequestResponseResult<()> {
+        self.req.headers_mut().clear();
+        Ok(())
     }
 }
 
