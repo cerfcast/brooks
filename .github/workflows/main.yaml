@@ -35,6 +35,32 @@ jobs:
       - run: cargo build
       - run: cargo test
       - run: cargo test --manifest-path parser/Cargo.toml
+  library-integration-caddy-build:
+    name: Library Integration - Caddy Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: tree-sitter/setup-action@v2
+      # Because our tree-sitter code is in a subdirectory,
+      # and working-directory does not apply to uses, we
+      # are forced to specify calls to the CI ourselves.
+      # See https://github.com/orgs/community/discussions/25742
+      - run: tree-sitter generate
+        working-directory: ./parser
+      - run: cargo build -F caddy
+  library-integration-nginx-build:
+    name: Library Integration - Nginx Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: tree-sitter/setup-action@v2
+      # Because our tree-sitter code is in a subdirectory,
+      # and working-directory does not apply to uses, we
+      # are forced to specify calls to the CI ourselves.
+      # See https://github.com/orgs/community/discussions/25742
+      - run: tree-sitter generate
+        working-directory: ./parser
+      - run: cargo build -F nginx
   library-format-tests:
     name: Library Format Tests
     runs-on: ubuntu-latest
