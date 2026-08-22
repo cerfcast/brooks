@@ -24,3 +24,12 @@ pub unsafe fn to_null_terminated_str(s: &str) -> Vec<u8> {
 
     res
 }
+
+#[allow(unused_macros)]
+macro_rules! c_str_literal {
+    ($lit:expr) => {
+        CStr::from_bytes_with_nul(concat!($lit, "\0").as_bytes())
+            .expect("Could not create c string from literal")
+            .as_ptr()
+    };
+}

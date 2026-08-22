@@ -24,8 +24,8 @@ pub mod nginx;
 pub mod caddy;
 
 #[cfg(feature = "hmds")]
-pub mod hmds;
-#[cfg(feature = "hmds")]
 pub mod common;
+#[cfg(feature = "hmds")]
+pub mod hmds;
 #[cfg(feature = "hmds")]
 pub mod support;
