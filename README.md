@@ -43,18 +43,33 @@ let us know which web servers to prioritize integrating, please open an [issue](
 ##### Nginx
 
 Brooks can be built with support for exposing the Processing Stages interpreter to nginx. Select the `nginx`
-feature when importing this library to select that feature. When the nginx feature is enabled, the library will
-configure your environment for building an nginx module that uses brooks to handle HTTP requests/responses
+feature when importing this library to select that feature. When the `nginx` feature is enabled, the library will
+configure your environment for building an Nginx module that uses brooks to handle HTTP requests/responses
 according to [`HostMetadata`](https://datatracker.ietf.org/doc/html/rfc8006). To do that, the library will
 
-1. clone the nginx source code into the library's `nginx/nginx` directory.
-1. configure the nginx build system
-    - to build the brooks nginx module, and
-    - to install the built nginx binary into `nginx/install`.
+1. clone the Nginx source code into the library's `nginx/nginx` directory.
+1. configure the Nginx build system
+    - to build the brooks Nginx module, and
+    - to install the built `nginx` binary into `nginx/install`.
 
-The brooks nginx module source code is in `nginx/module`.
+The brooks Nginx module source code is in `integrations/nginx/module`.
 
 Additional documentation for this feature is coming soon and will be located in the [`./integrations/nginx/module`](./integrations/nginx/module/) directory.
+
+##### Caddy
+
+Brooks can be built with support for exposing the Processing Stages interpreter to Caddy. Select the `caddy`
+feature when importing this library to select that feature. When the `caddy` feature is enabled, the library will
+configure your environment for building a version of Caddy that contains a module so that it will use brooks to
+handle HTTP requests/responses according to [`HostMetadata`](https://datatracker.ietf.org/doc/html/rfc8006).
+To do that, the library will
+
+1. build some "shim" shared libraries (to solve the chicken/egg build problem between the Caddy module and the Brooks Library).
+1. use go's build system (and package manager) to build a version of Caddy with the module builtin.
+
+The brooks Caddy module source code is in `integrations/caddy/module`.
+
+Additional documentation for this feature is coming soon and will be located in the [`./integrations/caddy/module`](./integrations/caddy/module/) directory.
 
 ### Documentation
 
