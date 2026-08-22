@@ -15,8 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::common::GrammarLocation;
 use std::fmt::Debug;
+
+use crate::common::GrammarLocation;
 
 #[cfg(feature = "json")]
 use serde::Serialize;
@@ -42,8 +43,7 @@ impl Formatter<LogMsg> for LogMsgFormatter {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, PartialOrd)]
-#[cfg(feature = "json")]
-#[derive(Serialize)]
+#[cfg_attr(feature = "json", derive(Serialize))]
 pub enum LogLevel {
     Trace,
     Debug,
@@ -53,8 +53,7 @@ pub enum LogLevel {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg(feature = "json")]
-#[derive(Serialize)]
+#[cfg_attr(feature = "json", derive(Serialize))]
 pub struct LogMsg {
     msg: String,
     location: Option<GrammarLocation>,
@@ -92,8 +91,7 @@ impl LogMsg {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg(feature = "json")]
-#[derive(Serialize)]
+#[cfg_attr(feature = "json", derive(Serialize))]
 pub struct LogMsgs {
     msgs: Vec<LogMsg>,
     level: LogLevel,

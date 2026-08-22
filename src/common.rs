@@ -21,8 +21,7 @@ use std::fmt::Display;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Default, PartialEq)]
-#[cfg(feature = "json")]
-#[derive(Serialize)]
+#[cfg_attr(feature = "json", derive(Serialize))]
 pub struct GrammarLocation {
     pub start: usize,
     pub extent: usize,
