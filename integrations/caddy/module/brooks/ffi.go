@@ -65,7 +65,7 @@ func (blc *BrooksLibConfiguration) ServeHTTP(req *http.Request, caddylogger *zap
 
 	defer bl.LogToZap(caddylogger)
 
-	if C.caddy_brooks_proxy(blc.Cookie, C.brooks_caddy_request_builder_finalize_with_body(request, nil), unsafe.Pointer(reqres), unsafe.Pointer(bl)) != 0 {
+	if C.brooks_caddy_proxy(blc.Cookie, C.brooks_caddy_request_builder_finalize_with_body(request, nil), unsafe.Pointer(reqres), unsafe.Pointer(bl)) != 0 {
 		return nil, fmt.Errorf("Did not proxy")
 	}
 	return res, nil

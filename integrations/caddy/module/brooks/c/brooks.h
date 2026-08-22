@@ -36,7 +36,7 @@ struct BrooksCaddyRequest *brooks_caddy_request_builder_finalize_with_body(struc
  * used to proxy \a req.
  * @param req_res The request/response to proxy.
  */
-int caddy_brooks_proxy(struct BrooksC *context, struct BrooksCaddyRequest *request, void *request_response_ffi, void *logger);
+int brooks_caddy_proxy(struct BrooksC *context, struct BrooksCaddyRequest *request, void *request_response_ffi, void *logger);
 
 typedef int (*caddy_brooks_result_user)(void *cookie, void *value);
 typedef int (*caddy_brooks_result_user2)(void *cookie, void *value1, void *value2);

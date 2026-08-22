@@ -3,7 +3,7 @@
 
 #include "brooks.h"
 
-int caddy_brooks_proxy(struct BrooksC *context, struct BrooksCaddyRequest *request, void *request_response_ffi, void *logger) {
+int brooks_caddy_proxy(struct BrooksC *context, struct BrooksCaddyRequest *request, void *request_response_ffi, void *logger) {
     return 0;
 }
 
