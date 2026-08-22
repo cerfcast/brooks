@@ -25,7 +25,7 @@ chrono = { version = "0.4.45", features = ["serde"] }
 
 [features]
 json = []
-hmds = ["dep:tokio"]
+hmds = ["dep:tokio", "dep:reqwest"]
 nginx = ["hmds", "dep:reqwest", "dep:tokio"]
 caddy = ["hmds", "dep:reqwest", "dep:tokio"]
 
