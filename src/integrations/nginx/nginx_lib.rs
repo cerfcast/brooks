@@ -16,9 +16,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    integrations::nginx::{
-        nginx_proxy::NginxTransformError, ngx_buf_s, ngx_log_error_core, ngx_log_s, ngx_pcalloc,
-        ngx_pool_s, ngx_str_t,
+    integrations::{
+        common::BrooksIntegrationTransformError,
+        nginx::{ngx_buf_s, ngx_log_error_core, ngx_log_s, ngx_pcalloc, ngx_pool_s, ngx_str_t},
     },
     logging::{LogLevel, LogMsgs},
 };
@@ -68,9 +68,11 @@ pub(crate) unsafe fn copy_to_pool(s: &[u8], pool: *mut ngx_pool_s) -> (*mut u8, 
 pub(crate) unsafe fn to_nginx_buf(
     s: &[u8],
     pool: *mut ngx_pool_s,
-) -> Result<*mut ngx_buf_s, Box<NginxTransformError>> {
+) -> Result<*mut ngx_buf_s, Box<BrooksIntegrationTransformError>> {
     let buf = ngx_pcalloc(pool, size_of::<ngx_buf_s>()) as *mut ngx_buf_s;
-    let buf = buf.as_mut().ok_or(NginxTransformError::BadMemory)?;
+    let buf = buf
+        .as_mut()
+        .ok_or(BrooksIntegrationTransformError::BadMemory)?;
 
     // Say that it is a memory buffer.
     buf.set_memory(1);

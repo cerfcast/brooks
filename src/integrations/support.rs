@@ -15,17 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[allow(dead_code)]
-#[cfg(feature = "nginx")]
-pub mod nginx;
+#[allow(clippy::missing_safety_doc)]
+pub unsafe fn to_null_terminated_str(s: &str) -> Vec<u8> {
+    let mut res = vec![0u8; s.len() + 1];
+    for (idx, l) in s.as_bytes().iter().enumerate() {
+        res[idx] = *l;
+    }
 
-#[allow(dead_code)]
-#[cfg(feature = "caddy")]
-pub mod caddy;
-
-#[cfg(feature = "hmds")]
-pub mod hmds;
-#[cfg(feature = "hmds")]
-pub mod common;
-#[cfg(feature = "hmds")]
-pub mod support;
+    res
+}
