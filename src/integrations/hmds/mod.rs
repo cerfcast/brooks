@@ -15,7 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    io,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -41,6 +45,7 @@ pub struct HmdsConfiguration {
 #[derive(Serialize, Deserialize)]
 pub struct ExpirableJsonValue {
     pub expiry: DateTime<Utc>,
+    pub host: String,
     pub value: Value,
 }
 
