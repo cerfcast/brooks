@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{io, path::Path};
+use std::{collections::HashMap, io, path::{Path, PathBuf}};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -24,6 +24,19 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
 };
+
+use crate::cdni::{spec::HostMetadata, verify::HostMetadataVerificationKey};
+
+pub struct HmdsConfiguration {
+    pub(crate) hmds_path: PathBuf,
+    pub(crate) hmds_cache: HashMap<
+        String,
+        (
+            chrono::DateTime<Utc>,
+            HostMetadata<HostMetadataVerificationKey>,
+        ),
+    >,
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct ExpirableJsonValue {

@@ -17,14 +17,22 @@
 
 use std::{fmt::Display, str::FromStr};
 
-use http::{HeaderName, HeaderValue, Request, StatusCode, Uri};
+use chrono::Utc;
+use http::{HeaderName, HeaderValue, Request, StatusCode, Uri, header::HOST};
 use reqwest::Url;
+use tokio::runtime::Runtime;
 
 use crate::{
-    cdni::{spec::HostMetadata, verify::HostMetadataVerificationKey},
-    logging::LogLevel,
-    logging::LogMsg,
-    logging::LogMsgs,
+    cdni::{
+        spec::{HostMetadata, TypedHostMetadata},
+        verify::{HostMetadataVerificationKey, verify_host_metadata},
+    },
+    integrations::hmds::{HmdsConfiguration, query_hmds},
+    logging::{LogLevel, LogMsg, LogMsgs},
+    mel::{
+        scope::{Scopes, minimal_core_variable_types},
+        tvs::Type,
+    },
     ps::{
         interpret::{
             ProcessableRequestResponse,
@@ -221,16 +229,21 @@ impl Display for BrooksIntegrationsProxyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BrooksIntegrationsProxyError::TransformError(nginx_transform_error) => {
-                write!(f, "Brooks Proxy Error: {nginx_transform_error}")
+                write!(
+                    f,
+                    "Brooks Proxy Error: Transformation error: {nginx_transform_error}"
+                )
             }
             BrooksIntegrationsProxyError::PsInterpretError(ps_interpret_error) => {
                 write!(f, "Brooks Proxy Error: {ps_interpret_error}")
             }
             BrooksIntegrationsProxyError::UpstreamError(ue) => {
-                write!(f, "Brooks Proxy Error: {ue}")
+                write!(f, "Brooks Proxy Error: Upstream error: {ue}")
             }
             BrooksIntegrationsProxyError::ProxyError(pe) => write!(f, "Brooks Proxy Error: {pe}"),
-            BrooksIntegrationsProxyError::RuntimeError(re) => write!(f, "Brooks Proxy Error: {re}"),
+            BrooksIntegrationsProxyError::RuntimeError(re) => {
+                write!(f, "Brooks Proxy Error: Runtime error: {re}")
+            }
             BrooksIntegrationsProxyError::MissingConfiguration(query) => {
                 write!(f, "Brooks Proxy Error: Missing configuration for {query}")
             }
@@ -240,6 +253,93 @@ impl Display for BrooksIntegrationsProxyError {
         }
     }
 }
+
+pub(crate) fn safe_brooks_integration_handle(
+    request: &mut Request<String>,
+    hmds_config: &mut HmdsConfiguration,
+    runtime: &Runtime,
+    log: &mut LogMsgs,
+) -> Result<(StatusCode, reqwest::Response), Box<BrooksIntegrationsProxyError>> {
+    let host = request
+        .headers()
+        .get(HOST)
+        .ok_or(BrooksIntegrationsProxyError::ProxyError(
+            "Could not get host from request".to_string(),
+        ))?
+        .to_str()
+        .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
+
+    // First, try to find the query in the cache.
+    *log = debug!(
+        log,
+        &format!("Looking for {host} in the host metadata cache.")
+    );
+
+    let found = match hmds_config.hmds_cache.get(host) {
+        Some((timeout, found)) => {
+            *log = debug!(
+                log,
+                &format!("Found {host} in the host metadata cache -- it is valid until {timeout}.")
+            );
+            if Utc::now() > *timeout {
+                *log = debug!(
+                    log,
+                    &format!("{host} in the host metadata cache timed out.")
+                );
+                hmds_config.hmds_cache.remove(host);
+                None
+            } else {
+                Some(found.clone())
+            }
+        }
+        None => None,
+    };
+
+    let found = match found {
+        Some(found) => found,
+        None => {
+            let (expiry, query_result) = match runtime
+                .block_on(query_hmds(host, &hmds_config.hmds_path))
+                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?
+            {
+                Some((timeout, query_result)) => (timeout, query_result),
+                None => {
+                    return Err(BrooksIntegrationsProxyError::MissingConfiguration(
+                        host.to_string(),
+                    )
+                    .into());
+                }
+            };
+
+            let metadata = serde_json::from_value::<TypedHostMetadata<()>>(query_result)
+                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
+
+            let types_scope = Scopes::<Type> {
+                scopes: vec![minimal_core_variable_types()],
+            };
+            let found = verify_host_metadata(&metadata.value, types_scope)
+                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
+
+            *log = debug!(
+                log,
+                &format!("Put {host} in the host metadata cache to expire at {expiry}.")
+            );
+            hmds_config
+                .hmds_cache
+                .insert(host.to_string(), (expiry, found.clone()));
+
+            found
+        }
+    };
+
+    let mut processed_http_req = ProcessedRequest {
+        req: request,
+        updated_uri: None,
+    };
+
+    safe_brooks_integrations_proxy(&found, &mut processed_http_req, runtime, log)
+}
+
 pub(crate) fn safe_brooks_integrations_proxy(
     hmd: &HostMetadata<HostMetadataVerificationKey>,
     processed_http_req: &mut ProcessedRequest,

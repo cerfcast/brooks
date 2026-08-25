@@ -37,9 +37,9 @@ use crate::{
         },
         common::{
             BrooksIntegrationTransformError, BrooksIntegrationsProxyError, ProcessedRequest,
-            safe_brooks_integrations_proxy,
+            safe_brooks_integration_handle, safe_brooks_integrations_proxy,
         },
-        hmds::query_hmds,
+        hmds::{HmdsConfiguration, query_hmds},
         support::to_null_terminated_str,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
@@ -88,8 +88,10 @@ pub unsafe extern "C" fn caddy_brooks_configure(
     }
 
     *cookie = Box::into_raw(Box::new(BrooksCaddyConfiguration {
-        hmds_path: path,
-        hmds_cache: Default::default(),
+        hmds: HmdsConfiguration {
+            hmds_path: path,
+            hmds_cache: Default::default(),
+        },
         _marker: PhantomData {},
     }));
 
@@ -160,90 +162,13 @@ unsafe fn do_brooks_caddy_proxy(
 ) -> Result<(), Box<BrooksIntegrationsProxyError>> {
     let mut http_req = Box::from_raw(req as *mut BrooksCaddyRequest).request;
 
-    let host = http_req
-        .headers()
-        .get(HOST)
-        .ok_or(BrooksIntegrationsProxyError::ProxyError(
-            "Could not get host from request".to_string(),
-        ))?
-        .to_str()
-        .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
-
     let runtime = runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| BrooksIntegrationsProxyError::RuntimeError(e.to_string()))?;
 
-    // First, try to find the query in the cache.
-    *log = debug!(
-        log,
-        &format!("Looking for {host} in the host metadata cache.")
-    );
-
-    let found = match (*cookie).hmds_cache.get(host) {
-        Some((timeout, found)) => {
-            *log = debug!(
-                log,
-                &format!("Found {host} in the host metadata cache -- it is valid until {timeout}.")
-            );
-            if Utc::now() > *timeout {
-                *log = debug!(
-                    log,
-                    &format!("{host} in the host metadata cache timed out.")
-                );
-                (*cookie).hmds_cache.remove(host);
-                None
-            } else {
-                Some(found.clone())
-            }
-        }
-        None => None,
-    };
-
-    let found = match found {
-        Some(found) => found,
-        None => {
-            let (expiry, query_result) = match runtime
-                .block_on(query_hmds(host, &(*cookie).hmds_path))
-                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?
-            {
-                Some((timeout, query_result)) => (timeout, query_result),
-                None => {
-                    return Err(BrooksIntegrationsProxyError::MissingConfiguration(
-                        host.to_string(),
-                    )
-                    .into());
-                }
-            };
-
-            let metadata = serde_json::from_value::<TypedHostMetadata<()>>(query_result)
-                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
-
-            let types_scope = Scopes::<Type> {
-                scopes: vec![minimal_core_variable_types()],
-            };
-            let found = verify_host_metadata(&metadata.value, types_scope)
-                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
-
-            *log = debug!(
-                log,
-                &format!("Put {host} in the host metadata cache to expire at {expiry}.")
-            );
-            (*cookie)
-                .hmds_cache
-                .insert(host.to_string(), (expiry, found.clone()));
-
-            found
-        }
-    };
-
-    let mut processed_http_req = ProcessedRequest {
-        req: &mut http_req,
-        updated_uri: None,
-    };
-
     let (status, response) =
-        safe_brooks_integrations_proxy(&found, &mut processed_http_req, &runtime, log)?;
+        safe_brooks_integration_handle(&mut http_req, &mut (*cookie).hmds, &runtime, log)?;
 
     try_from_response(&response, status, res)
         .map_err(BrooksIntegrationsProxyError::TransformError)?;

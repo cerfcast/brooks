@@ -17,45 +17,29 @@
 
 use std::{collections::HashMap, marker::PhantomData, path::PathBuf, ptr::null, str::FromStr};
 
-use chrono::Utc;
-use http::{HeaderName, HeaderValue, Method, Request, StatusCode, Uri, header::HOST};
+use http::{HeaderName, HeaderValue, Method, Request, StatusCode, Uri};
 use libc::intptr_t;
 use reqwest::Response;
 use tokio::runtime;
 
 use crate::{
-    cdni::{
-        spec::{HostMetadata, TypedHostMetadata},
-        verify::{HostMetadataVerificationKey, verify_host_metadata},
-    },
     integrations::{
         common::{
-            BrooksIntegrationTransformError, BrooksIntegrationsProxyError, ProcessedRequest,
-            safe_brooks_integrations_proxy,
+            BrooksIntegrationTransformError, BrooksIntegrationsProxyError,
+            safe_brooks_integration_handle,
         },
-        hmds::query_hmds,
+        hmds::HmdsConfiguration,
         nginx::{
             nginx_lib::{from_nginx_str, log_nginx_msgs, to_nginx_buf, to_nginx_str},
             ngx_buf_s, ngx_http_request_s, ngx_list_push, ngx_log_s, ngx_str_t, ngx_table_elt_s,
         },
     },
     logging::{LogLevel, LogMsg, LogMsgs},
-    mel::{
-        scope::{Scopes, minimal_core_variable_types},
-        tvs::Type,
-    },
 };
 
 #[repr(C)]
 pub struct NginxBrooksConfiguration {
-    hmds_path: PathBuf,
-    hmds_cache: HashMap<
-        String,
-        (
-            chrono::DateTime<Utc>,
-            HostMetadata<HostMetadataVerificationKey>,
-        ),
-    >,
+    hmds: HmdsConfiguration,
     _marker: core::marker::PhantomData<*mut u8>,
 }
 
@@ -69,8 +53,10 @@ pub unsafe extern "C" fn ngx_brooks_configure(
     let log = LogMsgs::new_with_prefix("brooks analysis", crate::logging::LogLevel::Debug);
 
     *cookie = Box::into_raw(Box::new(NginxBrooksConfiguration {
-        hmds_path: PathBuf::from(from_nginx_str(hmds_path)),
-        hmds_cache: HashMap::new(),
+        hmds: HmdsConfiguration {
+            hmds_path: PathBuf::from(from_nginx_str(hmds_path)),
+            hmds_cache: HashMap::new(),
+        },
         _marker: PhantomData {},
     }));
 
@@ -211,90 +197,13 @@ unsafe fn do_ngx_brooks_proxy(
     let mut http_req = TryInto::<Request<String>>::try_into(*req)
         .map_err(|e| Box::new(BrooksIntegrationsProxyError::TransformError(e)))?;
 
-    let host = http_req
-        .headers()
-        .get(HOST)
-        .ok_or(BrooksIntegrationsProxyError::ProxyError(
-            "Could not get host from request".to_string(),
-        ))?
-        .to_str()
-        .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
-
     let runtime = runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| BrooksIntegrationsProxyError::RuntimeError(e.to_string()))?;
 
-    // First, try to find the query in the cache.
-    *log = debug!(
-        log,
-        &format!("Looking for {host} in the host metadata cache.")
-    );
-
-    let found = match (*cookie).hmds_cache.get(host) {
-        Some((timeout, found)) => {
-            *log = debug!(
-                log,
-                &format!("Found {host} in the host metadata cache -- it is valid until {timeout}.")
-            );
-            if Utc::now() > *timeout {
-                *log = debug!(
-                    log,
-                    &format!("{host} in the host metadata cache timed out.")
-                );
-                (*cookie).hmds_cache.remove(host);
-                None
-            } else {
-                Some(found.clone())
-            }
-        }
-        None => None,
-    };
-
-    let found = match found {
-        Some(found) => found,
-        None => {
-            let (expiry, query_result) = match runtime
-                .block_on(query_hmds(host, &(*cookie).hmds_path))
-                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?
-            {
-                Some((timeout, query_result)) => (timeout, query_result),
-                None => {
-                    return Err(BrooksIntegrationsProxyError::MissingConfiguration(
-                        host.to_string(),
-                    )
-                    .into());
-                }
-            };
-
-            let metadata = serde_json::from_value::<TypedHostMetadata<()>>(query_result)
-                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
-
-            let types_scope = Scopes::<Type> {
-                scopes: vec![minimal_core_variable_types()],
-            };
-            let found = verify_host_metadata(&metadata.value, types_scope)
-                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
-
-            *log = debug!(
-                log,
-                &format!("Put {host} in the host metadata cache to expire at {expiry}.")
-            );
-            (*cookie)
-                .hmds_cache
-                .insert(host.to_string(), (expiry, found.clone()));
-
-            found
-        }
-    };
-
-    let mut processed_http_req = ProcessedRequest {
-        req: &mut http_req,
-        updated_uri: None,
-    };
-
     let (status, response) =
-        safe_brooks_integrations_proxy(&found, &mut processed_http_req, &runtime, log)?;
+        safe_brooks_integration_handle(&mut http_req, &mut (*cookie).hmds, &runtime, log)?;
 
     try_from_response(&response, status, req)
         .map_err(BrooksIntegrationsProxyError::TransformError)?;
@@ -306,7 +215,8 @@ unsafe fn do_ngx_brooks_proxy(
     *body = to_nginx_buf(&result_body, (*req).pool)
         .map_err(BrooksIntegrationsProxyError::TransformError)?;
 
-    (*req).headers_out.content_length_n = result_body.len() as i64;
+    // Indicate that the response should use chunked encoding.
+    (*req).headers_out.content_length_n = -1;
 
     Ok(())
 }

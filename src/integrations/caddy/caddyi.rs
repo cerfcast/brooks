@@ -31,20 +31,13 @@ use http::{
 
 use crate::{
     cdni::{spec::HostMetadata, verify::HostMetadataVerificationKey},
-    integrations::{caddy::caddy_log, support::to_null_terminated_str},
+    integrations::{caddy::caddy_log, hmds::HmdsConfiguration, support::to_null_terminated_str},
     logging::{LogLevel, LogMsgs},
 };
 
 #[repr(C)]
 pub struct BrooksCaddyConfiguration {
-    pub(crate) hmds_path: PathBuf,
-    pub(crate) hmds_cache: HashMap<
-        String,
-        (
-            chrono::DateTime<Utc>,
-            HostMetadata<HostMetadataVerificationKey>,
-        ),
-    >,
+    pub(crate) hmds: HmdsConfiguration,
     pub(crate) _marker: core::marker::PhantomData<*mut u8>,
 }
 
