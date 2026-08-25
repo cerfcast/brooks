@@ -16,21 +16,17 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashMap,
     ffi::{CStr, c_char, c_void},
-    path::PathBuf,
     ptr::null,
     str::FromStr,
 };
 
-use chrono::Utc;
 use http::{
     HeaderName, HeaderValue, Method, Request, Response, Uri, header::HOST,
     request::Builder as RequestBuilder, response::Builder as ResponseBuilder,
 };
 
 use crate::{
-    cdni::{spec::HostMetadata, verify::HostMetadataVerificationKey},
     integrations::{caddy::caddy_log, hmds::HmdsConfiguration, support::to_null_terminated_str},
     logging::{LogLevel, LogMsgs},
 };

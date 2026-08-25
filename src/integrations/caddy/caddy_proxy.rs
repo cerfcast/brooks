@@ -22,31 +22,25 @@ use std::{
     path::PathBuf,
 };
 
-use chrono::Utc;
-use http::{StatusCode, header::HOST};
+use http::StatusCode;
 use libc::intptr_t;
 use reqwest::Response;
 use tokio::runtime;
 
 use crate::{
-    cdni::{spec::TypedHostMetadata, verify::verify_host_metadata},
     integrations::{
         caddy::{
             GoInt, caddy_response_set_body, caddy_response_set_header, caddy_response_set_status,
             caddyi::{BrooksCaddyConfiguration, BrooksCaddyRequest, drain_to_caddy_log},
         },
         common::{
-            BrooksIntegrationTransformError, BrooksIntegrationsProxyError, ProcessedRequest,
-            safe_brooks_integration_handle, safe_brooks_integrations_proxy,
+            BrooksIntegrationTransformError, BrooksIntegrationsProxyError,
+            safe_brooks_integration_handle,
         },
-        hmds::{HmdsConfiguration, query_hmds},
+        hmds::HmdsConfiguration,
         support::to_null_terminated_str,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
-    mel::{
-        scope::{Scopes, minimal_core_variable_types},
-        tvs::Type,
-    },
 };
 
 #[allow(clippy::missing_safety_doc)]
