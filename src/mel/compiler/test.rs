@@ -212,6 +212,6 @@ mod tests {
                 error: MelCompilerError::SyntaxError(msg),
                 location: _
             }
-            if msg == "Missing identifier");
+            if msg == "Bad token /");
     }
 }

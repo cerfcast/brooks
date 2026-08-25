@@ -9,7 +9,7 @@ bindgen = "0.71.0"
 git2 = { version = "0.21.0", features = ["https"] }
 
 [dependencies]
-tree-sitter = "0.26.9"
+tree-sitter = "0.26.13"
 tree-sitter-mel = { path = "parser" }
 brooks-macros = { path = "macros" }
 pretty_assertions = "1.4.1"

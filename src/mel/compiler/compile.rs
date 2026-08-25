@@ -230,7 +230,7 @@ impl MELCompiler {
             let msg = repr.trim_start_matches("MISSING ");
             format!("Missing {msg}")
         } else {
-            repr
+            format!("Bad token {error_tok}")
         };
 
         MelCompilerLocatableError {
@@ -895,6 +895,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         _driver: &SyntaxVisitorDriver,
     ) -> MelCompilerLocatableError {
         // if the node is an error, then the error is really in the child.
+
         if syntax.is_error()
             && let Some(child) = syntax.child(0)
         {
