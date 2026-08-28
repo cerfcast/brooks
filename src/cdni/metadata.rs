@@ -15,6 +15,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod metadata;
-pub mod spec;
-pub mod verify;
+use std::{fmt::Debug, sync::Arc};
+
+pub trait CdniMetadata: Debug {}
+
+#[derive(Debug, Default, Clone)]
+pub struct CacheSpecification {}
+
+impl CdniMetadata for CacheSpecification {}
+
+#[derive(Debug, Default, Clone)]
+pub struct CdniMetadataElements {
+    pub elements: Vec<Arc<dyn CdniMetadata>>,
+}

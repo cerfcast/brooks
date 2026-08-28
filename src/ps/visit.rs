@@ -88,3 +88,7 @@ pub trait PsVisitor<A: Debug + Clone + Default, O, E> {
     ) -> PsVisitorResult<O, E>;
     fn visit_match_group(&mut self, v: &TypedMatchGroup<A>, c: &O) -> PsVisitorResult<O, E>;
 }
+
+pub trait PsGenericMetadataVisitor<A: Debug + Clone + Default, O, E> {
+    fn visit_generic_metadata(&self, v: &TypedGenericMetadata<A>, c: &O) -> PsVisitorResult<O, E>;
+}

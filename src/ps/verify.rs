@@ -29,6 +29,7 @@ use crate::{
         tvs::Type,
     },
     ps::{
+        interpret::PsGenericMetadataInterpreter,
         spec::{
             ClientRequestStage, ClientResponseStage, ExpressionMatch, Header, HeaderTransform,
             MatchGroup, OriginRequestStage, OriginResponseStage, ProcessingStages,
@@ -176,6 +177,8 @@ pub(crate) enum PsVerifierContextValue {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct PsVerifierContext {
+    pub generic_interpreters:
+        PsGenericMetadataInterpreter<(), PsVerifierContext, Box<PsVerificationError>>,
     pub value: Option<PsVerifierContextValue>,
     pub scopes: Scopes<Type>,
 }
@@ -317,6 +320,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::StageRules,
@@ -345,6 +349,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         }
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 ExpressionMatch {
                     expression: v.expression.clone(),
@@ -418,6 +423,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::StageMetadata,
@@ -482,6 +488,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::RequestTransform,
@@ -560,6 +567,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::ResponseTransform,
@@ -584,6 +592,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: Some(PsVerifierContextValue::GenericMetadata(
                 TypedGenericMetadata {
                     tpe: v.tpe.clone(),
@@ -640,6 +649,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         };
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::HeaderTransform,
@@ -682,6 +692,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::Header,
@@ -768,6 +779,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::SyntheticResponse,
@@ -804,6 +816,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::ClientRequestStage,
@@ -853,6 +866,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         };
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::MatchGroup,
@@ -889,6 +903,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::OriginRequestStage,
@@ -925,6 +940,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::ClientResponseStage,
@@ -961,6 +977,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
+            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::OriginResponseStage,

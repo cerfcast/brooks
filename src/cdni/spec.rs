@@ -32,6 +32,21 @@ pub struct TypedGenericMetadata<A: Debug + Clone + Default> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachePolicy<A: Debug + Clone + Default> {
+    pub policy: String,
+    #[serde(skip)]
+    pub aug: A,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+pub struct TypedCachePolicy<A: Debug + Clone + Default> {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: CachePolicy<A>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostMetadata<A: Debug + Clone + Default> {
     pub metadata: Vec<TypedGenericMetadata<A>>,
     #[serde(skip)]
