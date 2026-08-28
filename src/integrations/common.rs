@@ -429,7 +429,7 @@ pub(crate) fn safe_brooks_integrations_proxy(
             let result = interpret_stage(stge, &mut processed_http_res, PsInterpretMode::Response)
                 .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
 
-            if let PsInterpretValue::SyntheticResponse(sr) = result {
+            if let PsInterpretValue::SyntheticResponse(sr) = result.0 {
                 *log = debug!(
                     log,
                     "Got a synthetic response from an origin response stage."
@@ -459,7 +459,7 @@ pub(crate) fn safe_brooks_integrations_proxy(
             let result = interpret_stage(stge, &mut processed_http_res, PsInterpretMode::Response)
                 .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
 
-            if let PsInterpretValue::SyntheticResponse(sr) = result {
+            if let PsInterpretValue::SyntheticResponse(sr) = result.0 {
                 *log = debug!(
                     log,
                     "Got a synthetic response from an client response stage."
