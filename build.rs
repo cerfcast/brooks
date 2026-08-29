@@ -72,13 +72,13 @@ fn main() {
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
         .clang_args([
-            "-F./integrations/nginx/nginx/src/core/",
-            "-F./integrations/nginx/nginx/src/http/",
-            "-F./integrations/nginx/nginx/src/http/modules/",
-            "-F./integrations/nginx/nginx/src/event/",
-            "-F./integrations/nginx/nginx/src/event/modules/",
-            "-F./integrations/nginx/nginx/objs/",
-            "-F./integrations/nginx/nginx/src/os/unix/",
+            "-I./integrations/nginx/nginx/src/core/",
+            "-I./integrations/nginx/nginx/src/http/",
+            "-I./integrations/nginx/nginx/src/http/modules/",
+            "-I./integrations/nginx/nginx/src/event/",
+            "-I./integrations/nginx/nginx/src/event/modules/",
+            "-I./integrations/nginx/nginx/objs/",
+            "-I./integrations/nginx/nginx/src/os/unix/",
         ])
         // The input header we would like to generate
         // bindings for.
