@@ -23,10 +23,10 @@ use crate::mel::{
     interpreter::interpret::{StructValue, TypedValue, Value},
     tvs::{
         Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
-        Keep_Query_MultiBuiltin, Match_ReplaceBuiltin, MatchBuiltin, Path_ElementBuiltin,
-        Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin,
+        Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
+        Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin,
         Type::{self, Function},
-        header_type, header_type_from_req, req_type, uri_type,
+        UpperBuiltin, header_type, header_type_from_req, req_type, uri_type,
     },
 };
 
@@ -129,6 +129,8 @@ pub fn builtin_function_types() -> Scope<Type> {
     let remove_query = Remove_QueryBuiltin {};
     let remove_query_multi = Remove_Query_MultiBuiltin {};
     let keep_query_multi = Keep_Query_MultiBuiltin {};
+    let lower = LowerBuiltin {};
+    let upper = UpperBuiltin {};
     let boolean = BooleanBuiltin {};
 
     let mut scopes = Scope::<Type>::default();
@@ -141,6 +143,8 @@ pub fn builtin_function_types() -> Scope<Type> {
     scopes = add_builtin_function_type_to_scope!(scopes, remove_query);
     scopes = add_builtin_function_type_to_scope!(scopes, remove_query_multi);
     scopes = add_builtin_function_type_to_scope!(scopes, keep_query_multi);
+    scopes = add_builtin_function_type_to_scope!(scopes, lower);
+    scopes = add_builtin_function_type_to_scope!(scopes, upper);
     scopes = add_builtin_function_type_to_scope!(scopes, boolean);
     scopes
 }

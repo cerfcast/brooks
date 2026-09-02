@@ -33,9 +33,11 @@ mod interpreter_tests {
         },
         tvs::{
             self, Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
-            Keep_Query_MultiBuiltin, Match_ReplaceBuiltin, MatchBuiltin, Path_ElementBuiltin,
-            Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin,
+            Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
+            Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin,
+            Remove_QueryBuiltin,
             Type::{self, Function},
+            UpperBuiltin,
         },
     };
 
@@ -1646,6 +1648,118 @@ mod interpreter_tests {
                 value: Value::String(s),
                 tipe: Type::String
             }) if s.is_empty()
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_upper() {
+        let expr = "upper(\"abcd\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = UpperBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "ABCD"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_lower() {
+        let expr = "lower(\"AbCd\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = LowerBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "abcd"
         );
     }
 

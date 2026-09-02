@@ -202,6 +202,16 @@ pub struct Remove_Query_MultiBuiltin {}
 #[builtin_function(Type::String, Type::String, Type::String)]
 pub struct Keep_Query_MultiBuiltin {}
 
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String)]
+pub struct LowerBuiltin {}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String)]
+pub struct UpperBuiltin {}
+
 pub(crate) fn header_type(wild: bool) -> Struct {
     let mut ht = Struct::new("h");
     if wild {

@@ -28,8 +28,9 @@ use crate::mel::{
     scope::Scope,
     tvs::{
         Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
-        Keep_Query_MultiBuiltin, Match_ReplaceBuiltin, MatchBuiltin, Path_ElementBuiltin,
-        Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin, Type,
+        Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
+        Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin,
+        Type, UpperBuiltin,
     },
 };
 
@@ -312,6 +313,26 @@ impl BooleanBuiltin {
     }
 }
 
+#[builtin_function_interpreter(Type::String, Type::String)]
+impl UpperBuiltin {
+    fn interp(&self, s: &str) -> BuiltinInterpResult {
+        Ok(TypedValue {
+            value: Value::String(s.to_uppercase()),
+            tipe: Type::String,
+        })
+    }
+}
+
+#[builtin_function_interpreter(Type::String, Type::String)]
+impl LowerBuiltin {
+    fn interp(&self, s: &str) -> BuiltinInterpResult {
+        Ok(TypedValue {
+            value: Value::String(s.to_lowercase()),
+            tipe: Type::String,
+        })
+    }
+}
+
 macro_rules! add_builtin_function_interpreter_to_scope {
     ($scope:ident, $builtin:ident) => {
         $scope.insert(
@@ -334,6 +355,8 @@ pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
     let remove_query = Remove_QueryBuiltin {};
     let remove_query_multi = Remove_Query_MultiBuiltin {};
     let keep_query_multi = Keep_Query_MultiBuiltin {};
+    let lower = LowerBuiltin {};
+    let upper = UpperBuiltin {};
     let boolean = BooleanBuiltin {};
 
     let mut scopes = Scope::<TypedValue>::default();
@@ -347,6 +370,8 @@ pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
     scopes = add_builtin_function_interpreter_to_scope!(scopes, remove_query);
     scopes = add_builtin_function_interpreter_to_scope!(scopes, remove_query_multi);
     scopes = add_builtin_function_interpreter_to_scope!(scopes, keep_query_multi);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, lower);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, upper);
     scopes = add_builtin_function_interpreter_to_scope!(scopes, boolean);
     scopes
 }
