@@ -24,6 +24,8 @@ use std::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+#[cfg(feature = "domain")]
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
@@ -49,6 +51,7 @@ pub struct ExpirableJsonValue {
     pub value: Value,
 }
 
+#[cfg(feature = "domain")]
 async fn hmds_write_entire(s: &mut UnixStream, d: &[u8]) -> io::Result<usize> {
     s.write_u64_le(d.len() as u64).await?;
 
@@ -74,6 +77,7 @@ async fn hmds_write_entire(s: &mut UnixStream, d: &[u8]) -> io::Result<usize> {
     }
 }
 
+#[cfg(feature = "domain")]
 async fn hmds_read_entire(s: &mut UnixStream, d: &mut [u8]) -> io::Result<usize> {
     let mut already_read = 0usize;
     loop {
@@ -97,6 +101,7 @@ async fn hmds_read_entire(s: &mut UnixStream, d: &mut [u8]) -> io::Result<usize>
     }
 }
 
+#[cfg(feature = "domain")]
 pub async fn query_hmds(
     query: &str,
     server_path: &Path,
@@ -126,4 +131,12 @@ pub async fn query_hmds(
         serde_json::from_str(&s).map_err(|_| io::ErrorKind::InvalidData)?;
 
     Ok(Some((result.expiry, result.value)))
+}
+
+#[cfg(not(feature = "domain"))]
+pub async fn query_hmds(
+    _query: &str,
+    _server_path: &Path,
+) -> io::Result<Option<(DateTime<Utc>, Value)>> {
+    Ok(None)
 }
