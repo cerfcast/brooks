@@ -108,6 +108,7 @@ pub trait BuiltinFunction: BuiltinFunctionType + BuiltinFunctionInterpreter {}
 #[derive(Default, Debug, Clone)]
 pub enum Value {
     Integer(i64),
+    Real(f64),
     String(String),
     Boolean(bool),
     Regex(Regex),
@@ -129,6 +130,7 @@ impl Display for TypedValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
             Value::Integer(i) => write!(f, "{i}"),
+            Value::Real(i) => write!(f, "{i}"),
             Value::String(s) => write!(f, "\"{s}\""),
             Value::Boolean(b) => write!(f, "{b}"),
             Value::Regex(regex) => write!(f, "{regex}"),

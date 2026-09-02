@@ -725,8 +725,10 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 #[cfg(test)]
 mod type_check_tests {
     use crate::common::GrammarLocation;
-    use crate::mel::tvs::SimpleParamTypeChecker;
     use crate::mel::tvs::Type::IPAddress;
+    use crate::mel::tvs::{
+        BuiltinFunctionType, IntegerBuiltin, RealBuiltin, SimpleParamTypeChecker, StringBuiltin,
+    };
     use crate::mel::{
         analysis::{Analyzed, MelAnalysisContext, MelAnalysisError, MelTypeChecker},
         ast::{AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier},
@@ -1179,6 +1181,114 @@ mod type_check_tests {
                 }
             }
         );
+    }
+
+    #[test]
+    fn test_type_check_function_call_integer_error() {
+        let expr = "integer(0, 1)";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        let b = IntegerBuiltin {};
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
+        ));
+
+        let result = driver.visit(&ast, &visitor, context).expect_err(
+            "Could analyze call of builtin function with incorrect number of parameters",
+        );
+
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 7,
+                extent: 6
+            }
+        );
+        assert_matches!(*result.error, MelAnalysisError::Miscount(1, 2))
+    }
+
+    #[test]
+    fn test_type_check_function_call_real_error() {
+        let expr = "real(0, 1)";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        let b = RealBuiltin {};
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
+        ));
+
+        let result = driver.visit(&ast, &visitor, context).expect_err(
+            "Could analyze call of builtin function with incorrect number of parameters",
+        );
+
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 4,
+                extent: 6
+            }
+        );
+        assert_matches!(*result.error, MelAnalysisError::Miscount(1, 2))
+    }
+
+    #[test]
+    fn test_type_check_function_call_string_error() {
+        let expr = "string(0, 1)";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let mut context = MelAnalysisContext::default();
+
+        let b = StringBuiltin {};
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
+        ));
+
+        let result = driver.visit(&ast, &visitor, context).expect_err(
+            "Could analyze call of builtin function with incorrect number of parameters",
+        );
+
+        assert_eq!(
+            result.location,
+            GrammarLocation {
+                start: 6,
+                extent: 6
+            }
+        );
+        assert_matches!(*result.error, MelAnalysisError::Miscount(1, 2))
     }
 
     #[test]

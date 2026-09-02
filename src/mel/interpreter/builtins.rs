@@ -28,9 +28,9 @@ use crate::mel::{
     scope::Scope,
     tvs::{
         Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
-        Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
-        Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin,
-        Type, UpperBuiltin,
+        IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
+        Path_ElementBuiltin, Path_ElementsBuiltin, RealBuiltin, Remove_Query_MultiBuiltin,
+        Remove_QueryBuiltin, StringBuiltin, Type, UpperBuiltin,
     },
 };
 
@@ -330,6 +330,55 @@ impl LowerBuiltin {
             value: Value::String(s.to_lowercase()),
             tipe: Type::String,
         })
+    }
+}
+
+impl BuiltinFunctionInterpreter for IntegerBuiltin {
+    fn interpw(&self, args: Value) -> BuiltinInterpResult {
+        let args = match args {
+            Value::ArgumentList(args) => args,
+            _ => return Err(BuiltinInterpError::ArgumentsInvalid.into()),
+        };
+
+        if args.len() != 1 {
+            return Err(BuiltinInterpError::ArgumentMiscount(1, args.len()).into());
+        }
+
+        // Now, interpret!
+
+        todo!()
+    }
+}
+
+impl BuiltinFunctionInterpreter for RealBuiltin {
+    fn interpw(&self, args: Value) -> BuiltinInterpResult {
+        let args = match args {
+            Value::ArgumentList(args) => args,
+            _ => return Err(BuiltinInterpError::ArgumentsInvalid.into()),
+        };
+
+        if args.len() != 1 {
+            return Err(BuiltinInterpError::ArgumentMiscount(1, args.len()).into());
+        }
+
+        // Now, interpret!
+        todo!()
+    }
+}
+
+impl BuiltinFunctionInterpreter for StringBuiltin {
+    fn interpw(&self, args: Value) -> BuiltinInterpResult {
+        let args = match args {
+            Value::ArgumentList(args) => args,
+            _ => return Err(BuiltinInterpError::ArgumentsInvalid.into()),
+        };
+
+        if args.len() != 1 {
+            return Err(BuiltinInterpError::ArgumentMiscount(1, args.len()).into());
+        }
+
+        // Now, interpret!
+        todo!()
     }
 }
 

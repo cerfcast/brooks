@@ -23,6 +23,8 @@ use std::{
 use brooks_macros::builtin_function;
 use regex::Regex;
 
+use crate::mel::interpreter::interpret::BuiltinFunction;
+
 /// Types
 
 #[derive(Debug, Clone, Default)]
@@ -104,6 +106,7 @@ pub type ParamsTypeCheckerGenerator = fn() -> Box<dyn ParamsTypeChecker>;
 pub enum Type {
     Boolean,
     Integer,
+    Real,
     String,
     Regex,
     IPAddress,
@@ -141,6 +144,7 @@ impl Display for Type {
         match self {
             Type::Boolean => write!(f, "Bool"),
             Type::Integer => write!(f, "Integer"),
+            Type::Real => write!(f, "Real"),
             Type::String => write!(f, "String"),
             Type::Regex => write!(f, "Regex"),
             Type::IPAddress => write!(f, "IPAddress"),
@@ -209,6 +213,26 @@ impl Display for SimpleParamTypeChecker {
     }
 }
 
+pub struct TypelessParamTypeChecker {
+    pub count: usize,
+}
+
+impl ParamsTypeChecker for TypelessParamTypeChecker {
+    fn check(&self, a: Args) -> Result<(), ParamsTypeCheckerError> {
+        if self.count != a.args.len() {
+            return Err(ParamsTypeCheckerError::Miscount(self.count, a.args.len()));
+        }
+
+        Ok(())
+    }
+}
+
+impl Display for TypelessParamTypeChecker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", ["Any"].repeat(self.count).join(","))
+    }
+}
+
 pub trait BuiltinFunctionType: Debug {
     fn name(&self) -> String;
     fn params_type_checker(&self) -> ParamsTypeCheckerGenerator;
@@ -273,6 +297,57 @@ pub struct LowerBuiltin {}
 #[derive(Clone, Default, Debug)]
 #[builtin_function(Type::String, Type::String)]
 pub struct UpperBuiltin {}
+
+#[derive(Clone, Default, Debug)]
+pub struct IntegerBuiltin {}
+impl BuiltinFunction for IntegerBuiltin {}
+impl BuiltinFunctionType for IntegerBuiltin {
+    fn name(&self) -> String {
+        "integer".to_string()
+    }
+
+    fn params_type_checker(&self) -> ParamsTypeCheckerGenerator {
+        || Box::new(TypelessParamTypeChecker { count: 1 })
+    }
+
+    fn return_type_calculator(&self) -> ReturnTypeCalculator {
+        || Type::Integer
+    }
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct RealBuiltin {}
+impl BuiltinFunction for RealBuiltin {}
+impl BuiltinFunctionType for RealBuiltin {
+    fn name(&self) -> String {
+        "real".to_string()
+    }
+
+    fn params_type_checker(&self) -> ParamsTypeCheckerGenerator {
+        || Box::new(TypelessParamTypeChecker { count: 1 })
+    }
+
+    fn return_type_calculator(&self) -> ReturnTypeCalculator {
+        || Type::Integer
+    }
+}
+
+#[derive(Clone, Default, Debug)]
+pub struct StringBuiltin {}
+impl BuiltinFunction for StringBuiltin {}
+impl BuiltinFunctionType for StringBuiltin {
+    fn name(&self) -> String {
+        "string".to_string()
+    }
+
+    fn params_type_checker(&self) -> ParamsTypeCheckerGenerator {
+        || Box::new(TypelessParamTypeChecker { count: 1 })
+    }
+
+    fn return_type_calculator(&self) -> ReturnTypeCalculator {
+        || Type::String
+    }
+}
 
 pub(crate) fn header_type(wild: bool) -> Struct {
     let mut ht = Struct::new("h");

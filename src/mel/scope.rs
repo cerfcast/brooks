@@ -23,7 +23,7 @@ use crate::mel::{
     interpreter::interpret::{StructValue, TypedValue, Value},
     tvs::{
         Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
-        Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
+        IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
         Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin,
         Type::{self, Function},
         UpperBuiltin, header_type, header_type_from_req, req_type, uri_type,
@@ -136,6 +136,7 @@ pub fn builtin_function_types() -> Scope<Type> {
     let lower = LowerBuiltin {};
     let upper = UpperBuiltin {};
     let boolean = BooleanBuiltin {};
+    let integer = IntegerBuiltin {};
 
     let mut scopes = Scope::<Type>::default();
     scopes = add_builtin_function_type_to_scope!(scopes, path_element);
@@ -150,6 +151,7 @@ pub fn builtin_function_types() -> Scope<Type> {
     scopes = add_builtin_function_type_to_scope!(scopes, lower);
     scopes = add_builtin_function_type_to_scope!(scopes, upper);
     scopes = add_builtin_function_type_to_scope!(scopes, boolean);
+    scopes = add_builtin_function_type_to_scope!(scopes, integer);
     scopes
 }
 

@@ -139,6 +139,7 @@ pub(crate) fn mel_type_to_c_type(tipe: &Type) -> String {
     match tipe {
         Type::Boolean => "bool".to_string(),
         Type::Integer => "int".to_string(),
+        Type::Real => "double".to_string(),
         Type::String => "std::string".to_string(),
         Type::Regex => "std::regex".to_string(),
         Type::Struct(s) => s.name.clone(),
