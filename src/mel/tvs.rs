@@ -158,6 +158,11 @@ pub trait BuiltinFunctionType: Debug {
 #[builtin_function(Type::String, Type::String, Type::Integer)]
 pub struct Path_ElementBuiltin {}
 
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String, Type::Integer, Type::Integer)]
+pub struct Path_ElementsBuiltin {}
+
 #[derive(Debug, Clone)]
 #[builtin_function(Type::Boolean, Type::Integer)]
 pub struct BooleanBuiltin {}

@@ -32,7 +32,7 @@ mod interpreter_tests {
             },
         },
         tvs::{
-            self, BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin,
+            self, BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin, Path_ElementsBuiltin,
             Type::{self, Function},
         },
     };
@@ -298,6 +298,269 @@ mod interpreter_tests {
         assert_matches!(runtime_error,
             BuiltinInterpError::RuntimeError(s)
             if s == "Index 4 is out of bounds (max 3)")
+    }
+
+    #[test]
+    fn test_interp_function_call_path_elements_all() {
+        let expr = "path_elements(\"one/two/three\", 0, 3)";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Path_ElementsBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "one/two/three"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_path_elements_some() {
+        let expr = "path_elements(\"one/two/three\", 1, 2)";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Path_ElementsBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "two/three"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_path_elements_last() {
+        let expr = "path_elements(\"one/two/three\", 2, 2)";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Path_ElementsBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "three"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_path_elements_error() {
+        let expr = "path_elements(\"one/two/three\", 3, 2)";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Path_ElementsBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect_err("Could interpret call to path_elements with invalid arguments");
+
+        let runtime_error = match *result.error {
+            MelInterpError::BuiltinError(be) => *be,
+            _ => panic!("Expected BuiltinError, but didn't get one"),
+        };
+
+        assert_matches!(runtime_error,
+            BuiltinInterpError::RuntimeError(s)
+            if s == "Cannot access elements from 3 to 2 -- out of order")
+    }
+
+    #[test]
+    fn test_interp_ternary_expression() {
+        let expr = "true ? 5: 4";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let context = MelInterpContext::default();
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::Integer(5),
+                tipe: Type::Integer
+            })
+        );
     }
 
     #[test]

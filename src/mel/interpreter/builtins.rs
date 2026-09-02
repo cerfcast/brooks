@@ -25,7 +25,7 @@ use brooks_macros::builtin_function_interpreter;
 use crate::mel::{
     interpreter::interpret::{BuiltinFunction, TypedValue, Value},
     scope::Scope,
-    tvs::{BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin, Type},
+    tvs::{BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin, Path_ElementsBuiltin, Type},
 };
 
 #[derive(Debug, Clone)]
@@ -85,6 +85,30 @@ impl Path_ElementBuiltin {
             ))
             .into())
         }
+    }
+}
+
+#[builtin_function_interpreter(Type::String, Type::String, Type::Integer, Type::Integer)]
+impl Path_ElementsBuiltin {
+    fn interp(&self, path: &str, element_n: &i64, element_m: &i64) -> BuiltinInterpResult {
+        let parts = path.split("/");
+
+        let element_n = *element_n as usize;
+        let element_m = *element_m as usize;
+
+        if element_m < element_n {
+            return Err(BuiltinInterpError::RuntimeError(format!(
+                "Cannot access elements from {element_n} to {element_m} -- out of order",
+            ))
+            .into());
+        }
+
+        let result = parts.skip(element_n).take(element_m - element_n + 1); // + 1 for inclusive.
+
+        Ok(TypedValue {
+            value: Value::String(result.collect::<Vec<_>>().join("/")),
+            tipe: Type::String,
+        })
     }
 }
 
