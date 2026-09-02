@@ -22,8 +22,9 @@ use http::uri::Scheme;
 use crate::mel::{
     interpreter::interpret::{StructValue, TypedValue, Value},
     tvs::{
-        BooleanBuiltin, BuiltinFunctionType, Match_ReplaceBuiltin, MatchBuiltin,
-        Path_ElementBuiltin, Path_ElementsBuiltin,
+        Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
+        Keep_Query_MultiBuiltin, Match_ReplaceBuiltin, MatchBuiltin, Path_ElementBuiltin,
+        Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin,
         Type::{self, Function},
         header_type, header_type_from_req, req_type, uri_type,
     },
@@ -108,44 +109,39 @@ pub fn minimal_core_variable_types() -> Scope<Type> {
     scope
 }
 
+macro_rules! add_builtin_function_type_to_scope {
+    ($scope:ident, $builtin:ident) => {
+        $scope.insert(
+            &$builtin.name(),
+            Function(Arc::new($builtin.return_type()), $builtin.parameters()),
+        )
+    };
+}
+
 /// Create a scope that contains the types of the MEL builtin functions.
 pub fn builtin_function_types() -> Scope<Type> {
     let path_element = Path_ElementBuiltin {};
     let path_elements = Path_ElementsBuiltin {};
     let mtch = MatchBuiltin {};
     let match_replace = Match_ReplaceBuiltin {};
+    let add_query = Add_QueryBuiltin {};
+    let add_query_multi = Add_Query_MultiBuiltin {};
+    let remove_query = Remove_QueryBuiltin {};
+    let remove_query_multi = Remove_Query_MultiBuiltin {};
+    let keep_query_multi = Keep_Query_MultiBuiltin {};
     let boolean = BooleanBuiltin {};
 
     let mut scopes = Scope::<Type>::default();
-    scopes = scopes.insert(
-        &path_element.name(),
-        Function(
-            Arc::new(path_element.return_type()),
-            path_element.parameters(),
-        ),
-    );
-    scopes = scopes.insert(
-        &boolean.name(),
-        Function(Arc::new(boolean.return_type()), boolean.parameters()),
-    );
-    scopes = scopes.insert(
-        &path_elements.name(),
-        Function(
-            Arc::new(path_elements.return_type()),
-            path_elements.parameters(),
-        ),
-    );
-    scopes = scopes.insert(
-        &mtch.name(),
-        Function(Arc::new(mtch.return_type()), mtch.parameters()),
-    );
-    scopes = scopes.insert(
-        &match_replace.name(),
-        Function(
-            Arc::new(match_replace.return_type()),
-            match_replace.parameters(),
-        ),
-    );
+    scopes = add_builtin_function_type_to_scope!(scopes, path_element);
+    scopes = add_builtin_function_type_to_scope!(scopes, path_elements);
+    scopes = add_builtin_function_type_to_scope!(scopes, mtch);
+    scopes = add_builtin_function_type_to_scope!(scopes, match_replace);
+    scopes = add_builtin_function_type_to_scope!(scopes, add_query);
+    scopes = add_builtin_function_type_to_scope!(scopes, add_query_multi);
+    scopes = add_builtin_function_type_to_scope!(scopes, remove_query);
+    scopes = add_builtin_function_type_to_scope!(scopes, remove_query_multi);
+    scopes = add_builtin_function_type_to_scope!(scopes, keep_query_multi);
+    scopes = add_builtin_function_type_to_scope!(scopes, boolean);
     scopes
 }
 

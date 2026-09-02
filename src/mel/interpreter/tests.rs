@@ -32,8 +32,9 @@ mod interpreter_tests {
             },
         },
         tvs::{
-            self, BooleanBuiltin, BuiltinFunctionType, Match_ReplaceBuiltin, MatchBuiltin,
-            Path_ElementBuiltin, Path_ElementsBuiltin,
+            self, Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
+            Keep_Query_MultiBuiltin, Match_ReplaceBuiltin, MatchBuiltin, Path_ElementBuiltin,
+            Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin,
             Type::{self, Function},
         },
     };
@@ -862,6 +863,790 @@ mod interpreter_tests {
         assert_matches!(runtime_error,
             BuiltinInterpError::RuntimeError(s)
             if s.ends_with("is not a valid regular expression"))
+    }
+
+    #[test]
+    fn test_interp_function_call_add_query_add() {
+        let expr = "add_query(\"a=b&c\", \"d\", \"e\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Add_QueryBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "a=b&c&d=e"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_add_query_update() {
+        let expr = "add_query(\"a=b&c&d=dee\", \"c\", \"xx\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Add_QueryBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "a=b&c=xx&d=dee"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_add_query_update_empty() {
+        let expr = "add_query(\"a=b&c&d=dee\", \"a\", \"\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Add_QueryBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "a&c&d=dee"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_add_query_multi_add() {
+        let expr = "add_query_multi(\"a=b&c&d=d\", \"a,c=,e=eee,f=ffff\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Add_Query_MultiBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "a=b&c&d=d&e=eee&f=ffff"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_add_query_multi_update() {
+        let expr = "add_query_multi(\"a=b&c&d=d\", \"a=aa,c=cc,d=\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Add_Query_MultiBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "a=aa&c=cc&d=d"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_remove_query() {
+        let expr = "remove_query(\"a=b&c&d=d\", \"a\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Remove_QueryBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "c&d=d"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_remove_query_middle() {
+        let expr = "remove_query(\"a=b&c&d=d\", \"c\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Remove_QueryBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "a=b&d=d"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_remove_query_not_found() {
+        let expr = "remove_query(\"a=b&c&d=d\", \"f\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Remove_QueryBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "a=b&c&d=d"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_remove_query_multi() {
+        let expr = "remove_query_multi(\"a=b&c&d=d\", \"a,c\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Remove_Query_MultiBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "d=d"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_remove_query_multi_missing() {
+        let expr = "remove_query_multi(\"a=b&c&d=d\", \"a,c,e\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Remove_Query_MultiBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "d=d"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_remove_query_multi_all() {
+        let expr = "remove_query_multi(\"a=b&c&d=d\", \"a,c,d\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Remove_Query_MultiBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s.is_empty()
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_keep_query_multi() {
+        let expr = "keep_query_multi(\"a=b&c&d=d\", \"a,c,d\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Keep_Query_MultiBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "a=b&c&d=d"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_keep_query_multi_some() {
+        let expr = "keep_query_multi(\"a=b&c&d=d\", \"d,a\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Keep_Query_MultiBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s == "a=b&d=d"
+        );
+    }
+
+    #[test]
+    fn test_interp_function_call_keep_query_multi_none() {
+        let expr = "keep_query_multi(\"a=b&c&d=d\", \"\")";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+
+        let b = Keep_Query_MultiBuiltin {};
+
+        let mut context = MelAnalysisContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            Function(Arc::new(b.return_type()), b.parameters()),
+        ));
+
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get the analyzed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let mut context = MelInterpContext::default();
+
+        context = context.update_scopes(&context.scopes.insert(
+            &b.name(),
+            TypedValue {
+                value: Value::Function(Arc::new(b.clone())),
+                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            },
+        ));
+
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::String(s),
+                tipe: Type::String
+            }) if s.is_empty()
+        );
     }
 
     #[test]

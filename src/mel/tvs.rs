@@ -177,6 +177,31 @@ pub struct MatchBuiltin {}
 #[builtin_function(Type::String, Type::String, Type::String, Type::String)]
 pub struct Match_ReplaceBuiltin {}
 
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String, Type::String, Type::String)]
+pub struct Add_QueryBuiltin {}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String, Type::String)]
+pub struct Add_Query_MultiBuiltin {}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String, Type::String)]
+pub struct Remove_QueryBuiltin {}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String, Type::String)]
+pub struct Remove_Query_MultiBuiltin {}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String, Type::String)]
+pub struct Keep_Query_MultiBuiltin {}
+
 pub(crate) fn header_type(wild: bool) -> Struct {
     let mut ht = Struct::new("h");
     if wild {

@@ -16,6 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashMap,
     fmt::{Debug, Display},
     sync::Arc,
 };
@@ -26,8 +27,9 @@ use crate::mel::{
     interpreter::interpret::{BuiltinFunction, TypedValue, Value},
     scope::Scope,
     tvs::{
-        BooleanBuiltin, BuiltinFunctionType, Match_ReplaceBuiltin, MatchBuiltin,
-        Path_ElementBuiltin, Path_ElementsBuiltin, Type,
+        Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
+        Keep_Query_MultiBuiltin, Match_ReplaceBuiltin, MatchBuiltin, Path_ElementBuiltin,
+        Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin, Type,
     },
 };
 
@@ -151,6 +153,155 @@ impl Match_ReplaceBuiltin {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct ParsedQuery {
+    elems: HashMap<String, String>,
+    order: Vec<String>,
+}
+
+impl TryFrom<&str> for ParsedQuery {
+    type Error = BuiltinInterpError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // Based on https://url.spec.whatwg.org/#urlencoded-parsing
+        let sequences = value.split('&');
+        let mut elems: HashMap<String, String> = HashMap::new();
+        let mut order: Vec<String> = vec![];
+        for bytes in sequences {
+            if bytes.is_empty() {
+                continue;
+            }
+
+            let (name, value) = match bytes.split_once('=') {
+                None => (bytes.to_string(), "".to_string()),
+                Some((n, v)) => (n.to_string(), v.to_string()),
+            };
+
+            elems.insert(name.clone(), value);
+            order.push(name);
+        }
+
+        Ok(ParsedQuery { elems, order })
+    }
+}
+
+impl Display for ParsedQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let res: Vec<_> = self
+            .order
+            .iter()
+            .map(|e| {
+                if let Some((k, v)) = self.elems.get_key_value(e) {
+                    let rest = if !v.is_empty() {
+                        format!("={v}")
+                    } else {
+                        "".to_string()
+                    };
+                    k.to_string() + &rest
+                } else {
+                    "".to_string()
+                }
+            })
+            .filter(|e| !e.is_empty())
+            .collect();
+
+        write!(f, "{}", res.join("&"))
+    }
+}
+
+#[builtin_function_interpreter(Type::String, Type::String, Type::String, Type::String)]
+impl Add_QueryBuiltin {
+    fn interp(&self, existing: &str, newq: &str, newv: &str) -> BuiltinInterpResult {
+        let mut pq = ParsedQuery::try_from(existing)?;
+
+        if pq
+            .elems
+            .insert(newq.to_string(), newv.to_string())
+            .is_none()
+        {
+            pq.order.push(newq.to_string())
+        }
+
+        Ok(TypedValue {
+            value: Value::String(pq.to_string()),
+            tipe: Type::String,
+        })
+    }
+}
+
+#[builtin_function_interpreter(Type::String, Type::String, Type::String)]
+impl Add_Query_MultiBuiltin {
+    fn interp(&self, existing: &str, news: &str) -> BuiltinInterpResult {
+        let mut pq = ParsedQuery::try_from(existing)?;
+
+        for newi in news.split(',') {
+            if let Some((n, v)) = newi.split_once('=')
+                && !v.is_empty()
+                && pq.elems.insert(n.to_string(), v.to_string()).is_none()
+            {
+                pq.order.push(n.to_string())
+            };
+        }
+
+        Ok(TypedValue {
+            value: Value::String(pq.to_string()),
+            tipe: Type::String,
+        })
+    }
+}
+
+#[builtin_function_interpreter(Type::String, Type::String, Type::String)]
+impl Remove_QueryBuiltin {
+    fn interp(&self, existing: &str, oldq: &str) -> BuiltinInterpResult {
+        let mut pq = ParsedQuery::try_from(existing)?;
+
+        pq.elems.remove(oldq);
+
+        Ok(TypedValue {
+            value: Value::String(pq.to_string()),
+            tipe: Type::String,
+        })
+    }
+}
+
+#[builtin_function_interpreter(Type::String, Type::String, Type::String)]
+impl Remove_Query_MultiBuiltin {
+    fn interp(&self, existing: &str, news: &str) -> BuiltinInterpResult {
+        let mut pq = ParsedQuery::try_from(existing)?;
+
+        for oldi in news.split(',') {
+            pq.elems.remove(oldi);
+        }
+
+        Ok(TypedValue {
+            value: Value::String(pq.to_string()),
+            tipe: Type::String,
+        })
+    }
+}
+
+#[builtin_function_interpreter(Type::String, Type::String, Type::String)]
+impl Keep_Query_MultiBuiltin {
+    fn interp(&self, existing: &str, keeps: &str) -> BuiltinInterpResult {
+        let mut pq = ParsedQuery::try_from(existing)?;
+
+        // TODO: This could be so much nicer.
+        let keep: Vec<_> = keeps.split(',').collect();
+        let keys: Vec<_> = pq.elems.keys().cloned().collect();
+
+        for k in keys {
+            if !keep.contains(&k.as_str()) {
+                pq.elems.remove(&k);
+            }
+        }
+
+        Ok(TypedValue {
+            value: Value::String(pq.to_string()),
+            tipe: Type::String,
+        })
+    }
+}
+
 #[builtin_function_interpreter(Type::Boolean, Type::Integer)]
 impl BooleanBuiltin {
     fn interp(&self, c: &i64) -> BuiltinInterpResult {
@@ -161,58 +312,41 @@ impl BooleanBuiltin {
     }
 }
 
+macro_rules! add_builtin_function_interpreter_to_scope {
+    ($scope:ident, $builtin:ident) => {
+        $scope.insert(
+            &$builtin.name(),
+            TypedValue {
+                value: Value::Function(Arc::new($builtin.clone())),
+                tipe: Type::Function(Arc::new($builtin.return_type()), $builtin.parameters()),
+            },
+        )
+    };
+}
+
 pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
     let path_element = Path_ElementBuiltin {};
     let path_elements = Path_ElementsBuiltin {};
     let mtch = MatchBuiltin {};
     let match_replace = Match_ReplaceBuiltin {};
+    let add_query = Add_QueryBuiltin {};
+    let add_query_multi = Add_Query_MultiBuiltin {};
+    let remove_query = Remove_QueryBuiltin {};
+    let remove_query_multi = Remove_Query_MultiBuiltin {};
+    let keep_query_multi = Keep_Query_MultiBuiltin {};
     let boolean = BooleanBuiltin {};
 
     let mut scopes = Scope::<TypedValue>::default();
 
-    scopes = scopes.insert(
-        &path_element.name(),
-        TypedValue {
-            value: Value::Function(Arc::new(path_element.clone())),
-            tipe: Type::Function(
-                Arc::new(path_element.return_type()),
-                path_element.parameters(),
-            ),
-        },
-    );
-    scopes = scopes.insert(
-        &path_elements.name(),
-        TypedValue {
-            value: Value::Function(Arc::new(path_elements.clone())),
-            tipe: Type::Function(
-                Arc::new(path_elements.return_type()),
-                path_elements.parameters(),
-            ),
-        },
-    );
-    scopes = scopes.insert(
-        &boolean.name(),
-        TypedValue {
-            value: Value::Function(Arc::new(boolean.clone())),
-            tipe: Type::Function(Arc::new(boolean.return_type()), boolean.parameters()),
-        },
-    );
-    scopes = scopes.insert(
-        &mtch.name(),
-        TypedValue {
-            value: Value::Function(Arc::new(mtch.clone())),
-            tipe: Type::Function(Arc::new(mtch.return_type()), mtch.parameters()),
-        },
-    );
-    scopes = scopes.insert(
-        &match_replace.name(),
-        TypedValue {
-            value: Value::Function(Arc::new(match_replace.clone())),
-            tipe: Type::Function(
-                Arc::new(match_replace.return_type()),
-                match_replace.parameters(),
-            ),
-        },
-    );
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, path_element);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, path_elements);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, mtch);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, match_replace);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, add_query);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, add_query_multi);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, remove_query);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, remove_query_multi);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, keep_query_multi);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, boolean);
     scopes
 }
