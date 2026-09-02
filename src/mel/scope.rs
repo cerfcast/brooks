@@ -22,7 +22,8 @@ use http::uri::Scheme;
 use crate::mel::{
     interpreter::interpret::{StructValue, TypedValue, Value},
     tvs::{
-        BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin, Path_ElementsBuiltin,
+        BooleanBuiltin, BuiltinFunctionType, Match_ReplaceBuiltin, MatchBuiltin,
+        Path_ElementBuiltin, Path_ElementsBuiltin,
         Type::{self, Function},
         header_type, header_type_from_req, req_type, uri_type,
     },
@@ -111,6 +112,8 @@ pub fn minimal_core_variable_types() -> Scope<Type> {
 pub fn builtin_function_types() -> Scope<Type> {
     let path_element = Path_ElementBuiltin {};
     let path_elements = Path_ElementsBuiltin {};
+    let mtch = MatchBuiltin {};
+    let match_replace = Match_ReplaceBuiltin {};
     let boolean = BooleanBuiltin {};
 
     let mut scopes = Scope::<Type>::default();
@@ -130,6 +133,17 @@ pub fn builtin_function_types() -> Scope<Type> {
         Function(
             Arc::new(path_elements.return_type()),
             path_elements.parameters(),
+        ),
+    );
+    scopes = scopes.insert(
+        &mtch.name(),
+        Function(Arc::new(mtch.return_type()), mtch.parameters()),
+    );
+    scopes = scopes.insert(
+        &match_replace.name(),
+        Function(
+            Arc::new(match_replace.return_type()),
+            match_replace.parameters(),
         ),
     );
     scopes

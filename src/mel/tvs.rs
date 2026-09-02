@@ -167,6 +167,16 @@ pub struct Path_ElementsBuiltin {}
 #[builtin_function(Type::Boolean, Type::Integer)]
 pub struct BooleanBuiltin {}
 
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String, Type::String)]
+pub struct MatchBuiltin {}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Default, Debug)]
+#[builtin_function(Type::String, Type::String, Type::String, Type::String)]
+pub struct Match_ReplaceBuiltin {}
+
 pub(crate) fn header_type(wild: bool) -> Struct {
     let mut ht = Struct::new("h");
     if wild {

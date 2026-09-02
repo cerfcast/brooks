@@ -25,7 +25,10 @@ use brooks_macros::builtin_function_interpreter;
 use crate::mel::{
     interpreter::interpret::{BuiltinFunction, TypedValue, Value},
     scope::Scope,
-    tvs::{BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin, Path_ElementsBuiltin, Type},
+    tvs::{
+        BooleanBuiltin, BuiltinFunctionType, Match_ReplaceBuiltin, MatchBuiltin,
+        Path_ElementBuiltin, Path_ElementsBuiltin, Type,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -112,6 +115,42 @@ impl Path_ElementsBuiltin {
     }
 }
 
+#[builtin_function_interpreter(Type::String, Type::String, Type::String)]
+impl MatchBuiltin {
+    fn interp(&self, input: &str, mtch: &str) -> BuiltinInterpResult {
+        let re = regex::RegexBuilder::new(mtch).build().map_err(|_| {
+            // TODO: Figure out how to use regex error messages nicely.
+            BuiltinInterpError::RuntimeError(format!("{mtch} is not a valid regular expression"))
+        })?;
+
+        let result = match re.find(input) {
+            Some(found) => found.as_str().to_string(),
+            None => "".to_string(),
+        };
+        Ok(TypedValue {
+            value: Value::String(result),
+            tipe: Type::String,
+        })
+    }
+}
+
+#[builtin_function_interpreter(Type::String, Type::String, Type::String, Type::String)]
+impl Match_ReplaceBuiltin {
+    fn interp(&self, input: &str, mtch: &str, replace: &str) -> BuiltinInterpResult {
+        let re = regex::RegexBuilder::new(mtch).build().map_err(|_| {
+            // TODO: Figure out how to use regex error messages nicely.
+            BuiltinInterpError::RuntimeError(format!("{mtch} is not a valid regular expression"))
+        })?;
+
+        let result = re.replace(input, replace);
+
+        Ok(TypedValue {
+            value: Value::String(result.to_string()),
+            tipe: Type::String,
+        })
+    }
+}
+
 #[builtin_function_interpreter(Type::Boolean, Type::Integer)]
 impl BooleanBuiltin {
     fn interp(&self, c: &i64) -> BuiltinInterpResult {
@@ -125,6 +164,8 @@ impl BooleanBuiltin {
 pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
     let path_element = Path_ElementBuiltin {};
     let path_elements = Path_ElementsBuiltin {};
+    let mtch = MatchBuiltin {};
+    let match_replace = Match_ReplaceBuiltin {};
     let boolean = BooleanBuiltin {};
 
     let mut scopes = Scope::<TypedValue>::default();
@@ -154,6 +195,23 @@ pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
         TypedValue {
             value: Value::Function(Arc::new(boolean.clone())),
             tipe: Type::Function(Arc::new(boolean.return_type()), boolean.parameters()),
+        },
+    );
+    scopes = scopes.insert(
+        &mtch.name(),
+        TypedValue {
+            value: Value::Function(Arc::new(mtch.clone())),
+            tipe: Type::Function(Arc::new(mtch.return_type()), mtch.parameters()),
+        },
+    );
+    scopes = scopes.insert(
+        &match_replace.name(),
+        TypedValue {
+            value: Value::Function(Arc::new(match_replace.clone())),
+            tipe: Type::Function(
+                Arc::new(match_replace.return_type()),
+                match_replace.parameters(),
+            ),
         },
     );
     scopes
