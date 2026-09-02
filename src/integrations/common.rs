@@ -30,7 +30,7 @@ use crate::{
     integrations::hmds::{HmdsConfiguration, query_hmds},
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
-        scope::{Scopes, minimal_core_variable_types},
+        scope::{Scopes, builtin_function_types, minimal_core_variable_types},
         tvs::Type,
     },
     ps::{
@@ -315,8 +315,9 @@ pub(crate) fn safe_brooks_integration_handle(
                 .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
 
             let types_scope = Scopes::<Type> {
-                scopes: vec![minimal_core_variable_types()],
+                scopes: vec![&minimal_core_variable_types() + &builtin_function_types()],
             };
+
             let found = verify_host_metadata(&metadata.value, types_scope)
                 .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
 

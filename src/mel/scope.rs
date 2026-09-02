@@ -166,7 +166,7 @@ impl<A> From<http::Request<A>> for Scope<Type> {
     }
 }
 
-/// Create a scope that contains the values of only the MEL core variables present in an HTTP request.
+/// Create a scope that contains the values of the MEL core variables present in an HTTP request.
 impl<A> From<http::Request<A>> for Scope<TypedValue> {
     fn from(value: http::Request<A>) -> Self {
         let ht = header_type_from_req(&value);

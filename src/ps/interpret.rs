@@ -30,6 +30,7 @@ use crate::{
         ast::Expr,
         interpreter::{
             self,
+            builtins::builtin_builtin_function_interpreters,
             interpret::{
                 MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError,
                 TypedValue, Value,
@@ -228,7 +229,10 @@ impl<'a> PsInterpreter<'a> {
             .add_interpreter("MI.CachePolicy", Arc::new(PsGenericMetadataCachePolicy {}));
     }
 
-    fn scopes_from_req(&self) -> Result<Scopes<TypedValue>, PsInterpretError> {
+    fn scopes_from_req(
+        &self,
+        additional: &[Scope<TypedValue>],
+    ) -> Result<Scopes<TypedValue>, PsInterpretError> {
         let mel_req = http::Request::builder()
             .uri(
                 self.req
@@ -239,7 +243,11 @@ impl<'a> PsInterpreter<'a> {
             .map_err(|_| PsInterpretError::InvalidRequest)?;
 
         Ok(Scopes::<TypedValue> {
-            scopes: vec![Scope::<TypedValue>::from(mel_req)],
+            scopes: vec![
+                additional
+                    .iter()
+                    .fold(Scope::<TypedValue>::from(mel_req), |c, n| &c + &n),
+            ],
         })
     }
 
@@ -250,7 +258,7 @@ impl<'a> PsInterpreter<'a> {
     ) -> Result<TypedValue, PsInterpretError> {
         let expr_context = MelInterpContext {
             val: None,
-            scopes: self.scopes_from_req()?,
+            scopes: self.scopes_from_req(&[builtin_builtin_function_interpreters()])?,
             log: LogMsgs::new(crate::logging::LogLevel::Trace),
         };
 
