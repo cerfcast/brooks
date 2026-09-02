@@ -22,7 +22,7 @@ use http::uri::Scheme;
 use crate::mel::{
     interpreter::interpret::{StructValue, TypedValue, Value},
     tvs::{
-        BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin,
+        BooleanBuiltin, BuiltinFunctionType, Path_ElementBuiltin, Path_ElementsBuiltin,
         Type::{self, Function},
         header_type, header_type_from_req, req_type, uri_type,
     },
@@ -109,17 +109,28 @@ pub fn minimal_core_variable_types() -> Scope<Type> {
 
 /// Create a scope that contains the types of the MEL builtin functions.
 pub fn builtin_function_types() -> Scope<Type> {
-    let b = Path_ElementBuiltin {};
+    let path_element = Path_ElementBuiltin {};
+    let path_elements = Path_ElementsBuiltin {};
     let boolean = BooleanBuiltin {};
 
     let mut scopes = Scope::<Type>::default();
     scopes = scopes.insert(
-        &b.name(),
-        Function(Arc::new(b.return_type()), b.parameters()),
+        &path_element.name(),
+        Function(
+            Arc::new(path_element.return_type()),
+            path_element.parameters(),
+        ),
     );
     scopes = scopes.insert(
         &boolean.name(),
         Function(Arc::new(boolean.return_type()), boolean.parameters()),
+    );
+    scopes = scopes.insert(
+        &path_elements.name(),
+        Function(
+            Arc::new(path_elements.return_type()),
+            path_elements.parameters(),
+        ),
     );
     scopes
 }

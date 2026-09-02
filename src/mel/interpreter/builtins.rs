@@ -123,16 +123,30 @@ impl BooleanBuiltin {
 }
 
 pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
-    let b = Path_ElementBuiltin {};
+    let path_element = Path_ElementBuiltin {};
+    let path_elements = Path_ElementsBuiltin {};
     let boolean = BooleanBuiltin {};
 
     let mut scopes = Scope::<TypedValue>::default();
 
     scopes = scopes.insert(
-        &b.name(),
+        &path_element.name(),
         TypedValue {
-            value: Value::Function(Arc::new(b.clone())),
-            tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+            value: Value::Function(Arc::new(path_element.clone())),
+            tipe: Type::Function(
+                Arc::new(path_element.return_type()),
+                path_element.parameters(),
+            ),
+        },
+    );
+    scopes = scopes.insert(
+        &path_elements.name(),
+        TypedValue {
+            value: Value::Function(Arc::new(path_elements.clone())),
+            tipe: Type::Function(
+                Arc::new(path_elements.return_type()),
+                path_elements.parameters(),
+            ),
         },
     );
     scopes = scopes.insert(
