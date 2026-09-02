@@ -1004,10 +1004,8 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
 #[cfg(test)]
 mod analyzed_serializer_tests {
-    use std::sync::Arc;
-
     use crate::mel::tvs::{
-        self, Struct,
+        self, SimpleParamTypeChecker, Struct,
         Type::{self, Function},
     };
     use crate::mel::{
@@ -1084,9 +1082,14 @@ mod analyzed_serializer_tests {
         context = context.update_scopes(&context.scopes.insert(
             "use",
             Function(
-                Arc::new(Type::Integer),
-                tvs::Params {
-                    args: vec![Type::Integer],
+                "use".to_string(),
+                || Type::Integer,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer],
+                        },
+                    })
                 },
             ),
         ));
@@ -1399,7 +1402,7 @@ mod analyzed_serializer_tests {
 \t\t\t\tIdentifier: req
 \t\t\tMember:
 \t\t\t\tIdentifier: callable
-\t\t\tType: Return Type: Bool, Argument Types: Integer
+\t\t\tType: Name: callable Return Type: Bool, Parameter Types: Integer
 \t\t\tNot a constant
 \tArguments:
 \t\tLiteral: 5
@@ -1419,9 +1422,14 @@ mod analyzed_serializer_tests {
         reqs.insert_field(
             "callable",
             Function(
-                Arc::new(Type::Boolean),
-                tvs::Params {
-                    args: vec![Type::Integer],
+                "callable".to_string(),
+                || Type::Boolean,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer],
+                        },
+                    })
                 },
             ),
         );

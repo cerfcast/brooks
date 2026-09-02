@@ -339,7 +339,11 @@ macro_rules! add_builtin_function_interpreter_to_scope {
             &$builtin.name(),
             TypedValue {
                 value: Value::Function(Arc::new($builtin.clone())),
-                tipe: Type::Function(Arc::new($builtin.return_type()), $builtin.parameters()),
+                tipe: Type::Function(
+                    $builtin.name(),
+                    $builtin.return_type_calculator(),
+                    $builtin.params_type_checker(),
+                ),
             },
         )
     };

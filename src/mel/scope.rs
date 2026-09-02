@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug, ops::Add, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, ops::Add};
 
 use http::uri::Scheme;
 
@@ -113,7 +113,11 @@ macro_rules! add_builtin_function_type_to_scope {
     ($scope:ident, $builtin:ident) => {
         $scope.insert(
             &$builtin.name(),
-            Function(Arc::new($builtin.return_type()), $builtin.parameters()),
+            Function(
+                $builtin.name(),
+                $builtin.return_type_calculator(),
+                $builtin.params_type_checker(),
+            ),
         )
     };
 }

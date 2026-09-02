@@ -21,7 +21,13 @@ use std::{
     sync::Arc,
 };
 
-use crate::{common::GrammarLocation, mel::compiler::compile::MelCompilerLocatableError};
+use crate::{
+    common::GrammarLocation,
+    mel::{
+        compiler::compile::MelCompilerLocatableError,
+        tvs::{Args, ParamsTypeCheckerError, ParamsTypeCheckerGenerator},
+    },
+};
 
 use crate::mel::{
     analysis::{
@@ -42,7 +48,7 @@ use crate::mel::{
     scope::{self, Scopes},
     tvs::{
         self,
-        Type::{self, Function, Struct},
+        Type::{self, Struct},
     },
 };
 
@@ -213,7 +219,7 @@ impl Display for MelAnalysisLocatableError {
 #[derive(Debug, Clone, Default)]
 pub struct MelAnalysisContext {
     pub expr: Option<Expr<Analyzed>>,
-    pub params: Option<Vec<Type>>,
+    pub ptcg: Option<ParamsTypeCheckerGenerator>,
     pub scopes: scope::Scopes<Type>,
 }
 
@@ -221,22 +227,30 @@ impl MelAnalysisContext {
     pub fn update_expr(&self, new: Expr<Analyzed>) -> Self {
         MelAnalysisContext {
             expr: Some(new),
-            params: self.params.clone(),
+            ptcg: self.ptcg,
             scopes: self.scopes.clone(),
         }
     }
     pub fn update_scopes(&self, new: &scope::Scopes<Type>) -> Self {
         MelAnalysisContext {
             expr: self.expr.clone(),
-            params: self.params.clone(),
+            ptcg: self.ptcg,
             scopes: new.clone(),
         }
     }
-    pub fn update_params(&self, new: Vec<Type>) -> Self {
+    pub fn update_param_type_checker_generator(&self, ptcg: ParamsTypeCheckerGenerator) -> Self {
         MelAnalysisContext {
             expr: self.expr.clone(),
-            params: Some(new),
+            ptcg: Some(ptcg),
             scopes: self.scopes.clone(),
+        }
+    }
+}
+
+impl From<Vec<Argument<Analyzed>>> for Args {
+    fn from(value: Vec<Argument<Analyzed>>) -> Self {
+        Args {
+            args: value.iter().map(|a| a.expr.tipe()).collect(),
         }
     }
 }
@@ -265,20 +279,14 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         };
 
         let fn_params = match callee.tipe() {
-            Type::Function(return_type, tvs::Params { args }) => (return_type, args),
-            t => {
-                return Err(MelAnalysisLocatableError {
-                    error: Mismatch(
-                        Function(Arc::new(Type::None), tvs::Params { args: vec![] }),
-                        t,
-                    )
-                    .into(),
-                    location: ast.location.clone(),
-                });
+            Type::Function(_, return_type_generator, param_type_checker_generator) => {
+                let return_type = return_type_generator();
+                (return_type, param_type_checker_generator)
             }
+            _ => unreachable!(), // TODO: Check whether this scenario is _really_ unreachable.
         };
 
-        let context_with_params = context.update_params(fn_params.1.clone());
+        let context_with_params = context.update_param_type_checker_generator(fn_params.1);
         let args = self.visit_argument_list(&ast.arguments, context_with_params, driver)?;
         let args = match args.expr.unwrap() {
             Expr::ArgumentList(argument_list) => Ok(argument_list),
@@ -300,7 +308,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 location: ast.location.clone(),
                 arguments: (*args).clone(),
                 aug: Analyzed {
-                    tipe: (*fn_params.0).clone(),
+                    tipe: fn_params.0.clone(),
                     constant: None,
                 },
             }))),
@@ -337,29 +345,24 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
-        let params = context.params.as_ref().ok_or(MelAnalysisLocatableError {
+        let ptcg = context.ptcg.ok_or(MelAnalysisLocatableError {
             error: AssertionFailure(ContextMissingParams).into(),
             location: ast.location.clone(),
         })?;
 
-        if params.len() != ast.arguments.len() {
-            return Err(MelAnalysisLocatableError {
-                error: MelAnalysisError::Miscount(params.len(), ast.arguments.len()).into(),
-                location: ast.location.clone(),
-            });
-        }
+        let ptc = ptcg();
 
         let mut arg_types: Vec<Argument<Analyzed>> = vec![];
-        for arg in ast.arguments.iter().zip(params) {
+        for arg in &ast.arguments {
             let arg = self
-                .visit_argument(arg.0, context.update_params(vec![arg.1.clone()]), driver)?
+                .visit_argument(arg, context.clone(), driver)?
                 .expr
                 .ok_or(MelAnalysisLocatableError {
                     error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
                         "visit_argument_list".into(),
                     ))
                     .into(),
-                    location: arg.0.location.clone(),
+                    location: arg.location.clone(),
                 })?;
             let arg = match arg {
                 Expr::Argument(argument) => Ok(argument),
@@ -375,6 +378,21 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             })?;
             arg_types.push((*arg).clone());
         }
+
+        ptc.check(arg_types.clone().into()).map_err(|e| {
+            let error = match e {
+                ParamsTypeCheckerError::Miscount(expected, actual) => {
+                    MelAnalysisError::Miscount(expected, actual)
+                }
+                ParamsTypeCheckerError::Mismatch(expected, actual) => {
+                    MelAnalysisError::Mismatch(expected, actual)
+                }
+            };
+            MelAnalysisLocatableError {
+                error: error.into(),
+                location: ast.location.clone(),
+            }
+        })?;
 
         Ok(
             context.update_expr(Expr::ArgumentList(Arc::new(ArgumentList {
@@ -394,11 +412,6 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
-        let params = context.params.as_ref().ok_or(MelAnalysisLocatableError {
-            error: AssertionFailure(ContextMissingParams).into(),
-            location: ast.location.clone(),
-        })?;
-
         let arg = driver.visit(&ast.expr, self, context.clone())?.expr.ok_or(
             MelAnalysisLocatableError {
                 error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
@@ -410,12 +423,6 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         )?;
 
         let arg_type = arg.tipe();
-        if arg_type != params[0] {
-            return Err(MelAnalysisLocatableError {
-                error: Mismatch(params[0].clone(), arg_type).into(),
-                location: arg.location(),
-            });
-        }
         Ok(context.update_expr(Expr::Argument(Arc::new(Argument {
             expr: arg,
             location: ast.location.clone(),
@@ -718,16 +725,18 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 #[cfg(test)]
 mod type_check_tests {
     use crate::common::GrammarLocation;
+    use crate::mel::tvs::SimpleParamTypeChecker;
+    use crate::mel::tvs::Type::IPAddress;
     use crate::mel::{
         analysis::{Analyzed, MelAnalysisContext, MelAnalysisError, MelTypeChecker},
         ast::{AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier},
         compiler::compile,
         tvs::{
             self,
-            Type::{self, Boolean, Function, IPAddress, Integer},
+            Type::{self, Boolean, Function, Integer},
         },
     };
-    use std::{assert_matches, sync::Arc};
+    use std::assert_matches;
 
     #[test]
     fn test_type_check_literal() {
@@ -1186,9 +1195,14 @@ mod type_check_tests {
         context = context.update_scopes(&context.scopes.insert(
             "testing",
             Function(
-                Arc::new(Type::Integer),
-                tvs::Params {
-                    args: vec![Type::Integer],
+                "testing".to_string(),
+                || Type::Integer,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer],
+                        },
+                    })
                 },
             ),
         ));
@@ -1231,9 +1245,14 @@ mod type_check_tests {
         context = context.update_scopes(&context.scopes.insert(
             "use",
             Function(
-                Arc::new(Type::Integer),
-                tvs::Params {
-                    args: vec![Type::Integer],
+                "testing".to_string(),
+                || Type::Integer,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer],
+                        },
+                    })
                 },
             ),
         ));
@@ -1262,9 +1281,14 @@ mod type_check_tests {
         context = context.update_scopes(&context.scopes.insert(
             "use",
             Function(
-                Arc::new(Type::Integer),
-                tvs::Params {
-                    args: vec![Type::Integer, Type::String],
+                "use".to_string(),
+                || Type::Integer,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer, Type::String],
+                        },
+                    })
                 },
             ),
         ));
@@ -1290,9 +1314,14 @@ mod type_check_tests {
         context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
-                Arc::new(Type::Integer),
-                tvs::Params {
-                    args: vec![Type::Integer],
+                "use_me".to_string(),
+                || Type::Integer,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer],
+                        },
+                    })
                 },
             ),
         ));
@@ -1335,9 +1364,14 @@ mod type_check_tests {
         context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
-                Arc::new(Type::Integer),
-                tvs::Params {
-                    args: vec![Type::Integer, Type::String],
+                "use_me".to_string(),
+                || Type::Integer,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer, Type::String],
+                        },
+                    })
                 },
             ),
         ));
@@ -1380,9 +1414,14 @@ mod type_check_tests {
         context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
-                Arc::new(Type::Integer),
-                tvs::Params {
-                    args: vec![Type::Integer, Type::Integer],
+                "use_me".to_string(),
+                || Type::Integer,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer, Type::Integer],
+                        },
+                    })
                 },
             ),
         ));
@@ -1394,8 +1433,8 @@ mod type_check_tests {
         assert_eq!(
             result.location,
             GrammarLocation {
-                start: 10,
-                extent: 9
+                start: 6,
+                extent: 14
             }
         );
         assert_matches!(
@@ -1418,9 +1457,14 @@ mod type_check_tests {
         context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
-                Arc::new(Type::Integer),
-                tvs::Params {
-                    args: vec![Type::Integer],
+                "use_me".to_string(),
+                || Type::Integer,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer],
+                        },
+                    })
                 },
             ),
         ));
@@ -1465,9 +1509,14 @@ mod type_check_tests {
         context = context.update_scopes(&context.scopes.insert(
             "use_me",
             Function(
-                Arc::new(Type::Boolean),
-                tvs::Params {
-                    args: vec![Type::Integer],
+                "use_me".to_string(),
+                || Type::Boolean,
+                || {
+                    Box::new(SimpleParamTypeChecker {
+                        p: tvs::Params {
+                            params: vec![Type::Integer],
+                        },
+                    })
                 },
             ),
         ));

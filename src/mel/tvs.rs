@@ -18,7 +18,6 @@
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
-    sync::Arc,
 };
 
 use brooks_macros::builtin_function;
@@ -79,11 +78,29 @@ impl Struct {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Params {
+pub struct Args {
     pub args: Vec<Type>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Params {
+    pub params: Vec<Type>,
+}
+
+pub type ReturnTypeCalculator = fn() -> Type;
+
+pub enum ParamsTypeCheckerError {
+    Miscount(usize, usize),
+    Mismatch(Type, Type),
+}
+
+#[allow(clippy::result_large_err)]
+pub trait ParamsTypeChecker: Display {
+    fn check(&self, args: Args) -> Result<(), ParamsTypeCheckerError>;
+}
+pub type ParamsTypeCheckerGenerator = fn() -> Box<dyn ParamsTypeChecker>;
+
+#[derive(Default, Debug, Clone)]
 pub enum Type {
     Boolean,
     Integer,
@@ -91,10 +108,21 @@ pub enum Type {
     Regex,
     IPAddress,
     Params(Params),
-    Function(Arc<Type>, Params),
+    Function(String, ReturnTypeCalculator, ParamsTypeCheckerGenerator),
     Struct(Struct),
     #[default]
     None,
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Params(left), Self::Params(right)) => left == right,
+            (Self::Function(name, _, _), Self::Function(other_name, _, _)) => name == other_name,
+            (Self::Struct(left), Self::Struct(right)) => left == right,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
 }
 
 impl Display for Struct {
@@ -120,21 +148,17 @@ impl Display for Type {
                 f,
                 "Parameters: {}",
                 items
-                    .args
+                    .params
                     .iter()
                     .map(|c| c.to_string())
                     .collect::<Vec<_>>()
                     .join(","),
             ),
-            Type::Function(result, args) => write!(
-                f,
-                "Return Type: {result}, Argument Types: {}",
-                args.args
-                    .iter()
-                    .map(|a| a.to_string())
-                    .collect::<Vec<_>>()
-                    .join(","),
-            ),
+            Type::Function(name, rtg, ptcg) => {
+                let rt = rtg();
+                let ptc = ptcg();
+                write!(f, "Name: {name} Return Type: {rt}, Parameter Types: {ptc}")
+            }
             Type::Struct(s) => write!(f, "Struct: {s}"),
             Type::None => write!(f, "None"),
         }
@@ -147,10 +171,48 @@ impl Struct {
     }
 }
 
+pub struct SimpleParamTypeChecker {
+    pub p: Params,
+}
+
+impl ParamsTypeChecker for SimpleParamTypeChecker {
+    fn check(&self, a: Args) -> Result<(), ParamsTypeCheckerError> {
+        if self.p.params.len() != a.args.len() {
+            return Err(ParamsTypeCheckerError::Miscount(
+                self.p.params.len(),
+                a.args.len(),
+            ));
+        }
+
+        for (p, a) in self.p.params.iter().zip(&a.args) {
+            if *p != *a {
+                return Err(ParamsTypeCheckerError::Mismatch(p.clone(), a.clone()));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl Display for SimpleParamTypeChecker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.p
+                .params
+                .iter()
+                .map(|a| a.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    }
+}
+
 pub trait BuiltinFunctionType: Debug {
     fn name(&self) -> String;
-    fn parameters(&self) -> Params;
-    fn return_type(&self) -> Type;
+    fn params_type_checker(&self) -> ParamsTypeCheckerGenerator;
+    fn return_type_calculator(&self) -> ReturnTypeCalculator;
 }
 
 #[allow(non_camel_case_types)]

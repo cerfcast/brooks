@@ -261,15 +261,16 @@ pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
                 #builtin_name.to_string()
             }
 
-            fn parameters(&self) -> Params {
-                Params {
-                    args: vec![#(#parameter_types),*]
-                }
-            }
+    fn params_type_checker(&self) -> ParamsTypeCheckerGenerator {
+        || { Box::new(SimpleParamTypeChecker {
+                    p: Params{ params: vec![#(#parameter_types),*] }
+        }) }
+    }
 
-            fn return_type(&self) -> Type {
-                #return_type
-            }
+    fn return_type_calculator(&self) -> ReturnTypeCalculator {
+                || { #return_type }
+    }
+
         }
     };
 

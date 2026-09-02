@@ -246,7 +246,7 @@ impl<'a> PsInterpreter<'a> {
             scopes: vec![
                 additional
                     .iter()
-                    .fold(Scope::<TypedValue>::from(mel_req), |c, n| &c + &n),
+                    .fold(Scope::<TypedValue>::from(mel_req), |c, n| &c + n),
             ],
         })
     }

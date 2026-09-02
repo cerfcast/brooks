@@ -95,7 +95,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -118,7 +122,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -151,7 +159,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -174,7 +186,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -207,7 +223,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -230,7 +250,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -263,7 +287,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -286,7 +314,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -320,7 +352,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -343,7 +379,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -376,7 +416,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -399,7 +443,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -432,7 +480,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -455,7 +507,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -488,7 +544,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -511,7 +571,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -545,7 +609,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -568,7 +636,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -601,7 +673,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -624,7 +700,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -657,7 +737,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -680,7 +764,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -714,7 +802,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -737,7 +829,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -770,7 +866,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -793,7 +893,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -826,7 +930,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -849,7 +957,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -883,7 +995,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -906,7 +1022,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -939,7 +1059,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -962,7 +1086,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -995,7 +1123,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1018,7 +1150,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1051,7 +1187,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1074,7 +1214,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1107,7 +1251,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1130,7 +1278,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1163,7 +1315,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1186,7 +1342,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1219,7 +1379,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1242,7 +1406,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1275,7 +1443,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1298,7 +1470,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1331,7 +1507,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1354,7 +1534,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1387,7 +1571,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1410,7 +1598,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1443,7 +1635,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1466,7 +1662,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1499,7 +1699,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1522,7 +1726,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1555,7 +1763,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1578,7 +1790,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1611,7 +1827,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1634,7 +1854,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1667,7 +1891,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1690,7 +1918,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
@@ -1723,7 +1955,11 @@ mod interpreter_tests {
 
         context = context.update_scopes(&context.scopes.insert(
             &b.name(),
-            Function(Arc::new(b.return_type()), b.parameters()),
+            Function(
+                b.name(),
+                b.return_type_calculator(),
+                b.params_type_checker(),
+            ),
         ));
 
         let result = driver
@@ -1746,7 +1982,11 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Type::Function(Arc::new(b.return_type()), b.parameters()),
+                tipe: Function(
+                    b.name(),
+                    b.return_type_calculator(),
+                    b.params_type_checker(),
+                ),
             },
         ));
 
