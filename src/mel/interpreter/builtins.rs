@@ -230,15 +230,54 @@ impl Add_QueryBuiltin {
     }
 }
 
+fn parse_multi_kv(i: &str) -> Vec<(String, Option<String>)> {
+    parse_multi_k(i)
+        .into_iter()
+        .map(|newi| {
+            let newi = newi.trim();
+            if let Some((n, v)) = newi.split_once('=') {
+                let n = n.trim();
+                let v = v.trim();
+                Some((
+                    n.to_owned(),
+                    if v.is_empty() {
+                        None
+                    } else {
+                        Some(v.to_owned())
+                    },
+                ))
+            } else {
+                None
+            }
+        })
+        .filter(|f| f.is_some())
+        .flatten()
+        .collect()
+}
+
+fn parse_multi_k(i: &str) -> Vec<String> {
+    i.split(',')
+        .map(|newi| {
+            let newi = newi.trim();
+            if !newi.is_empty() {
+                Some(newi.to_owned())
+            } else {
+                None
+            }
+        })
+        .filter(|f| f.is_some())
+        .flatten()
+        .collect()
+}
+
 #[builtin_function_interpreter(Type::String, Type::String, Type::String)]
 impl Add_Query_MultiBuiltin {
     fn interp(&self, existing: &str, news: &str) -> BuiltinInterpResult {
         let mut pq = ParsedQuery::try_from(existing)?;
 
-        for newi in news.split(',') {
-            if let Some((n, v)) = newi.split_once('=')
-                && !v.is_empty()
-                && pq.elems.insert(n.to_string(), v.to_string()).is_none()
+        for (n, v) in parse_multi_kv(news) {
+            if let Some(v) = v
+                && pq.elems.insert(n.to_string(), v).is_none()
             {
                 pq.order.push(n.to_string())
             };
@@ -267,11 +306,11 @@ impl Remove_QueryBuiltin {
 
 #[builtin_function_interpreter(Type::String, Type::String, Type::String)]
 impl Remove_Query_MultiBuiltin {
-    fn interp(&self, existing: &str, news: &str) -> BuiltinInterpResult {
+    fn interp(&self, existing: &str, olds: &str) -> BuiltinInterpResult {
         let mut pq = ParsedQuery::try_from(existing)?;
 
-        for oldi in news.split(',') {
-            pq.elems.remove(oldi);
+        for oldi in parse_multi_k(olds) {
+            pq.elems.remove(&oldi);
         }
 
         Ok(TypedValue {
@@ -287,11 +326,11 @@ impl Keep_Query_MultiBuiltin {
         let mut pq = ParsedQuery::try_from(existing)?;
 
         // TODO: This could be so much nicer.
-        let keep: Vec<_> = keeps.split(',').collect();
+        let keep: Vec<_> = parse_multi_k(keeps);
         let keys: Vec<_> = pq.elems.keys().cloned().collect();
 
         for k in keys {
-            if !keep.contains(&k.as_str()) {
+            if !keep.contains(&k) {
                 pq.elems.remove(&k);
             }
         }
