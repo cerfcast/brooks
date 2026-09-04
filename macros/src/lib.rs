@@ -263,7 +263,7 @@ pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     fn params_type_checker(&self) -> ParamsTypeCheckerGenerator {
         || { Box::new(SimpleParamTypeChecker {
-                    p: Params{ params: vec![#(#parameter_types),*] }
+                    p: ParameterTypesList{ params: vec![#(#parameter_types),*] }
         }) }
     }
 

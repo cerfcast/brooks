@@ -1086,7 +1086,7 @@ mod analyzed_serializer_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1426,7 +1426,7 @@ mod analyzed_serializer_tests {
                 || Type::Boolean,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })

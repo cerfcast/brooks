@@ -80,12 +80,12 @@ impl Struct {
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Args {
+pub struct ArgumentTypeList {
     pub args: Vec<Type>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Params {
+pub struct ParameterTypesList {
     pub params: Vec<Type>,
 }
 
@@ -99,7 +99,7 @@ pub enum ParamsTypeCheckerError {
 
 #[allow(clippy::result_large_err)]
 pub trait ParamsTypeChecker: Display {
-    fn check(&self, args: Args) -> Result<(), ParamsTypeCheckerError>;
+    fn check(&self, args: ArgumentTypeList) -> Result<(), ParamsTypeCheckerError>;
 }
 pub type ParamsTypeCheckerGenerator = fn() -> Box<dyn ParamsTypeChecker>;
 
@@ -111,7 +111,7 @@ pub enum Type {
     String,
     Regex,
     IPAddress,
-    Params(Params),
+    Params(ParameterTypesList),
     Function(String, ReturnTypeCalculator, ParamsTypeCheckerGenerator),
     Struct(Struct),
     #[default]
@@ -177,11 +177,11 @@ impl Struct {
 }
 
 pub struct SimpleParamTypeChecker {
-    pub p: Params,
+    pub p: ParameterTypesList,
 }
 
 impl ParamsTypeChecker for SimpleParamTypeChecker {
-    fn check(&self, a: Args) -> Result<(), ParamsTypeCheckerError> {
+    fn check(&self, a: ArgumentTypeList) -> Result<(), ParamsTypeCheckerError> {
         if self.p.params.len() != a.args.len() {
             return Err(ParamsTypeCheckerError::Miscount(
                 self.p.params.len(),
@@ -219,7 +219,7 @@ pub struct TypelessParamTypeChecker {
 }
 
 impl ParamsTypeChecker for TypelessParamTypeChecker {
-    fn check(&self, a: Args) -> Result<(), ParamsTypeCheckerError> {
+    fn check(&self, a: ArgumentTypeList) -> Result<(), ParamsTypeCheckerError> {
         if self.count != a.args.len() {
             return Err(ParamsTypeCheckerError::Miscount(self.count, a.args.len()));
         }

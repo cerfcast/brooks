@@ -25,7 +25,7 @@ use crate::{
     common::GrammarLocation,
     mel::{
         compiler::compile::MelCompilerLocatableError,
-        tvs::{Args, ParamsTypeCheckerError, ParamsTypeCheckerGenerator},
+        tvs::{ArgumentTypeList, ParamsTypeCheckerError, ParamsTypeCheckerGenerator},
     },
 };
 
@@ -247,9 +247,9 @@ impl MelAnalysisContext {
     }
 }
 
-impl From<Vec<Argument<Analyzed>>> for Args {
+impl From<Vec<Argument<Analyzed>>> for ArgumentTypeList {
     fn from(value: Vec<Argument<Analyzed>>) -> Self {
-        Args {
+        ArgumentTypeList {
             args: value.iter().map(|a| a.expr.tipe()).collect(),
         }
     }
@@ -1309,7 +1309,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1359,7 +1359,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1395,7 +1395,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer, Type::String],
                         },
                     })
@@ -1428,7 +1428,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1478,7 +1478,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer, Type::String],
                         },
                     })
@@ -1528,7 +1528,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer, Type::Integer],
                         },
                     })
@@ -1571,7 +1571,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1623,7 +1623,7 @@ mod type_check_tests {
                 || Type::Boolean,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::Params {
+                        p: tvs::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })

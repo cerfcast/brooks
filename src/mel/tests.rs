@@ -20,7 +20,7 @@ mod builtin_function_types_tests {
     use std::assert_matches;
 
     use crate::mel::tvs::{
-        Args, BuiltinFunctionType, IntegerBuiltin, ParamsTypeCheckerError, Type,
+        ArgumentTypeList, BuiltinFunctionType, IntegerBuiltin, ParamsTypeCheckerError, Type,
     };
 
     #[test]
@@ -37,7 +37,7 @@ mod builtin_function_types_tests {
 
         let ptc = b.params_type_checker()();
 
-        let arg_types = Args {
+        let arg_types = ArgumentTypeList {
             args: vec![Type::Integer],
         };
         assert_matches!(ptc.check(arg_types), Ok(_));
@@ -47,7 +47,7 @@ mod builtin_function_types_tests {
         let b = IntegerBuiltin {};
         let ptc = b.params_type_checker()();
 
-        let arg_types = Args {
+        let arg_types = ArgumentTypeList {
             args: vec![Type::Integer, Type::Integer],
         };
         assert_matches!(
