@@ -222,6 +222,7 @@ pub enum BrooksIntegrationsProxyError {
     UpstreamError(String),
     MissingConfiguration(String),
     ProxyError(String),
+    HmdsQueryError(String),
     RuntimeError(String),
     BadMemory,
 }
@@ -229,6 +230,12 @@ pub enum BrooksIntegrationsProxyError {
 impl Display for BrooksIntegrationsProxyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            BrooksIntegrationsProxyError::HmdsQueryError(query_error) => {
+                write!(
+                    f,
+                    "Brooks Proxy Error: Error querying the HMDS: {query_error}"
+                )
+            }
             BrooksIntegrationsProxyError::TransformError(nginx_transform_error) => {
                 write!(
                     f,
@@ -301,8 +308,8 @@ pub(crate) fn safe_brooks_integration_handle(
         Some(found) => found,
         None => {
             let (expiry, query_result) = match runtime
-                .block_on(query_hmds(host, &hmds_config.hmds_path))
-                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?
+                .block_on(query_hmds(host, &hmds_config.hmds_server))
+                .map_err(|e| BrooksIntegrationsProxyError::HmdsQueryError(e.to_string()))?
             {
                 Some((timeout, query_result)) => (timeout, query_result),
                 None => {

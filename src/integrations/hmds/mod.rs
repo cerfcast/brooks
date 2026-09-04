@@ -15,13 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, fs, io, path::PathBuf, str::FromStr};
 
 use chrono::{DateTime, Utc};
+use http::Uri;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -33,8 +30,61 @@ use tokio::{
 
 use crate::cdni::{spec::HostMetadata, verify::HostMetadataVerificationKey};
 
-pub struct HmdsConfiguration {
-    pub(crate) hmds_path: PathBuf,
+#[derive(Debug, Default, Clone)]
+pub struct HmdsServerConfiguration {
+    pub(crate) path: Option<PathBuf>,
+    pub(crate) url: Option<http::Uri>,
+}
+
+impl HmdsServerConfiguration {
+    pub fn new_by_sense(config_str: &str) -> io::Result<Self> {
+        if config_str.starts_with("http://") || config_str.starts_with("https://") {
+            let url = http::Uri::try_from(config_str).map_err(io::Error::other)?;
+
+            Ok(HmdsServerConfiguration {
+                url: Some(url),
+                ..Default::default()
+            })
+        } else {
+            let path = PathBuf::from(config_str);
+
+            let exists = fs::exists(&path)?;
+            if !exists {
+                return Err(io::ErrorKind::NotFound.into());
+            }
+
+            Ok(HmdsServerConfiguration {
+                path: Some(path),
+                ..Default::default()
+            })
+        }
+    }
+
+    pub fn new_domain(path: PathBuf) -> Self {
+        Self {
+            path: Some(path),
+            ..Default::default()
+        }
+    }
+
+    pub fn new_http(http: Uri) -> Self {
+        Self {
+            url: Some(http),
+            ..Default::default()
+        }
+    }
+
+    pub fn is_http(&self) -> bool {
+        self.url.is_some()
+    }
+
+    pub fn is_domain(&self) -> bool {
+        self.path.is_some()
+    }
+}
+
+pub(crate) struct HmdsConfiguration {
+    pub(crate) hmds_server: HmdsServerConfiguration,
     pub(crate) hmds_cache: HashMap<
         String,
         (
@@ -101,8 +151,26 @@ async fn hmds_read_entire(s: &mut UnixStream, d: &mut [u8]) -> io::Result<usize>
     }
 }
 
-#[cfg(feature = "domain")]
 pub async fn query_hmds(
+    query: &str,
+    config: &HmdsServerConfiguration,
+) -> io::Result<Option<(DateTime<Utc>, Value)>> {
+    #[cfg(feature = "domain")]
+    if config.is_domain() {
+        return query_hmds_domain(query, config.path.as_ref().unwrap().as_path()).await;
+    }
+
+    if config.is_http() {
+        return query_hmds_http(query, config.url.as_ref().unwrap()).await;
+    } else {
+        Err(io::Error::other(
+            "Querying HMDS via HTTP is the only supported option and configuration is missing",
+        ))
+    }
+}
+
+#[cfg(feature = "domain")]
+pub async fn query_hmds_domain(
     query: &str,
     server_path: &Path,
 ) -> io::Result<Option<(DateTime<Utc>, Value)>> {
@@ -133,10 +201,26 @@ pub async fn query_hmds(
     Ok(Some((result.expiry, result.value)))
 }
 
-#[cfg(not(feature = "domain"))]
-pub async fn query_hmds(
-    _query: &str,
-    _server_path: &Path,
+pub async fn query_hmds_http(
+    query: &str,
+    server: &Uri,
 ) -> io::Result<Option<(DateTime<Utc>, Value)>> {
-    Ok(None)
+    let query_uri = reqwest::Url::from_str(&(server.to_string() + &format!("qry/?host={query}")))
+        .map_err(io::Error::other)?;
+
+    let query = reqwest::get(query_uri);
+
+    let response = query.await.map_err(io::Error::other)?;
+
+    match response.error_for_status() {
+        Ok(response) => {
+            let body = response.bytes().await.map_err(std::io::Error::other)?;
+
+            let result: ExpirableJsonValue =
+                serde_json::from_slice(&body).map_err(|_| io::ErrorKind::InvalidData)?;
+
+            Ok(Some((result.expiry, result.value)))
+        }
+        Err(e) => Err(io::Error::other(e)),
+    }
 }

@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, marker::PhantomData, path::PathBuf, ptr::null, str::FromStr};
+use std::{collections::HashMap, marker::PhantomData, ptr::null, str::FromStr};
 
 use http::{HeaderName, HeaderValue, Method, Request, StatusCode, Uri};
 use libc::intptr_t;
@@ -28,7 +28,7 @@ use crate::{
             BrooksIntegrationTransformError, BrooksIntegrationsProxyError,
             safe_brooks_integration_handle,
         },
-        hmds::HmdsConfiguration,
+        hmds::{HmdsConfiguration, HmdsServerConfiguration},
         nginx::{
             nginx_lib::{from_nginx_str, log_nginx_msgs, to_nginx_buf, to_nginx_str},
             ngx_buf_s, ngx_http_request_s, ngx_list_push, ngx_log_s, ngx_str_t, ngx_table_elt_s,
@@ -48,14 +48,29 @@ pub struct NginxBrooksConfiguration {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ngx_brooks_configure(
     cookie: *mut *const NginxBrooksConfiguration,
-    hmds_path: ngx_str_t,
+    config_str: ngx_str_t,
     nlx: *mut ngx_log_s,
 ) -> bool {
-    let log = LogMsgs::new_with_prefix("brooks analysis", crate::logging::LogLevel::Debug);
+    let mut log = LogMsgs::new_with_prefix("brooks analysis", crate::logging::LogLevel::Debug);
+
+    let config_str = from_nginx_str(config_str);
+    let server_config = match HmdsServerConfiguration::new_by_sense(&config_str) {
+        Ok(o) => o,
+        Err(e) => {
+            log = error!(
+                log,
+                &format!(
+                    "Could not determine HMDS configuration from given string ({config_str}: {e}"
+                )
+            );
+            log_nginx_msgs(nlx, &log);
+            return false;
+        }
+    };
 
     *cookie = Box::into_raw(Box::new(NginxBrooksConfiguration {
         hmds: HmdsConfiguration {
-            hmds_path: PathBuf::from(from_nginx_str(hmds_path)),
+            hmds_server: server_config,
             hmds_cache: HashMap::new(),
         },
         _marker: PhantomData {},

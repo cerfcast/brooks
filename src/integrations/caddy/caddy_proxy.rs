@@ -17,9 +17,7 @@
 
 use std::{
     ffi::{CStr, c_char, c_void},
-    fs,
     marker::PhantomData,
-    path::PathBuf,
 };
 
 use http::StatusCode;
@@ -37,7 +35,7 @@ use crate::{
             BrooksIntegrationTransformError, BrooksIntegrationsProxyError,
             safe_brooks_integration_handle,
         },
-        hmds::HmdsConfiguration,
+        hmds::{HmdsConfiguration, HmdsServerConfiguration},
         support::to_null_terminated_str,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
@@ -48,13 +46,13 @@ use crate::{
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn caddy_brooks_configure(
     cookie: *mut *const BrooksCaddyConfiguration,
-    path: *const c_char,
+    config_str: *const c_char,
     caddy_log_cb: *mut c_void,
 ) -> bool {
     let mut log = LogMsgs::new_with_prefix("brooks configure", crate::logging::LogLevel::Debug);
 
-    let path = match CStr::from_ptr(path).to_str() {
-        Ok(o) => PathBuf::from(o),
+    let config_str = match CStr::from_ptr(config_str).to_str() {
+        Ok(o) => o,
         Err(e) => {
             log = error!(
                 log,
@@ -65,26 +63,23 @@ pub unsafe extern "C" fn caddy_brooks_configure(
         }
     };
 
-    let exists = match fs::exists(&path) {
+    let server_config = match HmdsServerConfiguration::new_by_sense(config_str) {
         Ok(o) => o,
         Err(e) => {
             log = error!(
                 log,
-                &format!("Could not check whether the given path {path:?} exists: {e}")
+                &format!(
+                    "Could not determine HMDS configuration from given string ({config_str}: {e}"
+                )
             );
             drain_to_caddy_log(caddy_log_cb, &log);
             return false;
         }
     };
-    if !exists {
-        log = error!(log, &format!("the given path {path:?} does not exist"));
-        drain_to_caddy_log(caddy_log_cb, &log);
-        return false;
-    }
 
     *cookie = Box::into_raw(Box::new(BrooksCaddyConfiguration {
         hmds: HmdsConfiguration {
-            hmds_path: path,
+            hmds_server: server_config,
             hmds_cache: Default::default(),
         },
         _marker: PhantomData {},
