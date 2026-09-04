@@ -30,7 +30,6 @@ use crate::{
         ast::Expr,
         interpreter::{
             self,
-            builtins::builtin_builtin_function_interpreters,
             interpret::{
                 MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError,
                 TypedValue, Value,
@@ -218,6 +217,7 @@ impl PsGenericMetadataVisitor<PsVerificationKey, PsInterpretContext, PsInterpret
 // CDNI Processing Stage Interpreter
 
 struct PsInterpreter<'a> {
+    pub mel_scope: &'a Option<Scope<TypedValue>>,
     pub generic_interpreters:
         PsGenericMetadataInterpreter<PsVerificationKey, PsInterpretContext, PsInterpretError>,
     pub req: &'a mut dyn ProcessableRequestResponse,
@@ -229,10 +229,7 @@ impl<'a> PsInterpreter<'a> {
             .add_interpreter("MI.CachePolicy", Arc::new(PsGenericMetadataCachePolicy {}));
     }
 
-    fn scopes_from_req(
-        &self,
-        additional: &[Scope<TypedValue>],
-    ) -> Result<Scopes<TypedValue>, PsInterpretError> {
+    fn scopes_from_req(&self) -> Result<Scopes<TypedValue>, PsInterpretError> {
         let mel_req = http::Request::builder()
             .uri(
                 self.req
@@ -244,7 +241,7 @@ impl<'a> PsInterpreter<'a> {
 
         Ok(Scopes::<TypedValue> {
             scopes: vec![
-                additional
+                self.mel_scope
                     .iter()
                     .fold(Scope::<TypedValue>::from(mel_req), |c, n| &c + n),
             ],
@@ -258,7 +255,7 @@ impl<'a> PsInterpreter<'a> {
     ) -> Result<TypedValue, PsInterpretError> {
         let expr_context = MelInterpContext {
             val: None,
-            scopes: self.scopes_from_req(&[builtin_builtin_function_interpreters()])?,
+            scopes: self.scopes_from_req()?,
             log: LogMsgs::new(crate::logging::LogLevel::Trace),
         };
 
@@ -867,10 +864,12 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
 
 pub fn interpret_stage(
     ts: &TypedStage<PsVerificationKey>,
+    mel: &Option<Scope<TypedValue>>,
     req: &mut dyn ProcessableRequestResponse,
     mode: PsInterpretMode,
 ) -> PsInterpretResult {
     let mut visitor = PsInterpreter {
+        mel_scope: mel,
         req,
         generic_interpreters: Default::default(),
     };
@@ -1012,7 +1011,7 @@ mod ps_interpreter_tests {
             .expect("Could not verify valid client request stage JSON");
 
         let mut req = EffectfulProcessableRequestResponse::default();
-        let result = interpret_stage(&result, &mut req, PsInterpretMode::Request)
+        let result = interpret_stage(&result, &None, &mut req, PsInterpretMode::Request)
             .expect("Could not interpret a valid client request");
 
         assert_eq!(req.log.len(), 2);
@@ -1033,7 +1032,7 @@ mod ps_interpreter_tests {
         let result = verify_ps_request_stage(&result, Scopes::<Type>::default())
             .expect("Could not verify valid client request stage JSON");
         let mut req = EffectfulProcessableRequestResponse::default();
-        let result = interpret_stage(&result, &mut req, PsInterpretMode::Request)
+        let result = interpret_stage(&result, &None, &mut req, PsInterpretMode::Request)
             .expect("Could not interpret a valid client request");
 
         assert_eq!(req.log.len(), 2);
@@ -1078,6 +1077,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1134,6 +1134,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1204,6 +1205,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1273,6 +1275,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1315,6 +1318,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1364,6 +1368,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1425,6 +1430,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1485,6 +1491,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1540,6 +1547,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1594,6 +1602,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1647,6 +1656,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::default();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
+            &None,
             &mut req,
             PsInterpretMode::Response,
         )

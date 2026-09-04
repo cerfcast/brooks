@@ -35,6 +35,7 @@ use crate::{
         },
     },
     logging::{LogLevel, LogMsg, LogMsgs},
+    mel::interpreter::builtins::builtin_builtin_function_interpreters,
 };
 
 #[repr(C)]
@@ -194,6 +195,9 @@ unsafe fn do_ngx_brooks_proxy(
     body: *mut *mut ngx_buf_s,
     log: &mut LogMsgs,
 ) -> Result<(), Box<BrooksIntegrationsProxyError>> {
+    // When interpreting MEL expressions in the HMD, use all builtin functions.
+    let mel_scope = builtin_builtin_function_interpreters();
+
     let mut http_req = TryInto::<Request<String>>::try_into(*req)
         .map_err(|e| Box::new(BrooksIntegrationsProxyError::TransformError(e)))?;
 
@@ -202,8 +206,13 @@ unsafe fn do_ngx_brooks_proxy(
         .build()
         .map_err(|e| BrooksIntegrationsProxyError::RuntimeError(e.to_string()))?;
 
-    let (status, response) =
-        safe_brooks_integration_handle(&mut http_req, &mut (*cookie).hmds, &runtime, log)?;
+    let (status, response) = safe_brooks_integration_handle(
+        &mut http_req,
+        &Some(mel_scope),
+        &mut (*cookie).hmds,
+        &runtime,
+        log,
+    )?;
 
     try_from_response(&response, status, req)
         .map_err(BrooksIntegrationsProxyError::TransformError)?;

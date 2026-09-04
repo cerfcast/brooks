@@ -30,7 +30,8 @@ use crate::{
     integrations::hmds::{HmdsConfiguration, query_hmds},
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
-        scope::{Scopes, builtin_function_types, minimal_core_variable_types},
+        interpreter::interpret::TypedValue,
+        scope::{Scope, Scopes, builtin_function_types, minimal_core_variable_types},
         tvs::Type,
     },
     ps::{
@@ -256,6 +257,7 @@ impl Display for BrooksIntegrationsProxyError {
 
 pub(crate) fn safe_brooks_integration_handle(
     request: &mut Request<String>,
+    mel: &Option<Scope<TypedValue>>,
     hmds_config: &mut HmdsConfiguration,
     runtime: &Runtime,
     log: &mut LogMsgs,
@@ -338,11 +340,12 @@ pub(crate) fn safe_brooks_integration_handle(
         updated_uri: None,
     };
 
-    safe_brooks_integrations_proxy(&found, &mut processed_http_req, runtime, log)
+    safe_brooks_integrations_proxy(&found, mel, &mut processed_http_req, runtime, log)
 }
 
 pub(crate) fn safe_brooks_integrations_proxy(
     hmd: &HostMetadata<HostMetadataVerificationKey>,
+    mel: &Option<Scope<TypedValue>>,
     processed_http_req: &mut ProcessedRequest,
     runtime: &tokio::runtime::Runtime,
     log: &mut LogMsgs,
@@ -354,7 +357,7 @@ pub(crate) fn safe_brooks_integrations_proxy(
         if let Some(stge) = &stage.aug.stage
             && TypedStageTypes::ClientRequest == stge.into()
         {
-            interpret_stage(stge, processed_http_req, PsInterpretMode::Request)
+            interpret_stage(stge, mel, processed_http_req, PsInterpretMode::Request)
                 .map_err(|e| Box::new(BrooksIntegrationsProxyError::PsInterpretError(e)))?;
 
             // There are no synthetic responses at this stage.
@@ -373,7 +376,7 @@ pub(crate) fn safe_brooks_integrations_proxy(
         if let Some(stge) = &stage.aug.stage
             && TypedStageTypes::OriginRequest == stge.into()
         {
-            interpret_stage(stge, processed_http_req, PsInterpretMode::Request)
+            interpret_stage(stge, mel, processed_http_req, PsInterpretMode::Request)
                 .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
 
             // There are no synthetic responses at this stage.
@@ -427,8 +430,13 @@ pub(crate) fn safe_brooks_integrations_proxy(
             && (TypedStageTypes::OriginRequest == stge.into()
                 || TypedStageTypes::OriginResponse == stge.into())
         {
-            let result = interpret_stage(stge, &mut processed_http_res, PsInterpretMode::Response)
-                .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
+            let result = interpret_stage(
+                stge,
+                mel,
+                &mut processed_http_res,
+                PsInterpretMode::Response,
+            )
+            .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
 
             if let PsInterpretValue::SyntheticResponse(sr) = result.0 {
                 *log = debug!(
@@ -457,8 +465,13 @@ pub(crate) fn safe_brooks_integrations_proxy(
             && (TypedStageTypes::ClientResponse == stge.into()
                 || TypedStageTypes::ClientRequest == stge.into())
         {
-            let result = interpret_stage(stge, &mut processed_http_res, PsInterpretMode::Response)
-                .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
+            let result = interpret_stage(
+                stge,
+                mel,
+                &mut processed_http_res,
+                PsInterpretMode::Response,
+            )
+            .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
 
             if let PsInterpretValue::SyntheticResponse(sr) = result.0 {
                 *log = debug!(

@@ -41,6 +41,7 @@ use crate::{
         support::to_null_terminated_str,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
+    mel::interpreter::builtins::builtin_builtin_function_interpreters,
 };
 
 #[allow(clippy::missing_safety_doc)]
@@ -154,6 +155,9 @@ unsafe fn do_brooks_caddy_proxy(
     res: *mut c_void,
     log: &mut LogMsgs,
 ) -> Result<(), Box<BrooksIntegrationsProxyError>> {
+    // When interpreting MEL expressions in the HMD, use all builtin functions.
+    let mel_scope = builtin_builtin_function_interpreters();
+
     let mut http_req = Box::from_raw(req as *mut BrooksCaddyRequest).request;
 
     let runtime = runtime::Builder::new_current_thread()
@@ -161,8 +165,13 @@ unsafe fn do_brooks_caddy_proxy(
         .build()
         .map_err(|e| BrooksIntegrationsProxyError::RuntimeError(e.to_string()))?;
 
-    let (status, response) =
-        safe_brooks_integration_handle(&mut http_req, &mut (*cookie).hmds, &runtime, log)?;
+    let (status, response) = safe_brooks_integration_handle(
+        &mut http_req,
+        &Some(mel_scope),
+        &mut (*cookie).hmds,
+        &runtime,
+        log,
+    )?;
 
     try_from_response(&response, status, res)
         .map_err(BrooksIntegrationsProxyError::TransformError)?;
