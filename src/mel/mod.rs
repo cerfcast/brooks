@@ -33,3 +33,6 @@ pub mod scope;
 pub mod serializer;
 #[allow(dead_code)]
 pub mod tvs;
+
+#[cfg(test)]
+mod tests;

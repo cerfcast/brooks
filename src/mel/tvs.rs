@@ -91,6 +91,7 @@ pub struct Params {
 
 pub type ReturnTypeCalculator = fn() -> Type;
 
+#[derive(Debug, Clone)]
 pub enum ParamsTypeCheckerError {
     Miscount(usize, usize),
     Mismatch(Type, Type),

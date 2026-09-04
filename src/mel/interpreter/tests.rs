@@ -2404,3 +2404,135 @@ mod interpreter_value_tests {
         )
     }
 }
+
+/// Test semantics and "checking" implementation of builtin functions directly.
+///
+/// See `type_check_tests` for similar tests in the context of analyzing a MEL expression.
+#[cfg(test)]
+mod builtin_function_interpreter_tests {
+    use std::assert_matches;
+
+    use crate::mel::{
+        interpreter::{
+            builtins::{BuiltinFunctionInterpreter, BuiltinInterpError},
+            interpret::{
+                TypedValue,
+                Value::{self, ArgumentList},
+            },
+        },
+        tvs::{Add_Query_MultiBuiltin, IntegerBuiltin, Type},
+    };
+
+    #[test]
+    #[ignore = "TODO"]
+    fn test_interpret_builtin_function_integer_parameter_count_ok() {
+        let _b = IntegerBuiltin {};
+
+        let _arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Integer(5),
+            tipe: Type::Integer,
+        }]);
+
+        // Update when implemented.
+        todo!()
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_query_path() {
+        let b = Add_Query_MultiBuiltin {};
+
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::String("a=b&c=d".to_string()),
+                tipe: Type::String,
+            },
+            TypedValue {
+                value: Value::String("n=v".to_string()),
+                tipe: Type::String,
+            },
+        ]);
+
+        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tipe: _ }) if s == "a=b&c=d&n=v" );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_query_path_trimmed_spaces() {
+        let b = Add_Query_MultiBuiltin {};
+
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::String("a=b&c=d&x=x".to_string()),
+                tipe: Type::String,
+            },
+            TypedValue {
+                value: Value::String("n=v, x=y".to_string()),
+                tipe: Type::String,
+            },
+        ]);
+
+        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tipe: _ }) if s == "a=b&c=d&x=y&n=v" );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_query_path_trimmed_spaces_in_value() {
+        let b = Add_Query_MultiBuiltin {};
+
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::String("a=b&c=d&x=x".to_string()),
+                tipe: Type::String,
+            },
+            TypedValue {
+                value: Value::String("n=v, x= y ".to_string()),
+                tipe: Type::String,
+            },
+        ]);
+
+        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tipe: _ }) if s == "a=b&c=d&x=y&n=v" );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_query_path_trimmed_spaces_in_value_embedded_in_value() {
+        let b = Add_Query_MultiBuiltin {};
+
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::String("a=b&c=d&x=x".to_string()),
+                tipe: Type::String,
+            },
+            TypedValue {
+                value: Value::String("n=v, x= \"y is y\"".to_string()),
+                tipe: Type::String,
+            },
+        ]);
+
+        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tipe: _ }) if s == "a=b&c=d&x=\"y is y\"&n=v" );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_query_path_wrong_type_params() {
+        let b = Add_Query_MultiBuiltin {};
+
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::Integer(5),
+                tipe: Type::Integer,
+            },
+            TypedValue {
+                value: Value::String("n=v, x= \"y is y\"".to_string()),
+                tipe: Type::String,
+            },
+        ]);
+
+        let error = match b.interpw(arg_values) {
+            Ok(_) => {
+                panic!("Could interpret call to builtin function with incorrectly typed arguments")
+            }
+            Err(e) => *e,
+        };
+        assert_matches!(
+            error,
+            BuiltinInterpError::ArgumentMismatch(0, Type::String, Type::Integer)
+        );
+    }
+}
