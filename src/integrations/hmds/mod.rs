@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+#[cfg(feature = "domain")]
+use std::path::Path;
 use std::{collections::HashMap, fs, io, path::PathBuf, str::FromStr};
 
 use chrono::{DateTime, Utc};
