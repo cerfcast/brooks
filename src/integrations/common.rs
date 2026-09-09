@@ -267,31 +267,45 @@ pub(crate) fn safe_brooks_integration_handle(
     mel: &Option<Scope<TypedValue>>,
     hmds_config: &mut HmdsConfiguration,
     runtime: &Runtime,
-    log: &mut LogMsgs,
-) -> Result<(StatusCode, reqwest::Response), Box<BrooksIntegrationsProxyError>> {
-    let host = request
-        .headers()
-        .get(HOST)
-        .ok_or(BrooksIntegrationsProxyError::ProxyError(
-            "Could not get host from request".to_string(),
-        ))?
-        .to_str()
-        .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
+    mut log: LogMsgs,
+) -> Result<(StatusCode, reqwest::Response, LogMsgs), (Box<BrooksIntegrationsProxyError>, LogMsgs)>
+{
+    let host = match request.headers().get(HOST) {
+        Some(o) => o,
+        None => {
+            return Err((
+                BrooksIntegrationsProxyError::ProxyError(
+                    "Could not get host from request".to_string(),
+                )
+                .into(),
+                log,
+            ));
+        }
+    };
+    let host = match host.to_str() {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((
+                BrooksIntegrationsProxyError::ProxyError(e.to_string()).into(),
+                log,
+            ));
+        }
+    };
 
     // First, try to find the query in the cache.
-    *log = debug!(
+    log = debug!(
         log,
         &format!("Looking for {host} in the host metadata cache.")
     );
 
     let found = match hmds_config.hmds_cache.get(host) {
         Some((timeout, found)) => {
-            *log = debug!(
+            log = debug!(
                 log,
                 &format!("Found {host} in the host metadata cache -- it is valid until {timeout}.")
             );
             if Utc::now() > *timeout {
-                *log = debug!(
+                log = debug!(
                     log,
                     &format!("{host} in the host metadata cache timed out.")
                 );
@@ -307,30 +321,50 @@ pub(crate) fn safe_brooks_integration_handle(
     let found = match found {
         Some(found) => found,
         None => {
-            let (expiry, query_result) = match runtime
-                .block_on(query_hmds(host, &hmds_config.hmds_server))
-                .map_err(|e| BrooksIntegrationsProxyError::HmdsQueryError(e.to_string()))?
-            {
+            let res = match runtime.block_on(query_hmds(host, &hmds_config.hmds_server)) {
+                Ok(o) => o,
+                Err(e) => {
+                    return Err((
+                        BrooksIntegrationsProxyError::HmdsQueryError(e.to_string()).into(),
+                        log,
+                    ));
+                }
+            };
+            let (expiry, query_result) = match res {
                 Some((timeout, query_result)) => (timeout, query_result),
                 None => {
-                    return Err(BrooksIntegrationsProxyError::MissingConfiguration(
-                        host.to_string(),
-                    )
-                    .into());
+                    return Err((
+                        BrooksIntegrationsProxyError::MissingConfiguration(host.to_string()).into(),
+                        log,
+                    ));
                 }
             };
 
-            let metadata = serde_json::from_value::<TypedHostMetadata<()>>(query_result)
-                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
+            let metadata = match serde_json::from_value::<TypedHostMetadata<()>>(query_result) {
+                Ok(o) => o,
+                Err(e) => {
+                    return Err((
+                        BrooksIntegrationsProxyError::ProxyError(e.to_string()).into(),
+                        log,
+                    ));
+                }
+            };
 
             let types_scope = Scopes::<Type> {
                 scopes: vec![&minimal_core_variable_types() + &builtin_function_types()],
             };
 
-            let found = verify_host_metadata(&metadata.value, types_scope)
-                .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
+            let found = match verify_host_metadata(&metadata.value, types_scope) {
+                Ok(o) => o,
+                Err(e) => {
+                    return Err((
+                        BrooksIntegrationsProxyError::ProxyError(e.to_string()).into(),
+                        log,
+                    ));
+                }
+            };
 
-            *log = debug!(
+            log = debug!(
                 log,
                 &format!("Put {host} in the host metadata cache to expire at {expiry}.")
             );
@@ -355,17 +389,24 @@ pub(crate) fn safe_brooks_integrations_proxy(
     mel: &Option<Scope<TypedValue>>,
     processed_http_req: &mut ProcessedRequest,
     runtime: &tokio::runtime::Runtime,
-    log: &mut LogMsgs,
-) -> Result<(StatusCode, reqwest::Response), Box<BrooksIntegrationsProxyError>> {
+    mut log: LogMsgs,
+) -> Result<(StatusCode, reqwest::Response, LogMsgs), (Box<BrooksIntegrationsProxyError>, LogMsgs)>
+{
     // For any of the host metadata entries that are client requests,
     // do them now.
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
+        #[allow(clippy::collapsible_if)]
         if let Some(stge) = &stage.aug.stage
             && TypedStageTypes::ClientRequest == stge.into()
         {
-            interpret_stage(stge, mel, processed_http_req, PsInterpretMode::Request)
-                .map_err(|e| Box::new(BrooksIntegrationsProxyError::PsInterpretError(e)))?;
+            if let Err(e) = interpret_stage(stge, mel, processed_http_req, PsInterpretMode::Request)
+            {
+                return Err((
+                    BrooksIntegrationsProxyError::PsInterpretError(e).into(),
+                    log,
+                ));
+            }
 
             // There are no synthetic responses at this stage.
         }
@@ -380,34 +421,61 @@ pub(crate) fn safe_brooks_integrations_proxy(
     // do them now.
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
+        #[allow(clippy::collapsible_if)]
         if let Some(stge) = &stage.aug.stage
             && TypedStageTypes::OriginRequest == stge.into()
         {
-            interpret_stage(stge, mel, processed_http_req, PsInterpretMode::Request)
-                .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
+            if let Err(e) = interpret_stage(stge, mel, processed_http_req, PsInterpretMode::Request)
+            {
+                return Err((
+                    BrooksIntegrationsProxyError::PsInterpretError(e).into(),
+                    log,
+                ));
+            }
 
             // There are no synthetic responses at this stage.
         }
     }
 
     // Now, send the request to the origin.
-    let processed_uri = processed_http_req.uri().map_err(|e| {
-        BrooksIntegrationsProxyError::TransformError(Box::new(
-            BrooksIntegrationTransformError::BadUri(e.to_string()),
-        ))
-    })?;
+    let processed_uri = match processed_http_req.uri() {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((
+                BrooksIntegrationsProxyError::TransformError(
+                    BrooksIntegrationTransformError::BadUri(e.to_string()).into(),
+                )
+                .into(),
+                log,
+            ));
+        }
+    };
 
-    let get_uri = Uri::from_str(&processed_uri.to_string()).map_err(|e| {
-        BrooksIntegrationsProxyError::TransformError(Box::new(
-            BrooksIntegrationTransformError::BadUri(e.to_string()),
-        ))
-    })?;
+    let get_uri = match Uri::from_str(&processed_uri.to_string()) {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((
+                BrooksIntegrationsProxyError::TransformError(
+                    BrooksIntegrationTransformError::BadUri(e.to_string()).into(),
+                )
+                .into(),
+                log,
+            ));
+        }
+    };
 
-    let get_url = Url::from_str(&get_uri.to_string()).map_err(|e| {
-        BrooksIntegrationsProxyError::TransformError(Box::new(
-            BrooksIntegrationTransformError::BadUrl(e.to_string()),
-        ))
-    })?;
+    let get_url = match Url::from_str(&get_uri.to_string()) {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((
+                BrooksIntegrationsProxyError::TransformError(
+                    BrooksIntegrationTransformError::BadUrl(e.to_string()).into(),
+                )
+                .into(),
+                log,
+            ));
+        }
+    };
 
     let mut proxy_request = reqwest::Client::new().get(get_url.clone());
 
@@ -419,9 +487,15 @@ pub(crate) fn safe_brooks_integrations_proxy(
     for (name, value) in processed_http_req.req.headers() {
         proxy_request = proxy_request.header(name, value);
     }
-    let mut result = runtime
-        .block_on(proxy_request.send())
-        .map_err(|e| BrooksIntegrationsProxyError::UpstreamError(e.to_string()))?;
+    let mut result = match runtime.block_on(proxy_request.send()) {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((
+                BrooksIntegrationsProxyError::UpstreamError(e.to_string()).into(),
+                log,
+            ));
+        }
+    };
 
     let mut processed_http_res = ProcessedResponse {
         requested_uri: get_uri,
@@ -437,22 +511,30 @@ pub(crate) fn safe_brooks_integrations_proxy(
             && (TypedStageTypes::OriginRequest == stge.into()
                 || TypedStageTypes::OriginResponse == stge.into())
         {
-            let result = interpret_stage(
+            let result = match interpret_stage(
                 stge,
                 mel,
                 &mut processed_http_res,
                 PsInterpretMode::Response,
-            )
-            .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
+            ) {
+                Ok(o) => o,
+                Err(e) => {
+                    return Err((
+                        BrooksIntegrationsProxyError::PsInterpretError(e).into(),
+                        log,
+                    ));
+                }
+            };
 
             if let PsInterpretValue::SyntheticResponse(sr) = result.0 {
-                *log = debug!(
+                log = debug!(
                     log,
                     "Got a synthetic response from an origin response stage."
                 );
                 return Ok((
                     processed_http_res.status(),
                     sr.clone().map(reqwest::Body::from).into(),
+                    log,
                 ));
             }
         }
@@ -472,26 +554,34 @@ pub(crate) fn safe_brooks_integrations_proxy(
             && (TypedStageTypes::ClientResponse == stge.into()
                 || TypedStageTypes::ClientRequest == stge.into())
         {
-            let result = interpret_stage(
+            let result = match interpret_stage(
                 stge,
                 mel,
                 &mut processed_http_res,
                 PsInterpretMode::Response,
-            )
-            .map_err(BrooksIntegrationsProxyError::PsInterpretError)?;
+            ) {
+                Ok(o) => o,
+                Err(e) => {
+                    return Err((
+                        BrooksIntegrationsProxyError::PsInterpretError(e).into(),
+                        log,
+                    ));
+                }
+            };
 
             if let PsInterpretValue::SyntheticResponse(sr) = result.0 {
-                *log = debug!(
+                log = debug!(
                     log,
                     "Got a synthetic response from an client response stage."
                 );
                 return Ok((
                     processed_http_res.status(),
                     sr.clone().map(reqwest::Body::from).into(),
+                    log,
                 ));
             }
         }
     }
 
-    Ok((processed_http_res.status(), result))
+    Ok((processed_http_res.status(), result, log))
 }

@@ -122,22 +122,25 @@ pub unsafe extern "C" fn brooks_caddy_proxy(
     res: *mut c_void,
     caddy_log_cb: *mut c_void,
 ) -> intptr_t {
-    let mut log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
+    let log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
 
-    let result: intptr_t = if let Err(e) = do_brooks_caddy_proxy(cookie, req, res, &mut log) {
-        log = error!(
-            log,
-            &format!(
-                "Error occurred proxying original request according to configured host metadata: {e}",
-            )
-        );
-        -1
-    } else {
-        log = debug!(
-            log,
-            "Successfully proxied original request according to configured host metadata"
-        );
-        0
+    let (result, log) = match do_brooks_caddy_proxy(cookie, req, res, log) {
+        Err((e, mut log)) => {
+            log = error!(
+                log,
+                &format!(
+                    "Error occurred proxying original request according to configured host metadata: {e}",
+                )
+            );
+            (-1, log)
+        }
+        Ok(mut log) => {
+            log = debug!(
+                log,
+                "Successfully proxied original request according to configured host metadata"
+            );
+            (0, log)
+        }
     };
 
     drain_to_caddy_log(caddy_log_cb, &log);
@@ -148,19 +151,24 @@ unsafe fn do_brooks_caddy_proxy(
     cookie: *mut BrooksCaddyConfiguration,
     req: *mut c_void,
     res: *mut c_void,
-    log: &mut LogMsgs,
-) -> Result<(), Box<BrooksIntegrationsProxyError>> {
+    log: LogMsgs,
+) -> Result<LogMsgs, (Box<BrooksIntegrationsProxyError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
     let mel_scope = builtin_builtin_function_interpreters();
 
     let mut http_req = Box::from_raw(req as *mut BrooksCaddyRequest).request;
 
-    let runtime = runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| BrooksIntegrationsProxyError::RuntimeError(e.to_string()))?;
+    let runtime = match runtime::Builder::new_current_thread().enable_all().build() {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((
+                BrooksIntegrationsProxyError::RuntimeError(e.to_string()).into(),
+                log,
+            ));
+        }
+    };
 
-    let (status, response) = safe_brooks_integration_handle(
+    let (status, response, log) = safe_brooks_integration_handle(
         &mut http_req,
         &Some(mel_scope),
         &mut (*cookie).hmds,
@@ -168,14 +176,21 @@ unsafe fn do_brooks_caddy_proxy(
         log,
     )?;
 
-    try_from_response(&response, status, res)
-        .map_err(BrooksIntegrationsProxyError::TransformError)?;
+    if let Err(e) = try_from_response(&response, status, res) {
+        return Err((BrooksIntegrationsProxyError::TransformError(e).into(), log));
+    }
 
-    let result_body = runtime
-        .block_on(response.bytes())
-        .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
+    let result_body = match runtime.block_on(response.bytes()) {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((
+                BrooksIntegrationsProxyError::ProxyError(e.to_string()).into(),
+                log,
+            ));
+        }
+    };
 
     caddy_response_set_body(res, result_body.len() as GoInt, result_body.as_ptr());
 
-    Ok(())
+    Ok(log)
 }

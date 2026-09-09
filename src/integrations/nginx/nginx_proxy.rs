@@ -173,14 +173,15 @@ pub unsafe extern "C" fn ngx_brooks_proxy(
     req: *mut ngx_http_request_s,
     body: *mut *mut ngx_buf_s,
 ) -> intptr_t {
-    let mut log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
+    let log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
 
     let mut result = NginxReturnCodes::Ok;
-    match do_ngx_brooks_proxy(cookie, req, body, &mut log) {
-        Ok(_) => {
+    let log = match do_ngx_brooks_proxy(cookie, req, body, log) {
+        Ok(mut log) => {
             log = error!(log, "Successful proxy");
+            log
         }
-        Err(e) => {
+        Err((e, mut log)) => {
             log = error!(log, &e.to_string());
             (*req).headers_out.content_length_n = e.to_string().len() as i64;
             (*req).headers_out.status = 500;
@@ -198,8 +199,9 @@ pub unsafe extern "C" fn ngx_brooks_proxy(
                     null::<*mut ngx_buf_s>() as *mut ngx_buf_s
                 }
             };
+            log
         }
-    }
+    };
     log_nginx_msgs((*(*req).connection).log, &log);
     result as intptr_t
 }
@@ -208,20 +210,27 @@ unsafe fn do_ngx_brooks_proxy(
     cookie: *mut NginxBrooksConfiguration,
     req: *mut ngx_http_request_s,
     body: *mut *mut ngx_buf_s,
-    log: &mut LogMsgs,
-) -> Result<(), Box<BrooksIntegrationsProxyError>> {
+    log: LogMsgs,
+) -> Result<LogMsgs, (Box<BrooksIntegrationsProxyError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
     let mel_scope = builtin_builtin_function_interpreters();
 
-    let mut http_req = TryInto::<Request<String>>::try_into(*req)
-        .map_err(|e| Box::new(BrooksIntegrationsProxyError::TransformError(e)))?;
+    let mut http_req = match TryInto::<Request<String>>::try_into(*req) {
+        Ok(o) => o,
+        Err(e) => return Err((BrooksIntegrationsProxyError::TransformError(e).into(), log)),
+    };
 
-    let runtime = runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| BrooksIntegrationsProxyError::RuntimeError(e.to_string()))?;
+    let runtime = match runtime::Builder::new_current_thread().enable_all().build() {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((
+                BrooksIntegrationsProxyError::RuntimeError(e.to_string()).into(),
+                log,
+            ));
+        }
+    };
 
-    let (status, response) = safe_brooks_integration_handle(
+    let (status, response, log) = safe_brooks_integration_handle(
         &mut http_req,
         &Some(mel_scope),
         &mut (*cookie).hmds,
@@ -229,18 +238,27 @@ unsafe fn do_ngx_brooks_proxy(
         log,
     )?;
 
-    try_from_response(&response, status, req)
-        .map_err(BrooksIntegrationsProxyError::TransformError)?;
+    if let Err(e) = try_from_response(&response, status, req) {
+        return Err((BrooksIntegrationsProxyError::TransformError(e).into(), log));
+    }
 
-    let result_body = runtime
-        .block_on(response.bytes())
-        .map_err(|e| BrooksIntegrationsProxyError::ProxyError(e.to_string()))?;
+    let result_body = match runtime.block_on(response.bytes()) {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((
+                BrooksIntegrationsProxyError::ProxyError(e.to_string()).into(),
+                log,
+            ));
+        }
+    };
 
-    *body = to_nginx_buf(&result_body, (*req).pool)
-        .map_err(BrooksIntegrationsProxyError::TransformError)?;
+    *body = match to_nginx_buf(&result_body, (*req).pool) {
+        Ok(o) => o,
+        Err(e) => return Err((BrooksIntegrationsProxyError::TransformError(e).into(), log)),
+    };
 
     // Indicate that the response should use chunked encoding.
     (*req).headers_out.content_length_n = -1;
 
-    Ok(())
+    Ok(log)
 }
