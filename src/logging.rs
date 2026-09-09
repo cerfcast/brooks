@@ -17,9 +17,6 @@
 
 use std::fmt::{Debug, Display};
 
-#[cfg(feature = "json")]
-use serde::Serialize;
-
 pub trait Location: Display + Debug {}
 
 pub trait Formatter<T> {
@@ -43,7 +40,6 @@ impl Formatter<LogMsg> for LogMsgFormatter {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, PartialOrd)]
-#[cfg_attr(feature = "json", derive(Serialize))]
 pub enum LogLevel {
     Trace,
     Debug,
@@ -53,7 +49,6 @@ pub enum LogLevel {
 }
 
 #[derive(Debug, Default)]
-#[cfg_attr(feature = "json", derive(Serialize))]
 pub struct LogMsg {
     msg: String,
     location: Option<Box<dyn Location>>,
@@ -91,7 +86,6 @@ impl LogMsg {
 }
 
 #[derive(Debug, Default)]
-#[cfg_attr(feature = "json", derive(Serialize))]
 pub struct LogMsgs {
     msgs: Vec<LogMsg>,
     level: LogLevel,
