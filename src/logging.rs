@@ -52,6 +52,17 @@ pub enum LogLevel {
     Error,
 }
 
+impl Display for LogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogLevel::Trace => write!(f, "Trace"),
+            LogLevel::Debug => write!(f, "Debug"),
+            LogLevel::Warn => write!(f, "Warn"),
+            LogLevel::Error => write!(f, "Error"),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct LogMsg {
     msg: String,
@@ -105,6 +116,10 @@ impl LogMsg {
 
     pub fn msg(&self) -> String {
         self.msg.clone()
+    }
+
+    pub fn location(&self) -> &Option<Box<dyn Location>> {
+        &self.location
     }
 }
 
