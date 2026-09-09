@@ -17,6 +17,9 @@
 
 use std::fmt::{Debug, Display};
 
+#[cfg(feature = "serializable_logs")]
+use serde::{Serialize, ser::SerializeStruct};
+
 pub trait Location: Display + Debug {}
 
 pub trait Formatter<T> {
@@ -40,6 +43,7 @@ impl Formatter<LogMsg> for LogMsgFormatter {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serializable_logs", derive(Serialize))]
 pub enum LogLevel {
     Trace,
     Debug,
@@ -53,6 +57,25 @@ pub struct LogMsg {
     msg: String,
     location: Option<Box<dyn Location>>,
     level: LogLevel,
+}
+
+#[cfg(feature = "serializable_logs")]
+impl Serialize for LogMsg {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("LogMsg", 3)?;
+        state.serialize_field("msg", &self.msg)?;
+        if let Some(location) = &self.location {
+            let v = Some((*location).to_string());
+            state.serialize_field("location", &v)?;
+        } else {
+            state.skip_field("location")?;
+        };
+        state.serialize_field("level", &self.level)?;
+        state.end()
+    }
 }
 
 impl LogMsg {
@@ -86,9 +109,12 @@ impl LogMsg {
 }
 
 #[derive(Debug, Default)]
+#[cfg_attr(feature = "serializable_logs", derive(Serialize))]
 pub struct LogMsgs {
     msgs: Vec<LogMsg>,
+    #[cfg_attr(feature = "serializable_logs", serde(skip_serializing))]
     level: LogLevel,
+    #[cfg_attr(feature = "serializable_logs", serde(skip_serializing))]
     prefix: Option<String>,
 }
 
@@ -179,3 +205,48 @@ emit_!(trace_with_loc, trace, LogLevel::Trace);
 emit_!(debug_with_loc, debug, LogLevel::Debug);
 emit_!(warn_with_loc, warn, LogLevel::Warn);
 emit_!(error_with_loc, error, LogLevel::Error);
+
+#[cfg(all(test, feature = "serializable_logs"))]
+mod serializable_logs {
+    use std::fmt::Display;
+
+    use crate::logging::{Location, LogMsg, LogMsgs};
+
+    #[derive(Debug)]
+    struct SimpleLocation {
+        l: i32,
+    }
+
+    impl Display for SimpleLocation {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.l)
+        }
+    }
+
+    impl Location for SimpleLocation {}
+
+    #[test]
+    fn simple_test() {
+        let msg = LogMsg {
+            msg: "Trace message".into(),
+            location: Some(Box::new(SimpleLocation { l: 5 })),
+            level: super::LogLevel::Trace,
+        };
+
+        let log = LogMsgs::new(crate::logging::LogLevel::Trace);
+        let log = log.log(msg);
+        let serialized =
+            serde_json::to_string_pretty(&log).expect("Could not serialize valid log messages");
+
+        let expected = "{
+  \"msgs\": [
+    {
+      \"msg\": \"Trace message\",
+      \"location\": \"5\",
+      \"level\": \"Trace\"
+    }
+  ]
+}";
+        pretty_assertions::assert_eq!(expected, serialized);
+    }
+}
