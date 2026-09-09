@@ -19,7 +19,8 @@ use std::fmt::Display;
 
 use crate::{
     cdni::spec::{HostMetadata, TypedGenericMetadata},
-    mel::{scope::Scopes, tvs::Type},
+    environment::scope::Scopes,
+    mel::tvs::Type,
     ps::{
         spec::{TypedGenericStage, TypedStage},
         verify::{PsVerificationError, PsVerificationKey, verify_ps_request_stage},

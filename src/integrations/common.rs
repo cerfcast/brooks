@@ -27,11 +27,12 @@ use crate::{
         spec::{HostMetadata, TypedHostMetadata},
         verify::{HostMetadataVerificationKey, verify_host_metadata},
     },
+    environment::scope::{Scope, Scopes},
     integrations::hmds::{HmdsConfiguration, query_hmds},
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
         interpreter::interpret::TypedValue,
-        scope::{Scope, Scopes, builtin_function_types, minimal_core_variable_types},
+        scope::{builtin_function_types, minimal_core_variable_types},
         tvs::Type,
     },
     ps::{
