@@ -166,7 +166,7 @@ pub async fn query_hmds(
         return query_hmds_http(query, config.url.as_ref().unwrap()).await;
     } else {
         Err(io::Error::other(
-            "Querying HMDS via HTTP is the only supported option and configuration is missing",
+            "Querying HMDS over HTTP is the only supported option and configuration is missing",
         ))
     }
 }

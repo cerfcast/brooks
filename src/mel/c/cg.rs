@@ -78,7 +78,7 @@ impl SSA {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct MelCodegenContext {
     pub scopes: scope::Scopes<Type>,
     pub code: Vec<LocatableString>,
@@ -98,37 +98,37 @@ impl MelCodegenContext {
         }
     }
 
-    pub fn append_code(&self, code: LocatableString) -> Self {
+    pub fn append_code(self, code: LocatableString) -> Self {
         let mut nc = self.code.clone();
         nc.push(code);
         MelCodegenContext {
             code: nc,
-            scopes: self.scopes.clone(),
-            log: self.log.clone(),
-            ssa: self.ssa.clone(),
-            ssa_gen: self.ssa_gen.clone(),
+            scopes: self.scopes,
+            log: self.log,
+            ssa: self.ssa,
+            ssa_gen: self.ssa_gen,
         }
     }
 
-    pub fn used_ssa(&self, ssa: String) -> Self {
+    pub fn used_ssa(self, ssa: String) -> Self {
         MelCodegenContext {
-            code: self.code.clone(),
-            scopes: self.scopes.clone(),
-            log: self.log.clone(),
+            code: self.code,
+            scopes: self.scopes,
+            log: self.log,
             ssa,
-            ssa_gen: self.ssa_gen.clone(),
+            ssa_gen: self.ssa_gen,
         }
     }
 
-    pub fn next_ssa(&self) -> (String, Self) {
+    pub fn next_ssa(self) -> (String, Self) {
         let (next_handle, next_ssa) = self.ssa_gen.usse();
         (
             next_handle,
             MelCodegenContext {
-                code: self.code.clone(),
-                scopes: self.scopes.clone(),
-                log: self.log.clone(),
-                ssa: self.ssa.clone(),
+                code: self.code,
+                scopes: self.scopes,
+                log: self.log,
+                ssa: self.ssa,
                 ssa_gen: next_ssa,
             },
         )
@@ -205,6 +205,29 @@ macro_rules! decl {
     };
 }
 
+macro_rules! use_log {
+    ($context:ident, $logx:expr) => {
+        match $context {
+            MelCodegenContext {
+                log,
+                scopes,
+                code,
+                ssa_gen,
+                ssa,
+            } => {
+                let logp = $logx(log);
+                MelCodegenContext {
+                    log: logp,
+                    scopes,
+                    code,
+                    ssa,
+                    ssa_gen,
+                }
+            }
+        }
+    };
+}
+
 pub struct MelCodegen {}
 
 impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCodegen {
@@ -214,11 +237,13 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         context: MelCodegenContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {
-        let _context = context.update_log(trace_with_loc!(
-            context.log,
-            ast.location.clone(),
-            "Generating code for function call expression"
-        ));
+        let _context = use_log!(context, |log: LogMsgs| {
+            trace_with_loc!(
+                log,
+                ast.location.clone(),
+                "Generating code for function call expression"
+            )
+        });
 
         todo!()
     }
@@ -229,30 +254,32 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         context: MelCodegenContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {
-        let context = context.update_log(trace_with_loc!(
-            context.log,
-            ast.location.clone(),
-            "Generating code for identifier expression"
-        ));
+        let context = use_log!(context, |log: LogMsgs| {
+            trace_with_loc!(
+                log,
+                ast.location.clone(),
+                "Generating code for identifier expression"
+            )
+        });
 
-        let (ssa, mut context) = context.next_ssa();
+        let (ssa, context) = context.next_ssa();
 
-        let found_id = context
-            .scopes
-            .lookup(&ast.identifier)
-            .as_ref()
-            .ok_or(MelCodegenLocatableError {
-                error: MelCodegenError::UnknownIdentifier(ast.identifier.clone()),
-                location: ast.location.clone(),
-                context: context.clone(),
-            })?
-            .clone();
+        let found_id = match context.scopes.lookup(&ast.identifier) {
+            Some(v) => v,
+            None => {
+                return Err(MelCodegenLocatableError {
+                    error: MelCodegenError::UnknownIdentifier(ast.identifier.clone()),
+                    location: ast.location.clone(),
+                    context,
+                });
+            }
+        };
 
         let decl = decl!(found_id, ssa, ast.identifier);
 
-        context = context.used_ssa(ssa);
+        let context = context.used_ssa(ssa);
 
-        context = context.append_code(LocatableString {
+        let context = context.append_code(LocatableString {
             s: decl,
             l: ast.location.clone(),
         });
@@ -266,11 +293,13 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         context: MelCodegenContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {
-        let _context = context.update_log(trace_with_loc!(
-            context.log,
-            ast.location.clone(),
-            "Generating code for argument list expression"
-        ));
+        let _context = use_log!(context, |log: LogMsgs| {
+            trace_with_loc!(
+                log,
+                ast.location.clone(),
+                "Generating code for argument list expression"
+            )
+        });
 
         todo!()
     }
@@ -281,11 +310,13 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         context: MelCodegenContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {
-        let _context = context.update_log(trace_with_loc!(
-            context.log,
-            ast.location.clone(),
-            "Generating code for argument list expression"
-        ));
+        let _context = use_log!(context, |log: LogMsgs| {
+            trace_with_loc!(
+                log,
+                ast.location.clone(),
+                "Generating code for argument list expression"
+            )
+        });
 
         todo!()
     }
@@ -296,16 +327,18 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         context: MelCodegenContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {
-        let mut context = context.update_log(trace_with_loc!(
-            context.log,
-            ast.location.clone(),
-            "Generating code for binary expression"
-        ));
+        let context = use_log!(context, |log: LogMsgs| {
+            trace_with_loc!(
+                log,
+                ast.location.clone(),
+                "Generating code for binary expression"
+            )
+        });
 
-        context = driver.visit(&ast.left, self, context.clone())?;
+        let context = driver.visit(&ast.left, self, context)?;
         let left_ssa = context.ssa.clone();
 
-        context = driver.visit(&ast.right, self, context.clone())?;
+        let context = driver.visit(&ast.right, self, context)?;
         let right_ssa = context.ssa.clone();
 
         let (ssa, mut context) = context.next_ssa();
@@ -352,11 +385,9 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         context: MelCodegenContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {
-        let context = context.update_log(trace_with_loc!(
-            context.log,
-            ast.1.clone(),
-            "Generating code for literal expression"
-        ));
+        let context = use_log!(context, |log: LogMsgs| {
+            trace_with_loc!(log, ast.1.clone(), "Generating code for literal expression")
+        });
 
         let (ssa, mut context) = context.next_ssa();
 
@@ -395,19 +426,21 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         context: MelCodegenContext,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {
-        let mut context = context.update_log(trace_with_loc!(
-            context.log,
-            ast.location.clone(),
-            "Generating code for ternary expression"
-        ));
+        let context = use_log!(context, |log: LogMsgs| {
+            trace_with_loc!(
+                log,
+                ast.location.clone(),
+                "Generating code for literal expression"
+            )
+        });
 
-        context = driver.visit(&ast.condition, self, context.clone())?;
+        let context = driver.visit(&ast.condition, self, context)?;
         let condition_ssa = context.ssa.clone();
 
-        context = driver.visit(&ast.yes, self, context.clone())?;
+        let context = driver.visit(&ast.yes, self, context)?;
         let yes_ssa = context.ssa.clone();
 
-        context = driver.visit(&ast.no, self, context.clone())?;
+        let context = driver.visit(&ast.no, self, context)?;
         let no_ssa = context.ssa.clone();
 
         let (ssa, mut context) = context.next_ssa();
@@ -431,11 +464,13 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
         context: MelCodegenContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {
-        let _context = context.update_log(trace_with_loc!(
-            context.log,
-            ast.location.clone(),
-            "Generating code for member access expression"
-        ));
+        let _context = use_log!(context, |log: LogMsgs| {
+            trace_with_loc!(
+                log,
+                ast.location.clone(),
+                "Generating code for member access expression"
+            )
+        });
 
         todo!()
     }

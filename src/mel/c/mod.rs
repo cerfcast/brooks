@@ -47,11 +47,13 @@ pub fn codegen<A: Write>(
     let result = driver.visit(expr, &visitor, context)?;
 
     for c in &result.code {
-        write!(output, "// {}\n{}\n", c.l, c.s).map_err(|e| MelCodegenLocatableError {
-            location: expr.location().clone(),
-            error: MelCodegenError::WriteFailed(Box::new(e)),
-            context: result.clone(),
-        })?;
+        if let Err(e) = write!(output, "// {}\n{}\n", c.l, c.s) {
+            return Err(MelCodegenLocatableError {
+                location: expr.location().clone(),
+                error: MelCodegenError::WriteFailed(Box::new(e)),
+                context: result,
+            });
+        }
     }
 
     Ok(output)
@@ -68,7 +70,7 @@ pub fn codegen_function<A: Write>(
     let driver = AstVisitorDriver {};
     let visitor = MelCodegen {};
 
-    writeln!(
+    if let Err(e) = writeln!(
         output,
         "{} {}({}) {{",
         mel_type_to_c_type(&expr.tipe()),
@@ -78,12 +80,13 @@ pub fn codegen_function<A: Write>(
             .map(|(tpe, name)| { format!("{} {}", tpe, name) })
             .collect::<Vec<_>>()
             .join(",")
-    )
-    .map_err(|e| MelCodegenLocatableError {
-        location: expr.location().clone(),
-        error: MelCodegenError::WriteFailed(Box::new(e)),
-        context: context.clone(),
-    })?;
+    ) {
+        return Err(MelCodegenLocatableError {
+            location: expr.location().clone(),
+            error: MelCodegenError::WriteFailed(Box::new(e)),
+            context,
+        });
+    };
 
     let mut context = driver.visit(expr, &visitor, context)?;
 
@@ -96,17 +99,19 @@ pub fn codegen_function<A: Write>(
     });
 
     for c in &context.code {
-        write!(output, "// {}\n{}\n", c.l, c.s).map_err(|e| MelCodegenLocatableError {
-            location: expr.location().clone(),
-            error: MelCodegenError::WriteFailed(Box::new(e)),
-            context: context.clone(),
-        })?;
+        if let Err(e) = write!(output, "// {}\n{}\n", c.l, c.s) {
+            return Err(MelCodegenLocatableError {
+                location: expr.location().clone(),
+                error: MelCodegenError::WriteFailed(Box::new(e)),
+                context,
+            });
+        }
     }
 
     writeln!(output, "}}").map_err(|e| MelCodegenLocatableError {
         location: expr.location().clone(),
         error: MelCodegenError::WriteFailed(Box::new(e)),
-        context: context.clone(),
+        context,
     })?;
     Ok(output)
 }
@@ -140,7 +145,7 @@ pub fn codegen_project(
     let function_data: Vec<u8> = vec![];
     let mut function_buffer = BufWriter::new(function_data);
 
-    writeln!(
+    if let Err(e) = writeln!(
         function_buffer,
         "{} {}({}) {{",
         mel_type_to_c_type(&expr.tipe()),
@@ -150,12 +155,13 @@ pub fn codegen_project(
             .map(|(tpe, name)| { format!("{} {}", tpe, name) })
             .collect::<Vec<_>>()
             .join(",")
-    )
-    .map_err(|e| MelCodegenLocatableError {
-        location: expr.location().clone(),
-        error: MelCodegenError::WriteFailed(Box::new(e)),
-        context: context.clone(),
-    })?;
+    ) {
+        return Err(MelCodegenLocatableError {
+            location: expr.location().clone(),
+            error: MelCodegenError::WriteFailed(Box::new(e)),
+            context,
+        });
+    };
 
     let mut context = driver.visit(expr, &visitor, context)?;
 
@@ -168,19 +174,19 @@ pub fn codegen_project(
     });
 
     for c in &context.code {
-        write!(function_buffer, "\t// {}\n\t{}\n", c.l, c.s).map_err(|e| {
-            MelCodegenLocatableError {
+        if let Err(e) = write!(function_buffer, "\t// {}\n\t{}\n", c.l, c.s) {
+            return Err(MelCodegenLocatableError {
                 location: expr.location().clone(),
                 error: MelCodegenError::WriteFailed(Box::new(e)),
-                context: context.clone(),
-            }
-        })?;
+                context,
+            });
+        }
     }
 
     writeln!(function_buffer, "}}").map_err(|e| MelCodegenLocatableError {
         location: expr.location().clone(),
         error: MelCodegenError::WriteFailed(Box::new(e)),
-        context: context.clone(),
+        context,
     })?;
 
     let function_code = String::from_utf8_lossy(function_buffer.buffer());

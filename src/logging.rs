@@ -15,12 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::fmt::Debug;
-
-use crate::common::GrammarLocation;
+use std::fmt::{Debug, Display};
 
 #[cfg(feature = "json")]
 use serde::Serialize;
+
+pub trait Location: Display + Debug {}
 
 pub trait Formatter<T> {
     fn format(&self, value: &T) -> String;
@@ -52,11 +52,11 @@ pub enum LogLevel {
     Error,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 #[cfg_attr(feature = "json", derive(Serialize))]
 pub struct LogMsg {
     msg: String,
-    location: Option<GrammarLocation>,
+    location: Option<Box<dyn Location>>,
     level: LogLevel,
 }
 
@@ -68,7 +68,7 @@ impl LogMsg {
     pub fn new_with_location(
         msg: &str,
         level: LogLevel,
-        location: Option<GrammarLocation>,
+        location: Option<Box<dyn Location>>,
     ) -> Self {
         LogMsg {
             msg: msg.to_string(),
@@ -90,7 +90,7 @@ impl LogMsg {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 #[cfg_attr(feature = "json", derive(Serialize))]
 pub struct LogMsgs {
     msgs: Vec<LogMsg>,
@@ -115,15 +115,15 @@ impl LogMsgs {
         }
     }
 
-    pub fn update_level(&self, new_level: LogLevel) -> Self {
+    pub fn update_level(self, new_level: LogLevel) -> Self {
         LogMsgs {
-            msgs: self.msgs.clone(),
+            msgs: self.msgs,
             level: new_level,
             prefix: self.prefix.clone(),
         }
     }
 
-    pub fn log(&self, msg: LogMsg) -> Self {
+    pub fn log(self, msg: LogMsg) -> Self {
         if msg.level >= self.level {
             let msg = if let Some(prefix) = &self.prefix {
                 LogMsg {
@@ -134,11 +134,11 @@ impl LogMsgs {
             } else {
                 msg
             };
-            let mut ns = self.clone();
+            let mut ns = self;
             ns.msgs.push(msg);
             ns
         } else {
-            self.clone()
+            self
         }
     }
 
@@ -164,7 +164,11 @@ macro_rules! emit_ {
         #[allow(unused_macros)]
         macro_rules! $nameloc {
             ($log:expr, $loc:expr, $msg:expr ) => {
-                $log.log(LogMsg::new_with_location($msg, $level, Some($loc)))
+                $log.log(LogMsg::new_with_location(
+                    $msg,
+                    $level,
+                    Some(Box::new($loc)),
+                ))
             };
         }
 

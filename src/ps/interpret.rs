@@ -259,23 +259,26 @@ impl<'a> PsInterpreter<'a> {
             log: LogMsgs::new(crate::logging::LogLevel::Trace),
         };
 
-        let result = interpreter::interpret(expr, expr_context.clone())
-            .map_err(PsInterpretError::MelInterpreterError)?
+        let result_ctxt = interpreter::interpret(expr, expr_context)
+            .map_err(PsInterpretError::MelInterpreterError)?;
+
+        let result_val = result_ctxt
             .val
+            .as_ref()
             .ok_or(PsInterpretError::AssertionFailure(
                 PsInterpretAssertionFailures::MissingInterpreterExpressionValue,
             ))?;
 
-        if result.tipe == expected {
-            Ok(result)
+        if result_val.tipe == expected {
+            Ok(result_val.clone())
         } else {
             Err(PsInterpretError::MelInterpreterError(
                 MelInterpLocatableError {
                     error: MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(expected, result.tipe).into(),
+                        MelInterpAssertion::TypeMismatch(expected, result_val.tipe.clone()).into(),
                     )
                     .into(),
-                    context: expr_context.clone(),
+                    context: result_ctxt,
                     location: expr.location().clone(),
                 }
                 .into(),

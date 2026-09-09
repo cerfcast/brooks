@@ -31,6 +31,7 @@ mod interpreter_tests {
                 Value::{self, Struct},
             },
         },
+        scope::Scopes,
         tvs::{
             self, Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
             Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
@@ -91,9 +92,9 @@ mod interpreter_tests {
 
         let b = BooleanBuiltin {};
 
-        let mut context = MelAnalysisContext::default();
+        let context = MelAnalysisContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let context = context.update_scopes(&context.scopes.insert(
             &b.name(),
             Function(
                 b.name(),
@@ -116,9 +117,11 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -128,7 +131,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -180,9 +184,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -192,7 +197,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -244,9 +250,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -256,7 +263,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -308,9 +316,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -320,7 +329,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -373,9 +383,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -385,7 +396,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -437,9 +449,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -449,7 +462,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -501,9 +515,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -513,7 +528,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -565,9 +581,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -577,7 +594,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -630,9 +648,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -642,7 +661,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -694,9 +714,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -706,7 +727,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -758,9 +780,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -770,7 +793,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -823,9 +847,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -835,7 +860,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -887,9 +913,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -899,7 +926,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -951,9 +979,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -963,7 +992,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1016,9 +1046,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1028,7 +1059,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1080,9 +1112,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1092,7 +1125,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1144,9 +1178,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1156,7 +1191,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1208,9 +1244,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1220,7 +1257,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1272,9 +1310,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1284,7 +1323,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1336,9 +1376,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1348,7 +1389,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1400,9 +1442,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1412,7 +1455,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1464,9 +1508,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1476,7 +1521,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1528,9 +1574,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1540,7 +1587,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1592,9 +1640,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1604,7 +1653,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1656,9 +1706,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1668,7 +1719,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1720,9 +1772,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1732,7 +1785,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1784,9 +1838,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1796,7 +1851,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1848,9 +1904,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1860,7 +1917,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1912,9 +1970,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1924,7 +1983,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -1976,9 +2036,10 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
@@ -1988,7 +2049,8 @@ mod interpreter_tests {
                     b.params_type_checker(),
                 ),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -2068,15 +2130,17 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = Scopes::<TypedValue>::default();
+        let tv_scopes = tv_scopes.insert(
             "a",
             TypedValue {
                 value: Value::String("Hello".to_string()),
                 tipe: Type::String,
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -2121,7 +2185,7 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
         let mut reqsv = StructValue {
             fields: HashMap::new(),
@@ -2135,13 +2199,17 @@ mod interpreter_tests {
                 tipe: Type::String,
             },
         );
-        context = context.update_scopes(&context.scopes.insert(
+
+        let tv_scopes = Scopes::<TypedValue>::default();
+
+        let tv_scopes = tv_scopes.insert(
             "req",
             TypedValue {
                 value: Struct(reqsv),
                 tipe: Type::Struct(reqs),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -2185,7 +2253,8 @@ mod interpreter_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
+        let tv_scopes = Scopes::<TypedValue>::default();
 
         let mut reqsv = StructValue {
             fields: HashMap::new(),
@@ -2199,13 +2268,14 @@ mod interpreter_tests {
                 tipe: Type::String,
             },
         );
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = tv_scopes.insert(
             "req",
             TypedValue {
                 value: Struct(reqsv),
                 tipe: Type::Struct(reqs),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
@@ -2224,7 +2294,7 @@ mod interpreter_tests {
 #[cfg(test)]
 mod interpreter_logger_tests {
     use crate::{
-        logging::{LogLevel::Trace, LogMsgFormatter},
+        logging::{LogLevel::Trace, LogMsgFormatter, LogMsgs},
         mel::{
             analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
             ast::AstVisitorDriver,
@@ -2233,6 +2303,7 @@ mod interpreter_logger_tests {
                 MelInterp, MelInterpContext, StructValue, TypedValue,
                 Value::{self, Struct},
             },
+            scope::Scopes,
             tvs::{self, Type},
         },
     };
@@ -2263,9 +2334,12 @@ mod interpreter_logger_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_log(context.log.update_level(Trace));
+        let mut log = LogMsgs::default();
+        log = log.update_level(Trace);
+
+        let context = context.update_log(log);
         let result = driver
             .visit(&expr, &visitor, context)
             .expect("Could not interpret");
@@ -2310,9 +2384,14 @@ mod interpreter_logger_tests {
 
         let driver = AstVisitorDriver {};
         let visitor = MelInterp {};
-        let mut context = MelInterpContext::default();
+        let context = MelInterpContext::default();
 
-        context = context.update_log(context.log.update_level(Trace));
+        let mut log = LogMsgs::default();
+        log = log.update_level(Trace);
+
+        let context = context.update_log(log);
+
+        let tv_scopes = Scopes::<TypedValue>::default();
 
         let mut reqsv = StructValue {
             fields: HashMap::new(),
@@ -2327,13 +2406,14 @@ mod interpreter_logger_tests {
             },
         );
 
-        context = context.update_scopes(&context.scopes.insert(
+        let tv_scopes = tv_scopes.insert(
             "req",
             TypedValue {
                 value: Struct(reqsv),
                 tipe: Type::Struct(reqs),
             },
-        ));
+        );
+        let context = context.update_scopes(&tv_scopes);
 
         let result = driver
             .visit(&expr, &visitor, context)
