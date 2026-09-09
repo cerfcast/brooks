@@ -21,11 +21,11 @@ use serde::Serialize;
 
 use crate::{
     cdni::spec::TypedGenericMetadata,
+    environment::scope::Scopes,
     mel::{
         analysis::{Analyzed, MelAnalysisLocatableError, analyze},
         ast::Expr,
         compiler::{self, compile::MelCompilerLocatableError},
-        scope::Scopes,
         tvs::Type,
     },
     ps::{
@@ -1461,7 +1461,7 @@ mod test_verify {
 mod test_verify_from_json {
     use std::assert_matches;
 
-    use crate::mel::scope::Scopes;
+    use crate::environment::scope::Scopes;
     use crate::mel::tvs::Type;
     use crate::ps::spec::{
         HeaderTransform, ResponseTransform, SyntheticResponse, TypedGenericStage,

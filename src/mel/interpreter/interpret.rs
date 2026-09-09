@@ -24,7 +24,10 @@ use std::{
 
 use regex::Regex;
 
-use crate::{common::GrammarLocation, mel::interpreter::builtins::BuiltinInterpError};
+use crate::{
+    common::GrammarLocation, environment::scope::Scopes,
+    mel::interpreter::builtins::BuiltinInterpError,
+};
 use crate::{
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{interpreter::builtins::BuiltinFunctionInterpreter, tvs::BuiltinFunctionType},
@@ -42,7 +45,6 @@ use crate::mel::{
     interpreter::interpret::{
         MelInterpAssertion::SuccessWithoutValue, MelInterpError::UnknownIdentifier,
     },
-    scope,
     tvs::{Struct, Type},
 };
 
@@ -261,7 +263,7 @@ pub type MelInterpResult = Result<MelInterpContext, Box<MelInterpLocatableError>
 #[derive(Debug, Default)]
 pub struct MelInterpContext {
     pub val: Option<TypedValue>,
-    pub scopes: scope::Scopes<TypedValue>,
+    pub scopes: Scopes<TypedValue>,
     pub log: LogMsgs,
 }
 
@@ -273,7 +275,7 @@ impl MelInterpContext {
             log: self.log,
         }
     }
-    pub fn update_scopes(self, new: &scope::Scopes<TypedValue>) -> Self {
+    pub fn update_scopes(self, new: &Scopes<TypedValue>) -> Self {
         MelInterpContext {
             val: self.val,
             scopes: new.clone(),

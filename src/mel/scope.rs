@@ -15,91 +15,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt::Debug, ops::Add};
-
 use http::uri::Scheme;
 
-use crate::mel::{
-    interpreter::interpret::{StructValue, TypedValue, Value},
-    tvs::{
-        Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
-        IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
-        Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin, Remove_QueryBuiltin,
-        Type::{self, Function},
-        UpperBuiltin, header_type, header_type_from_req, req_type, uri_type,
+use crate::{
+    environment::scope::Scope,
+    mel::{
+        interpreter::interpret::{StructValue, TypedValue, Value},
+        tvs::{
+            Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
+            IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,
+            MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin,
+            Remove_QueryBuiltin,
+            Type::{self, Function},
+            UpperBuiltin, header_type, header_type_from_req, req_type, uri_type,
+        },
     },
 };
-
-#[derive(Debug, Clone, Default)]
-pub struct Scope<I: Clone + Default> {
-    pub items: HashMap<String, I>,
-}
-
-impl<I: Clone + Default> Scope<I> {
-    pub fn lookup(&self, id: &str) -> Option<I> {
-        self.items.get(id).cloned()
-    }
-    pub fn insert(&self, id: &str, value: I) -> Self {
-        let mut next = self.items.clone();
-        next.insert(id.to_string(), value);
-        Self { items: next }
-    }
-}
-
-impl<I: Clone + Default> Add for &Scope<I> {
-    type Output = Scope<I>;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        let mut ns = Scope::<I> {
-            items: HashMap::new(),
-        };
-        for (k, v) in &self.items {
-            ns = ns.insert(k, v.clone());
-        }
-        for (k, v) in &rhs.items {
-            ns = ns.insert(k, v.clone());
-        }
-        ns
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Scopes<I: Clone + Default> {
-    pub scopes: Vec<Scope<I>>,
-}
-
-impl<I: Clone + Default> Scopes<I> {
-    pub fn lookup(&self, id: &str) -> Option<I> {
-        self.scopes[0].lookup(id)
-    }
-
-    pub fn insert(&self, id: &str, value: I) -> Self {
-        let updated_scope = self.scopes[0].insert(id, value);
-
-        let mut next = self.scopes.clone();
-        next[0] = updated_scope;
-
-        Self { scopes: next }
-    }
-
-    pub fn enter(&self) -> Scopes<I> {
-        let mut next = self.scopes.clone();
-        next.extend([Scope::default()]);
-        Self { scopes: next }
-    }
-
-    pub fn current(&self) -> &Scope<I> {
-        &self.scopes[0]
-    }
-}
-
-impl<I: Clone + Default> Default for Scopes<I> {
-    fn default() -> Self {
-        Self {
-            scopes: vec![Scope::default()],
-        }
-    }
-}
 
 /// Create a scope that contains the types of the MEL core variables.
 pub fn minimal_core_variable_types() -> Scope<Type> {
@@ -264,29 +195,5 @@ impl<A> From<http::Request<A>> for Scope<TypedValue> {
         );
 
         value_scope
-    }
-}
-
-#[cfg(test)]
-mod scope_tests {
-    use crate::mel::scope::Scope;
-    use std::assert_matches;
-    use std::collections::HashMap;
-
-    #[test]
-    fn test_operator_plus() {
-        let mut s1 = Scope::<i8> {
-            items: HashMap::new(),
-        };
-        s1 = s1.insert("x", 5);
-        let mut s2 = Scope::<i8> {
-            items: HashMap::new(),
-        };
-        s2 = s2.insert("y", 4);
-
-        let s3 = &s1 + &s2;
-
-        assert_matches!(s3.lookup("y"), Some(4));
-        assert_matches!(s3.lookup("x"), Some(5));
     }
 }

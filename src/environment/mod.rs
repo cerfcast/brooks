@@ -15,27 +15,5 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[macro_use]
-pub mod logging;
 #[allow(dead_code)]
-pub mod common;
-#[allow(dead_code)]
-pub mod utils;
-
-#[allow(dead_code)]
-pub mod mel;
-
-#[allow(dead_code)]
-pub mod cdni;
-
-#[allow(dead_code)]
-pub mod ps;
-
-#[allow(dead_code)]
-pub mod integrations;
-
-#[allow(dead_code)]
-pub mod environment;
-
-#[cfg(test)]
-pub(crate) mod tests;
+pub mod scope;

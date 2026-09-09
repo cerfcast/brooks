@@ -23,14 +23,16 @@ use std::{
 
 use brooks_macros::builtin_function_interpreter;
 
-use crate::mel::{
-    interpreter::interpret::{BuiltinFunction, TypedValue, Value},
-    scope::Scope,
-    tvs::{
-        Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
-        IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
-        Path_ElementBuiltin, Path_ElementsBuiltin, RealBuiltin, Remove_Query_MultiBuiltin,
-        Remove_QueryBuiltin, StringBuiltin, Type, UpperBuiltin,
+use crate::{
+    environment::scope::Scope,
+    mel::{
+        interpreter::interpret::{BuiltinFunction, TypedValue, Value},
+        tvs::{
+            Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
+            IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,
+            MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, RealBuiltin,
+            Remove_Query_MultiBuiltin, Remove_QueryBuiltin, StringBuiltin, Type, UpperBuiltin,
+        },
     },
 };
 

@@ -24,6 +24,7 @@ use crate::{
         metadata::{CacheSpecification, CdniMetadata, CdniMetadataElements},
         spec::TypedGenericMetadata,
     },
+    environment::scope::{Scope, Scopes},
     logging::LogMsgs,
     mel::{
         analysis::Analyzed,
@@ -35,7 +36,6 @@ use crate::{
                 TypedValue, Value,
             },
         },
-        scope::{Scope, Scopes},
         tvs::Type,
     },
     ps::{
@@ -983,7 +983,8 @@ impl ProcessableRequestResponse for EffectfulProcessableRequestResponse {
 mod ps_interpreter_tests {
     use crate::{
         cdni::spec::{CachePolicy, TypedCachePolicy, TypedGenericMetadata},
-        mel::{scope::Scopes, tvs::Type},
+        environment::scope::Scopes,
+        mel::tvs::Type,
         ps::{
             interpret::{
                 EffectfulProcessableRequestResponse, EffectfulRequestActions, PsInterpretMode,

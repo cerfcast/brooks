@@ -19,26 +19,28 @@
 mod interpreter_tests {
     use std::{assert_matches, collections::HashMap, sync::Arc};
 
-    use crate::mel::{
-        analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
-        ast::AstVisitorDriver,
-        compiler::compile,
-        interpreter::{
-            builtins::BuiltinInterpError,
-            interpret::{
-                MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError, StructValue,
-                TypedValue,
-                Value::{self, Struct},
+    use crate::{
+        environment::scope::Scopes,
+        mel::{
+            analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
+            ast::AstVisitorDriver,
+            compiler::compile,
+            interpreter::{
+                builtins::BuiltinInterpError,
+                interpret::{
+                    MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError, StructValue,
+                    TypedValue,
+                    Value::{self, Struct},
+                },
             },
-        },
-        scope::Scopes,
-        tvs::{
-            self, Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
-            Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin, MatchBuiltin,
-            Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin,
-            Remove_QueryBuiltin,
-            Type::{self, Function},
-            UpperBuiltin,
+            tvs::{
+                self, Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin,
+                BuiltinFunctionType, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,
+                MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin,
+                Remove_QueryBuiltin,
+                Type::{self, Function},
+                UpperBuiltin,
+            },
         },
     };
 
@@ -2294,6 +2296,7 @@ mod interpreter_tests {
 #[cfg(test)]
 mod interpreter_logger_tests {
     use crate::{
+        environment::scope::Scopes,
         logging::{LogLevel::Trace, LogMsgFormatter, LogMsgs},
         mel::{
             analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
@@ -2303,7 +2306,6 @@ mod interpreter_logger_tests {
                 MelInterp, MelInterpContext, StructValue, TypedValue,
                 Value::{self, Struct},
             },
-            scope::Scopes,
             tvs::{self, Type},
         },
     };

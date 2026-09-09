@@ -18,6 +18,7 @@
 #[cfg(test)]
 mod codegen_tests {
     use crate::{
+        environment::scope::Scopes,
         logging::LogMsgs,
         mel::{
             analysis::analyze,
@@ -26,7 +27,6 @@ mod codegen_tests {
                 codegen, codegen_project,
             },
             compiler::compile,
-            scope::Scopes,
             tvs::Type,
         },
         tests::read_test_file,

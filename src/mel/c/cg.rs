@@ -18,6 +18,7 @@
 use std::fmt::Debug;
 
 use crate::common::GrammarLocation;
+use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
 
 use crate::mel::ast::{ComparisonOperator, LogicOperator, MathOperator, StringConcatOperator};
@@ -28,7 +29,6 @@ use crate::mel::{
         FunctionCall, IPAddressLiteral, Identifier, NumberLiteral, RegexLiteral, StringLiteral,
         TernaryExpr,
     },
-    scope,
     tvs::Type,
 };
 
@@ -80,7 +80,7 @@ impl SSA {
 
 #[derive(Debug, Default)]
 pub struct MelCodegenContext {
-    pub scopes: scope::Scopes<Type>,
+    pub scopes: Scopes<Type>,
     pub code: Vec<LocatableString>,
     pub ssa_gen: SSA,
     pub ssa: String,

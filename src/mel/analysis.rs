@@ -23,6 +23,7 @@ use std::{
 
 use crate::{
     common::GrammarLocation,
+    environment::scope::Scopes,
     mel::{
         compiler::compile::MelCompilerLocatableError,
         tvs::{ArgumentTypeList, ParamsTypeCheckerError, ParamsTypeCheckerGenerator},
@@ -45,7 +46,6 @@ use crate::mel::{
         Expr, FunctionCall, IPAddressLiteral, Identifier, MemberAccessExpression, NumberLiteral,
         StringLiteral, TernaryExpr,
     },
-    scope::{self, Scopes},
     tvs::{
         self,
         Type::{self, Struct},
@@ -220,7 +220,7 @@ impl Display for MelAnalysisLocatableError {
 pub struct MelAnalysisContext {
     pub expr: Option<Expr<Analyzed>>,
     pub ptcg: Option<ParamsTypeCheckerGenerator>,
-    pub scopes: scope::Scopes<Type>,
+    pub scopes: Scopes<Type>,
 }
 
 impl MelAnalysisContext {
@@ -231,7 +231,7 @@ impl MelAnalysisContext {
             scopes: self.scopes.clone(),
         }
     }
-    pub fn update_scopes(&self, new: &scope::Scopes<Type>) -> Self {
+    pub fn update_scopes(&self, new: &Scopes<Type>) -> Self {
         MelAnalysisContext {
             expr: self.expr.clone(),
             ptcg: self.ptcg,
