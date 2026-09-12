@@ -15,13 +15,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::cdni::spec::TypedGenericMetadata;
-
-use crate::ps::spec::{
-    TypedClientRequestStage, TypedClientResponseStage, TypedExpressionMatch, TypedHeader,
-    TypedHeaderTransform, TypedMatchGroup, TypedOriginRequestStage, TypedOriginResponseStage,
-    TypedProcessingStages, TypedRequestTransform, TypedResponseTransform, TypedStageMetadata,
-    TypedStageRules, TypedSyntheticResponse,
+use crate::cdni::{
+    ps::spec::{
+        TypedClientRequestStage, TypedClientResponseStage, TypedExpressionMatch, TypedHeader,
+        TypedHeaderTransform, TypedMatchGroup, TypedOriginRequestStage, TypedOriginResponseStage,
+        TypedProcessingStages, TypedRequestTransform, TypedResponseTransform, TypedStageMetadata,
+        TypedStageRules, TypedSyntheticResponse,
+    },
+    spec::TypedGenericMetadata,
 };
 
 use std::fmt::Debug;
@@ -91,4 +92,8 @@ pub trait PsVisitor<A: Debug + Clone + Default, O, E> {
 
 pub trait PsGenericMetadataVisitor<A: Debug + Clone + Default, O, E> {
     fn visit_generic_metadata(&self, v: &TypedGenericMetadata<A>, c: &O) -> PsVisitorResult<O, E>;
+}
+
+pub trait PsGenericMetadataVisitorGenerator<A: Debug + Clone + Default, O, E> {
+    fn generator(&self) -> fn() -> Box<dyn PsGenericMetadataVisitor<A, O, E>>;
 }

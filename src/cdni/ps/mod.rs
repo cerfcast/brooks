@@ -20,6 +20,3 @@ pub mod spec;
 pub mod interpret;
 pub mod verify;
 pub(crate) mod visit;
-
-#[cfg(test)]
-mod tests;

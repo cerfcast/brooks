@@ -40,6 +40,7 @@ use brooks_macros::TypedGenericMetadata;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::cdni::spec::MetadataInformation;
 use crate::cdni::spec::TypedGenericMetadata;
 
 use std::fmt::Debug;
@@ -105,6 +106,7 @@ pub struct HeaderTransform<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
 pub struct TypedHeaderTransform<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
@@ -126,7 +128,7 @@ pub struct RequestTransform<A: Debug + Clone + Default> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub uri_is_expr: Option<bool>,
 
-    #[serde(skip_serializing, skip_deserializing)]
+    #[serde(skip)]
     pub aug: A,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
@@ -362,11 +364,10 @@ pub struct TypedGenericStage {
 mod test_spec {
     use std::path::Path;
 
+    use crate::cdni::tests::test_helpers::{expression_match, stage_metadata, stage_rule};
+
     use crate::{
-        ps::{
-            spec::{ProcessingStages, TypedClientRequestStage, TypedProcessingStages},
-            tests::test_helpers::{expression_match, stage_metadata, stage_rule},
-        },
+        cdni::ps::spec::{ProcessingStages, TypedClientRequestStage, TypedProcessingStages},
         tests::read_test_file,
     };
 
@@ -394,14 +395,14 @@ mod test_spec {
                 aug: (),
             },
         };
-        let expected = read_test_file(Path::new("./src/ps/tests/simple/serialize.json"));
+        let expected = read_test_file(Path::new("./src/cdni/ps/tests/simple/serialize.json"));
         let actual = serde_json::to_string_pretty(&x).expect("Could not serialize");
         pretty_assertions::assert_eq!(expected, actual);
     }
 
     #[test]
     fn test_deserialize_example8() {
-        let json = read_test_file(Path::new("./src/ps/tests/from-spec/example8.json"));
+        let json = read_test_file(Path::new("./src/cdni/ps/tests/from-spec/example8.json"));
 
         let result = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not deserialize Example 8");
@@ -427,7 +428,9 @@ mod test_spec {
 
     #[test]
     fn test_deserialize_client_request_stage() {
-        let json = read_test_file(Path::new("./src/ps/tests/client_request_stage/if.json"));
+        let json = read_test_file(Path::new(
+            "./src/cdni/ps/tests/client_request_stage/if.json",
+        ));
 
         let result = serde_json::from_str::<TypedClientRequestStage<()>>(&json)
             .expect("Could not deserialize simple client request stage JSON");

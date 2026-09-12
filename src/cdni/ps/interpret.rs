@@ -20,6 +20,22 @@
 use http::{HeaderName, HeaderValue, StatusCode, Uri, uri::InvalidUri};
 
 use crate::{
+    cdni::ps::{
+        interpret::{
+            PsInterpretMode::HeaderCalculate,
+            PsInterpretValue::{Header, MatchNo, MatchYes},
+            PsInterpretValueType::{MatchResult, SyntheticResponse, Terminate},
+        },
+        spec::{
+            TypedClientRequestStage, TypedExpressionMatch, TypedHeader, TypedHeaderTransform,
+            TypedMatchGroup, TypedProcessingStages, TypedRequestTransform, TypedResponseTransform,
+            TypedStage, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
+        },
+        verify::PsVerificationKey,
+        visit::{
+            PsGenericMetadataVisitor, PsGenericMetadataVisitorGenerator, PsVisitor, PsVisitorResult,
+        },
+    },
     cdni::{
         metadata::{CacheSpecification, CdniMetadata, CdniMetadataElements},
         spec::TypedGenericMetadata,
@@ -37,20 +53,6 @@ use crate::{
             },
         },
         tvs::Type,
-    },
-    ps::{
-        interpret::{
-            PsInterpretMode::HeaderCalculate,
-            PsInterpretValue::{Header, MatchNo, MatchYes},
-            PsInterpretValueType::{MatchResult, SyntheticResponse, Terminate},
-        },
-        spec::{
-            TypedClientRequestStage, TypedExpressionMatch, TypedHeader, TypedHeaderTransform,
-            TypedMatchGroup, TypedProcessingStages, TypedRequestTransform, TypedResponseTransform,
-            TypedStage, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
-        },
-        verify::PsVerificationKey,
-        visit::{PsGenericMetadataVisitor, PsVisitor, PsVisitorResult},
     },
 };
 
@@ -174,7 +176,7 @@ impl Display for PsInterpretError {
 
 #[derive(Default, Clone)]
 pub struct PsGenericMetadataInterpreter<A: Debug + Clone + Default, O, E> {
-    interpreters: HashMap<String, Arc<dyn PsGenericMetadataVisitor<A, O, E>>>,
+    interpreters: HashMap<String, fn() -> Box<dyn PsGenericMetadataVisitor<A, O, E>>>,
 }
 
 impl<A: Debug + Clone + Default, O, E> Debug for PsGenericMetadataInterpreter<A, O, E> {
@@ -187,13 +189,16 @@ impl<A: Debug + Clone + Default, O, E> PsGenericMetadataInterpreter<A, O, E> {
     pub fn add_interpreter(
         &mut self,
         tpe: &str,
-        interp: Arc<dyn PsGenericMetadataVisitor<A, O, E>>,
+        generator: fn() -> Box<dyn PsGenericMetadataVisitor<A, O, E>>,
     ) {
-        self.interpreters.insert(tpe.to_string(), interp);
+        self.interpreters.insert(tpe.to_string(), generator);
     }
 
-    pub fn get_interpreter(&mut self, tpe: &str) -> Option<&dyn PsGenericMetadataVisitor<A, O, E>> {
-        self.interpreters.get(tpe).map(|f| &**f)
+    pub fn get_interpreter(
+        &mut self,
+        tpe: &str,
+    ) -> Option<Box<dyn PsGenericMetadataVisitor<A, O, E>>> {
+        self.interpreters.get(tpe).map(|f| (*f)())
     }
 }
 
@@ -201,9 +206,23 @@ impl<A: Debug + Clone + Default, O, E> PsGenericMetadataInterpreter<A, O, E> {
 
 #[derive(Debug, Clone, Default)]
 struct PsGenericMetadataCachePolicy {}
+impl PsGenericMetadataVisitorGenerator<PsVerificationKey, PsInterpretContext, PsInterpretError>
+    for PsGenericMetadataCachePolicy
+{
+    fn generator(
+        &self,
+    ) -> fn() -> Box<
+        dyn PsGenericMetadataVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError>,
+    > {
+        return || Box::new(PsGenericMetadataCachePolicyVisitor {});
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct PsGenericMetadataCachePolicyVisitor {}
 
 impl PsGenericMetadataVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError>
-    for PsGenericMetadataCachePolicy
+    for PsGenericMetadataCachePolicyVisitor
 {
     fn visit_generic_metadata(
         &self,
@@ -225,8 +244,10 @@ struct PsInterpreter<'a> {
 
 impl<'a> PsInterpreter<'a> {
     fn install_generic_visitors(&mut self) {
-        self.generic_interpreters
-            .add_interpreter("MI.CachePolicy", Arc::new(PsGenericMetadataCachePolicy {}));
+        self.generic_interpreters.add_interpreter(
+            "MI.CachePolicy",
+            PsGenericMetadataCachePolicy {}.generator(),
+        );
     }
 
     fn scopes_from_req(&self) -> Result<Scopes<TypedValue>, PsInterpretError> {
@@ -982,23 +1003,22 @@ impl ProcessableRequestResponse for EffectfulProcessableRequestResponse {
 #[cfg(test)]
 mod ps_interpreter_tests {
     use crate::{
-        cdni::spec::{CachePolicy, TypedCachePolicy, TypedGenericMetadata},
-        environment::scope::Scopes,
-        mel::tvs::Type,
-        ps::{
+        cdni::ps::{
             interpret::{
                 EffectfulProcessableRequestResponse, EffectfulRequestActions, PsInterpretMode,
                 PsInterpretValue, interpret_stage,
             },
             spec::{TypedGenericStage, TypedStage},
-            tests::test_helpers::{
-                client_request_stage, expression_match, match_group, request_transform,
-                response_transform, stage_metadata, synthetic_response, typed_header,
-                typed_stage_rule,
-            },
             verify::{PsVerifierContextValue, verifier, verify_ps_request_stage},
             visit::PsVisitor,
         },
+        cdni::spec::{CachePolicy, TypedCachePolicy, TypedGenericMetadata},
+        cdni::tests::test_helpers::{
+            client_request_stage, expression_match, match_group, request_transform,
+            response_transform, stage_metadata, synthetic_response, typed_header, typed_stage_rule,
+        },
+        environment::scope::Scopes,
+        mel::tvs::Type,
         tests::read_test_file,
     };
     use std::assert_matches;
@@ -1006,7 +1026,9 @@ mod ps_interpreter_tests {
 
     #[test]
     fn test_interpret_client_request_stage() {
-        let json = read_test_file(Path::new("./src/ps/tests/client_request_stage/if.json"));
+        let json = read_test_file(Path::new(
+            "./src/cdni/ps/tests/client_request_stage/if.json",
+        ));
 
         let result = serde_json::from_str::<TypedGenericStage>(&json)
             .expect("Could not deserialize simple client request stage JSON");
@@ -1027,7 +1049,7 @@ mod ps_interpreter_tests {
     #[test]
     fn test_interpret_client_request_stage_request_response_header_transform() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/client_request_stage/request_response_header_transform.json",
+            "./src/cdni/ps/tests/client_request_stage/request_response_header_transform.json",
         ));
 
         let result = serde_json::from_str::<TypedGenericStage>(&json)

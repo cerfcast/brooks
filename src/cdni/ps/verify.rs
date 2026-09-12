@@ -20,15 +20,7 @@
 use serde::Serialize;
 
 use crate::{
-    cdni::spec::TypedGenericMetadata,
-    environment::scope::Scopes,
-    mel::{
-        analysis::{Analyzed, MelAnalysisLocatableError, analyze},
-        ast::Expr,
-        compiler::{self, compile::MelCompilerLocatableError},
-        tvs::Type,
-    },
-    ps::{
+    cdni::ps::{
         interpret::PsGenericMetadataInterpreter,
         spec::{
             ClientRequestStage, ClientResponseStage, ExpressionMatch, Header, HeaderTransform,
@@ -42,6 +34,14 @@ use crate::{
         },
         verify::PsVerificationError::ParseError,
         visit::PsVisitor,
+    },
+    cdni::spec::TypedGenericMetadata,
+    environment::scope::Scopes,
+    mel::{
+        analysis::{Analyzed, MelAnalysisLocatableError, analyze},
+        ast::Expr,
+        compiler::{self, compile::MelCompilerLocatableError},
+        tvs::Type,
     },
 };
 
@@ -1057,25 +1057,25 @@ pub fn verify_ps_request_stage(
 mod test_verify {
     use std::assert_matches;
 
-    use crate::mel::tvs::Type;
-    use crate::ps::spec::{
+    use crate::cdni::ps::spec::{
         HeaderTransform, ResponseTransform, SyntheticResponse, TypedHeaderTransform,
         TypedSyntheticResponse,
     };
-    use crate::ps::verify::{PsVerifierContextValue, verifier};
-    use crate::ps::visit::PsVisitor;
+    use crate::cdni::ps::verify::{PsVerifierContextValue, verifier};
+    use crate::cdni::ps::visit::PsVisitor;
+    use crate::mel::tvs::Type;
     use crate::{
-        mel::ast::Expr::BinaryExpr,
-        ps::{
+        cdni::ps::{
             spec::TypedResponseTransform,
             verify::{
                 PsVerificationError::{ExpressionWrongType, WrongGenericMetadataTypeName},
                 PsVerificationKey, verify_ps,
             },
         },
+        mel::ast::Expr::BinaryExpr,
     };
 
-    use crate::ps::tests::test_helpers::{
+    use crate::cdni::tests::test_helpers::{
         expression_match, generic_metadata, header_transform, processing_stages, request_transform,
         response_transform, synthetic_response, typed_header,
     };
@@ -1461,17 +1461,16 @@ mod test_verify {
 mod test_verify_from_json {
     use std::assert_matches;
 
-    use crate::environment::scope::Scopes;
-    use crate::mel::tvs::Type;
-    use crate::ps::spec::{
+    use crate::cdni::ps::spec::{
         HeaderTransform, ResponseTransform, SyntheticResponse, TypedGenericStage,
         TypedHeaderTransform, TypedStage, TypedSyntheticResponse,
     };
-    use crate::ps::verify::verify_ps_request_stage;
+    use crate::cdni::ps::verify::verify_ps_request_stage;
+    use crate::environment::scope::Scopes;
+    use crate::mel::tvs::Type;
     use crate::tests::read_test_file;
     use crate::{
-        mel::ast::Expr::BinaryExpr,
-        ps::{
+        cdni::ps::{
             spec::{
                 RequestTransform, TypedProcessingStages, TypedRequestTransform,
                 TypedResponseTransform,
@@ -1481,13 +1480,16 @@ mod test_verify_from_json {
                 PsVerificationKey, verify_ps,
             },
         },
+        mel::ast::Expr::BinaryExpr,
     };
 
     use std::path::Path;
 
     #[test]
     fn test_verify_simple() {
-        let json = read_test_file(Path::new("./src/ps/tests/simple/deserialize_verify.json"));
+        let json = read_test_file(Path::new(
+            "./src/cdni/ps/tests/simple/deserialize_verify.json",
+        ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
 
@@ -1501,7 +1503,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_bad_generic_md_typename() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/generic_metadata/bad-typename.json",
+            "./src/cdni/ps/tests/generic_metadata/bad-typename.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1515,7 +1517,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_stage_metadata_with_generic_metadata_bad_type_name() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/generic_metadata/bad-typename2.json",
+            "./src/cdni/ps/tests/generic_metadata/bad-typename2.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1528,7 +1530,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_match_wrong_type() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/stage_rules/wrong_match_type.json",
+            "./src/cdni/ps/tests/stage_rules/wrong_match_type.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1542,7 +1544,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_request_transform() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/request_transform/uri_no_expr.json",
+            "./src/cdni/ps/tests/request_transform/uri_no_expr.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1569,7 +1571,9 @@ mod test_verify_from_json {
 
     #[test]
     fn test_verify_request_transform_uri_expr() {
-        let json = read_test_file(Path::new("./src/ps/tests/request_transform/uri_expr.json"));
+        let json = read_test_file(Path::new(
+            "./src/cdni/ps/tests/request_transform/uri_expr.json",
+        ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
 
@@ -1596,7 +1600,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_request_transform_uri_expr_wrong_type() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/request_transform/uri_expr_wrong_type.json",
+            "./src/cdni/ps/tests/request_transform/uri_expr_wrong_type.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1610,7 +1614,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_response_transform() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/response_transform/rs_no_expr.json",
+            "./src/cdni/ps/tests/response_transform/rs_no_expr.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1638,7 +1642,9 @@ mod test_verify_from_json {
 
     #[test]
     fn test_verify_response_transform_rs_expr() {
-        let json = read_test_file(Path::new("./src/ps/tests/response_transform/rs_expr.json"));
+        let json = read_test_file(Path::new(
+            "./src/cdni/ps/tests/response_transform/rs_expr.json",
+        ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
 
@@ -1666,7 +1672,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_response_transform_rs_expr_wrong_type() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/response_transform/rs_expr_wrong_type.json",
+            "./src/cdni/ps/tests/response_transform/rs_expr_wrong_type.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1680,7 +1686,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_header_transform() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/header_transform/value_no_expr.json",
+            "./src/cdni/ps/tests/header_transform/value_no_expr.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1716,7 +1722,9 @@ mod test_verify_from_json {
 
     #[test]
     fn test_verify_header_transform_value_expr() {
-        let json = read_test_file(Path::new("./src/ps/tests/header_transform/value_expr.json"));
+        let json = read_test_file(Path::new(
+            "./src/cdni/ps/tests/header_transform/value_expr.json",
+        ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
 
@@ -1752,7 +1760,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_header_transform_value_expr_wrong_type_add() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/header_transform/value_expr_wrong_type.json",
+            "./src/cdni/ps/tests/header_transform/value_expr_wrong_type.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1766,7 +1774,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_header_transform_value_expr_wrong_type_replace() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/header_transform/value_expr_wrong_type_replace.json",
+            "./src/cdni/ps/tests/header_transform/value_expr_wrong_type_replace.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1778,7 +1786,9 @@ mod test_verify_from_json {
 
     #[test]
     fn test_verify_synthetic_response() {
-        let json = read_test_file(Path::new("./src/ps/tests/synthetic_response/no_expr.json"));
+        let json = read_test_file(Path::new(
+            "./src/cdni/ps/tests/synthetic_response/no_expr.json",
+        ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
 
@@ -1816,7 +1826,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_synthetic_response_response_expr() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/synthetic_response/response_expr.json",
+            "./src/cdni/ps/tests/synthetic_response/response_expr.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1855,7 +1865,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_synthetic_response_body_expr() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/synthetic_response/body_expr.json",
+            "./src/cdni/ps/tests/synthetic_response/body_expr.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1894,7 +1904,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_synthetic_response_body_and_response_expr() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/synthetic_response/both_body_response_exprs.json",
+            "./src/cdni/ps/tests/synthetic_response/both_body_response_exprs.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1933,7 +1943,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_synthetic_response_wrong_response_expr_type() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/synthetic_response/response_expr_wrong_type.json",
+            "./src/cdni/ps/tests/synthetic_response/response_expr_wrong_type.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1947,7 +1957,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_synthetic_response_wrong_body_expr_type() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/synthetic_response/body_expr_wrong_type.json",
+            "./src/cdni/ps/tests/synthetic_response/body_expr_wrong_type.json",
         ));
         let stages = serde_json::from_str::<TypedProcessingStages<()>>(&json)
             .expect("Could not parse JSON test file");
@@ -1960,7 +1970,9 @@ mod test_verify_from_json {
 
     #[test]
     fn test_verify_client_request_stage() {
-        let json = read_test_file(Path::new("./src/ps/tests/client_request_stage/if.json"));
+        let json = read_test_file(Path::new(
+            "./src/cdni/ps/tests/client_request_stage/if.json",
+        ));
         let stages = serde_json::from_str::<TypedGenericStage>(&json)
             .expect("Could not parse JSON test file");
 
@@ -1973,7 +1985,7 @@ mod test_verify_from_json {
     #[test]
     fn test_verify_client_request_stage_request_response_header_transform() {
         let json = read_test_file(Path::new(
-            "./src/ps/tests/client_request_stage/request_response_header_transform.json",
+            "./src/cdni/ps/tests/client_request_stage/request_response_header_transform.json",
         ));
         let stages = serde_json::from_str::<TypedGenericStage>(&json)
             .expect("Could not parse JSON test file");
