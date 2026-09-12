@@ -326,6 +326,16 @@ pub fn derive_typed_generic_metadata(item: TokenStream) -> TokenStream {
             }
         }
     }
+
+    impl MetadataInformation for #name<()> {
+        fn metadata_type(&self) -> String {
+            #metadata_type.to_string()
+        }
+
+        fn metadata_value(&self) -> Value {
+            serde_json::to_value::<#untyped_name<()>>(self.value.clone()).expect("")
+        }
+    }
     };
 
     r.into()
