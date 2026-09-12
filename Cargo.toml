@@ -20,16 +20,20 @@ http = "1.4.2"
 tempfile = "3.27.0"
 libc = "0.2.189"
 reqwest = { version = "0.13.4", optional = true }
-tokio = {version = "1.53.1", optional = true, features=["rt-multi-thread"] }
+tokio = {version = "1.53.1", features=["rt-multi-thread"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 
 [features]
 default = []
+
+# The MI Processors
+mi_source = ["dep:reqwest"]
+
 domain = []
 serializable_logs = []
-hmds = ["dep:tokio", "dep:reqwest"]
-nginx = ["hmds", "dep:reqwest", "dep:tokio"]
-caddy = ["hmds", "dep:reqwest", "dep:tokio"]
+hmds = ["dep:reqwest"]
+nginx = ["hmds", "dep:reqwest"]
+caddy = ["hmds", "dep:reqwest"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

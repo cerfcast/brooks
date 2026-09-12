@@ -21,7 +21,7 @@ jobs:
       - run: tree-sitter test
         working-directory: ./parser
   library-tests:
-    name: Library Tests
+    name: Library Tests (With No MI Processors)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -34,6 +34,21 @@ jobs:
         working-directory: ./parser
       - run: cargo build
       - run: cargo test
+      - run: cargo test --manifest-path parser/Cargo.toml
+  library-tests-mi:
+    name: Library Tests With MI Processors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: tree-sitter/setup-action@v2
+      # Because our tree-sitter code is in a subdirectory,
+      # and working-directory does not apply to uses, we
+      # are forced to specify calls to the CI ourselves.
+      # See https://github.com/orgs/community/discussions/25742
+      - run: tree-sitter generate
+        working-directory: ./parser
+      - run: cargo build -F mi_source
+      - run: cargo test -F mi_source
       - run: cargo test --manifest-path parser/Cargo.toml
   library-integration-caddy-build:
     name: Library Integration - Caddy Build

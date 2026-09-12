@@ -17,4 +17,5 @@
 
 //! Processors for Metadata Information.
 
+#[cfg(feature = "mi_source")]
 pub mod source;
