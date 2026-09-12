@@ -15,6 +15,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! For handling all Metadata Information except Processing Stages.
+
 pub mod metadata;
+pub mod processing;
+pub mod processors;
 pub mod spec;
 pub mod verify;
+
+pub mod ps;
+
+#[cfg(test)]
+pub mod tests;

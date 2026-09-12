@@ -15,12 +15,28 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! All Metadata Information except for what is defined in Processing Stages.
+
 use brooks_macros::TypedGenericMetadata;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use std::fmt::Debug;
 
+pub trait MetadataInformation {
+    fn metadata_type(&self) -> String;
+    fn metadata_value(&self) -> Value;
+}
+
+impl<A: Debug + Default + Clone, T: MetadataInformation> From<T> for TypedGenericMetadata<A> {
+    fn from(value: T) -> Self {
+        Self {
+            tpe: value.metadata_type(),
+            value: value.metadata_value(),
+            aug: A::default(),
+        }
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TypedGenericMetadata<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
@@ -29,6 +45,22 @@ pub struct TypedGenericMetadata<A: Debug + Clone + Default> {
     pub value: Value,
     #[serde(skip)]
     pub aug: A,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Source<A: Debug + Clone + Default> {
+    pub endpoints: Vec<String>,
+    pub protocol: String,
+    #[serde(skip)]
+    pub aug: A,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+pub struct TypedSource<A: Debug + Clone + Default> {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: Source<A>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,7 +97,14 @@ pub struct TypedHostMetadata<A: Debug + Clone + Default> {
 mod test_parse_host_metadata {
     use std::path::Path;
 
-    use crate::{cdni::spec::TypedHostMetadata, tests::read_test_file};
+    use crate::{
+        cdni::{
+            ps::spec::TypedHeader,
+            spec::{TypedGenericMetadata, TypedHostMetadata},
+            tests::test_helpers::typed_header,
+        },
+        tests::read_test_file,
+    };
 
     #[test]
     fn test_verify_bad_generic_md_typename() {
@@ -76,5 +115,12 @@ mod test_parse_host_metadata {
             host_metadata.tpe,
             TypedHostMetadata::<()>::typed_generic_metadata_name()
         );
+    }
+
+    #[test]
+    fn test_conversion_to_typed_generic_metadata() {
+        let x = typed_header("X-Cache-Control", "true", Some(true));
+        let y: TypedGenericMetadata<()> = x.into();
+        assert_eq!(y.tpe, TypedHeader::<()>::typed_generic_metadata_name());
     }
 }
