@@ -21,7 +21,6 @@ use serde::Serialize;
 
 use crate::{
     cdni::ps::{
-        interpret::PsGenericMetadataInterpreter,
         spec::{
             ClientRequestStage, ClientResponseStage, ExpressionMatch, Header, HeaderTransform,
             MatchGroup, OriginRequestStage, OriginResponseStage, ProcessingStages,
@@ -175,10 +174,8 @@ pub(crate) enum PsVerifierContextValue {
     OriginResponseStage(TypedOriginResponseStage<PsVerificationKey>),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub(crate) struct PsVerifierContext {
-    pub generic_interpreters:
-        PsGenericMetadataInterpreter<(), PsVerifierContext, Box<PsVerificationError>>,
     pub value: Option<PsVerifierContextValue>,
     pub scopes: Scopes<Type>,
 }
@@ -222,21 +219,21 @@ macro_rules! check_generic_md_typename {
     };
 }
 
-impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
+impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_processing_stages(
         &mut self,
         v: &TypedProcessingStages<()>,
-        c: &PsVerifierContext,
+        c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedProcessingStages);
 
         let mut result = ProcessingStages::<PsVerificationKey>::default();
-        let mut rc = c.clone();
+        let mut rc = c;
 
         let v = &v.value;
 
         for csr in &v.client_req {
-            rc = self.visit_stage_rules(csr, &rc)?;
+            rc = self.visit_stage_rules(csr, rc)?;
             if let Some(tsr) =
                 expect_maybe_some_value!(rc.value, PsVerifierContextValue::StageRules)
             {
@@ -245,7 +242,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         }
 
         for csr in &v.client_res {
-            rc = self.visit_stage_rules(csr, &rc)?;
+            rc = self.visit_stage_rules(csr, rc)?;
             if let Some(tsr) =
                 expect_maybe_some_value!(rc.value, PsVerifierContextValue::StageRules)
             {
@@ -254,7 +251,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         }
 
         for csr in &v.origin_req {
-            rc = self.visit_stage_rules(csr, &rc)?;
+            rc = self.visit_stage_rules(csr, rc)?;
             if let Some(tsr) =
                 expect_maybe_some_value!(rc.value, PsVerifierContextValue::StageRules)
             {
@@ -263,7 +260,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         }
 
         for csr in &v.origin_res {
-            rc = self.visit_stage_rules(csr, &rc)?;
+            rc = self.visit_stage_rules(csr, rc)?;
             if let Some(tsr) =
                 expect_maybe_some_value!(rc.value, PsVerifierContextValue::StageRules)
             {
@@ -278,13 +275,13 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
             TypedProcessingStages
         );
 
-        Ok(rc.clone())
+        Ok(rc)
     }
 
     fn visit_stage_rules(
         &mut self,
         v: &TypedStageRules<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         // Check whether the expression has the right type!
 
@@ -293,10 +290,10 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         let v = &v.value;
 
         let mut result = if let Some(mtch) = &v.mtch {
-            let expr = self.visit_expression_match(mtch, &c.clone())?;
+            c = self.visit_expression_match(mtch, c)?;
 
-            let expr =
-                expect_maybe_some_value!(&expr.value, PsVerifierContextValue::ExpressionMatch);
+            let expr = expect_maybe_some_value!(&c.value, PsVerifierContextValue::ExpressionMatch);
+
             StageRules::<PsVerificationKey> {
                 mtch: expr.cloned(),
                 stage_metadata: TypedStageMetadata::default(),
@@ -310,17 +307,13 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
             }
         };
 
-        result.stage_metadata = expect_some_value!(
-            &self
-                .visit_stage_metadata(&v.stage_metadata, &c.clone())?
-                .value,
-            PsVerifierContextValue::StageMetadata
-        )
-        .clone();
+        c = self.visit_stage_metadata(&v.stage_metadata, c)?;
+
+        result.stage_metadata =
+            expect_some_value!(&c.value, PsVerifierContextValue::StageMetadata).clone();
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::StageRules,
@@ -333,7 +326,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_expression_match(
         &mut self,
         v: &TypedExpressionMatch<()>,
-        c: &PsVerifierContext,
+        c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedExpressionMatch);
 
@@ -349,7 +342,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         }
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 ExpressionMatch {
                     expression: v.expression.clone(),
@@ -365,7 +357,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_stage_metadata(
         &mut self,
         v: &TypedStageMetadata<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedStageMetadata);
 
@@ -374,11 +366,9 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         let mut result = if let Some(generic) = &v.generic {
             let mut result: Vec<TypedGenericMetadata<PsVerificationKey>> = vec![];
             for generics in generic {
-                let generic = expect_some_value!(
-                    self.visit_generic_metadata(generics, &c.clone())?.value,
-                    PsVerifierContextValue::GenericMetadata
-                )
-                .clone();
+                c = self.visit_generic_metadata(generics, c)?;
+                let generic =
+                    expect_some_value!(&c.value, PsVerifierContextValue::GenericMetadata).clone();
                 result.push(generic);
             }
 
@@ -398,32 +388,21 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         };
 
         result.request_xform = if let Some(reqt) = &v.request_xform {
-            Some(
-                expect_some_value!(
-                    self.visit_request_transform(reqt, &c.clone())?.value,
-                    PsVerifierContextValue::RequestTransform
-                )
-                .clone(),
-            )
+            c = self.visit_request_transform(reqt, c)?;
+            Some(expect_some_value!(&c.value, PsVerifierContextValue::RequestTransform).clone())
         } else {
             None
         };
 
         result.response_xform = if let Some(reqt) = &v.response_xform {
-            Some(
-                expect_some_value!(
-                    self.visit_response_transform(reqt, &c.clone())?.value,
-                    PsVerifierContextValue::ResponseTransform
-                )
-                .clone(),
-            )
+            c = self.visit_response_transform(reqt, c)?;
+            Some(expect_some_value!(&c.value, PsVerifierContextValue::ResponseTransform).clone())
         } else {
             None
         };
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::StageMetadata,
@@ -436,20 +415,16 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_request_transform(
         &mut self,
         v: &TypedRequestTransform<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedRequestTransform);
 
         let v = &v.value;
 
         let mut result = if let Some(header_xform) = &v.xform {
-            let header = Some(
-                expect_some_value!(
-                    self.visit_header_transform(header_xform, &c.clone())?.value,
-                    PsVerifierContextValue::HeaderTransform
-                )
-                .clone(),
-            );
+            c = self.visit_header_transform(header_xform, c)?;
+            let header =
+                Some(expect_some_value!(&c.value, PsVerifierContextValue::HeaderTransform).clone());
 
             RequestTransform {
                 xform: header,
@@ -488,7 +463,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::RequestTransform,
@@ -501,20 +475,16 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_response_transform(
         &mut self,
         v: &TypedResponseTransform<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedResponseTransform);
 
         let v = &v.value;
 
         let mut result = if let Some(header_xform) = &v.xform {
-            let header = Some(
-                expect_some_value!(
-                    self.visit_header_transform(header_xform, &c.clone())?.value,
-                    PsVerifierContextValue::HeaderTransform
-                )
-                .clone(),
-            );
+            c = self.visit_header_transform(header_xform, c)?;
+            let header =
+                Some(expect_some_value!(&c.value, PsVerifierContextValue::HeaderTransform).clone());
 
             ResponseTransform {
                 xform: header,
@@ -534,13 +504,8 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         };
 
         result.synthetic = if let Some(synthetic) = &v.synthetic {
-            Some(
-                expect_some_value!(
-                    self.visit_synthetic_response(synthetic, &c.clone())?.value,
-                    PsVerifierContextValue::SyntheticResponse
-                )
-                .clone(),
-            )
+            c = self.visit_synthetic_response(synthetic, c)?;
+            Some(expect_some_value!(&c.value, PsVerifierContextValue::SyntheticResponse).clone())
         } else {
             None
         };
@@ -567,7 +532,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::ResponseTransform,
@@ -580,7 +544,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_generic_metadata(
         &mut self,
         v: &TypedGenericMetadata<()>,
-        c: &PsVerifierContext,
+        c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         // We only verify that the type starts with "MI.".
         if !v.tpe.starts_with("MI.") {
@@ -592,7 +556,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: Some(PsVerifierContextValue::GenericMetadata(
                 TypedGenericMetadata {
                     tpe: v.tpe.clone(),
@@ -606,7 +569,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_header_transform(
         &mut self,
         v: &TypedHeaderTransform<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedHeaderTransform);
         let v = &v.value;
@@ -619,13 +582,9 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         result.add = if let Some(adds) = &v.add {
             let mut verified_adds: Vec<TypedHeader<PsVerificationKey>> = vec![];
             for add in adds {
-                verified_adds.push(
-                    expect_some_value!(
-                        self.visit_header(add, &c.clone())?.value,
-                        PsVerifierContextValue::Header
-                    )
-                    .clone(),
-                );
+                c = self.visit_header(add, c)?;
+                verified_adds
+                    .push(expect_some_value!(&c.value, PsVerifierContextValue::Header).clone());
             }
             Some(verified_adds)
         } else {
@@ -635,13 +594,9 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         result.replace = if let Some(replaceds) = &v.replace {
             let mut verified_replaceds: Vec<TypedHeader<PsVerificationKey>> = vec![];
             for replaced in replaceds {
-                verified_replaceds.push(
-                    expect_some_value!(
-                        self.visit_header(replaced, &c.clone())?.value,
-                        PsVerifierContextValue::Header
-                    )
-                    .clone(),
-                );
+                c = self.visit_header(replaced, c)?;
+                verified_replaceds
+                    .push(expect_some_value!(&c.value, PsVerifierContextValue::Header).clone());
             }
             Some(verified_replaceds)
         } else {
@@ -649,7 +604,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         };
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::HeaderTransform,
@@ -662,7 +616,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_header(
         &mut self,
         v: &TypedHeader<()>,
-        c: &PsVerifierContext,
+        c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedHeader);
 
@@ -692,7 +646,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::Header,
@@ -705,7 +658,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_synthetic_response(
         &mut self,
         v: &TypedSyntheticResponse<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedSyntheticResponse);
         let v = &v.value;
@@ -722,13 +675,9 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         result.headers = if let Some(headers) = &v.headers {
             let mut verified_headers: Vec<TypedHeader<PsVerificationKey>> = vec![];
             for header in headers {
-                verified_headers.push(
-                    expect_some_value!(
-                        self.visit_header(header, &c.clone())?.value,
-                        PsVerifierContextValue::Header
-                    )
-                    .clone(),
-                );
+                c = self.visit_header(header, c)?;
+                verified_headers
+                    .push(expect_some_value!(&c.value, PsVerifierContextValue::Header).clone());
             }
             Some(verified_headers)
         } else {
@@ -779,7 +728,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::SyntheticResponse,
@@ -792,7 +740,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_client_request_stage(
         &mut self,
         v: &TypedClientRequestStage<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedClientRequestStage);
         let v = &v.value;
@@ -800,13 +748,9 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         // Verify each of the match groups!
         let mut verified_mgs: Vec<TypedMatchGroup<PsVerificationKey>> = vec![];
         for mg in &v.match_groups {
-            verified_mgs.push(
-                expect_some_value!(
-                    self.visit_match_group(mg, &c.clone())?.value,
-                    PsVerifierContextValue::MatchGroup
-                )
-                .clone(),
-            );
+            c = self.visit_match_group(mg, c)?;
+            verified_mgs
+                .push(expect_some_value!(&c.value, PsVerifierContextValue::MatchGroup).clone());
         }
 
         let result = ClientRequestStage {
@@ -816,7 +760,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::ClientRequestStage,
@@ -829,28 +772,22 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_match_group(
         &mut self,
         v: &TypedMatchGroup<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedMatchGroup);
         let v = &v.value;
 
-        let verified_if_rule = expect_some_value!(
-            self.visit_stage_rules(&v.if_rule, &c.clone())?.value,
-            PsVerifierContextValue::StageRules
-        )
-        .clone();
+        c = self.visit_stage_rules(&v.if_rule, c)?;
+        let verified_if_rule =
+            expect_some_value!(&c.value, PsVerifierContextValue::StageRules).clone();
 
         let result = if let Some(else_if_rules) = &v.else_ifs {
             // Verify each of the match groups!
             let mut verified_eirs: Vec<TypedStageRules<PsVerificationKey>> = vec![];
             for eir in else_if_rules {
-                verified_eirs.push(
-                    expect_some_value!(
-                        self.visit_stage_rules(eir, &c.clone())?.value,
-                        PsVerifierContextValue::StageRules
-                    )
-                    .clone(),
-                );
+                c = self.visit_stage_rules(eir, c)?;
+                verified_eirs
+                    .push(expect_some_value!(&c.value, PsVerifierContextValue::StageRules).clone());
             }
             MatchGroup {
                 if_rule: verified_if_rule,
@@ -866,7 +803,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         };
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::MatchGroup,
@@ -879,7 +815,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_origin_request_stage(
         &mut self,
         v: &TypedOriginRequestStage<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedOriginRequestStage);
         let v = &v.value;
@@ -887,13 +823,9 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         // Verify each of the match groups!
         let mut verified_mgs: Vec<TypedMatchGroup<PsVerificationKey>> = vec![];
         for mg in &v.match_groups {
-            verified_mgs.push(
-                expect_some_value!(
-                    self.visit_match_group(mg, &c.clone())?.value,
-                    PsVerifierContextValue::MatchGroup
-                )
-                .clone(),
-            );
+            c = self.visit_match_group(mg, c)?;
+            verified_mgs
+                .push(expect_some_value!(&c.value, PsVerifierContextValue::MatchGroup).clone());
         }
 
         let result = OriginRequestStage {
@@ -903,7 +835,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::OriginRequestStage,
@@ -916,7 +847,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_client_response_stage(
         &mut self,
         v: &TypedClientResponseStage<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedClientResponseStage);
         let v = &v.value;
@@ -924,13 +855,9 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         // Verify each of the match groups!
         let mut verified_mgs: Vec<TypedMatchGroup<PsVerificationKey>> = vec![];
         for mg in &v.match_groups {
-            verified_mgs.push(
-                expect_some_value!(
-                    self.visit_match_group(mg, &c.clone())?.value,
-                    PsVerifierContextValue::MatchGroup
-                )
-                .clone(),
-            );
+            c = self.visit_match_group(mg, c)?;
+            verified_mgs
+                .push(expect_some_value!(&c.value, PsVerifierContextValue::MatchGroup).clone());
         }
 
         let result = ClientResponseStage {
@@ -940,7 +867,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::ClientResponseStage,
@@ -953,7 +879,7 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
     fn visit_origin_response_stage(
         &mut self,
         v: &TypedOriginResponseStage<()>,
-        c: &PsVerifierContext,
+        mut c: PsVerifierContext,
     ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
         check_generic_md_typename!(v, TypedOriginResponseStage);
         let v = &v.value;
@@ -961,13 +887,9 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
         // Verify each of the match groups!
         let mut verified_mgs: Vec<TypedMatchGroup<PsVerificationKey>> = vec![];
         for mg in &v.match_groups {
-            verified_mgs.push(
-                expect_some_value!(
-                    self.visit_match_group(mg, &c.clone())?.value,
-                    PsVerifierContextValue::MatchGroup
-                )
-                .clone(),
-            );
+            c = self.visit_match_group(mg, c)?;
+            verified_mgs
+                .push(expect_some_value!(&c.value, PsVerifierContextValue::MatchGroup).clone());
         }
 
         let result = OriginResponseStage {
@@ -977,7 +899,6 @@ impl PsVisitor<(), PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            generic_interpreters: c.generic_interpreters.clone(),
             value: make_context_value!(
                 result,
                 PsVerifierContextValue::OriginResponseStage,
@@ -1003,7 +924,7 @@ pub fn verify_ps(
 ) -> Result<TypedProcessingStages<PsVerificationKey>, Box<PsVerificationError>> {
     let (mut verifier, context) = verifier();
     let value = &stages;
-    let result = verifier.visit_processing_stages(value, &context)?;
+    let result = verifier.visit_processing_stages(value, context)?;
     Ok(expect_some_value!(&result.value, PsVerifierContextValue::ProcessingStages).clone())
 }
 
@@ -1017,7 +938,7 @@ pub fn verify_ps_request_stage(
         TypedStage::ClientRequest(crq) => {
             let (mut verifier, mut context) = verifier();
             context.scopes = scopes;
-            let result = verifier.visit_client_request_stage(&crq, &context)?;
+            let result = verifier.visit_client_request_stage(&crq, context)?;
             Ok(TypedStage::ClientRequest(
                 expect_some_value!(&result.value, PsVerifierContextValue::ClientRequestStage)
                     .clone(),
@@ -1026,7 +947,7 @@ pub fn verify_ps_request_stage(
         TypedStage::ClientResponse(crs) => {
             let (mut verifier, mut context) = verifier();
             context.scopes = scopes;
-            let result = verifier.visit_client_response_stage(&crs, &context)?;
+            let result = verifier.visit_client_response_stage(&crs, context)?;
             Ok(TypedStage::ClientResponse(
                 expect_some_value!(&result.value, PsVerifierContextValue::ClientResponseStage)
                     .clone(),
@@ -1035,7 +956,7 @@ pub fn verify_ps_request_stage(
         TypedStage::OriginRequest(orq) => {
             let (mut verifier, mut context) = verifier();
             context.scopes = scopes;
-            let result = verifier.visit_origin_request_stage(&orq, &context)?;
+            let result = verifier.visit_origin_request_stage(&orq, context)?;
             Ok(TypedStage::OriginRequest(
                 expect_some_value!(&result.value, PsVerifierContextValue::OriginRequestStage)
                     .clone(),
@@ -1044,7 +965,7 @@ pub fn verify_ps_request_stage(
         TypedStage::OriginResponse(ors) => {
             let (mut verifier, mut context) = verifier();
             context.scopes = scopes;
-            let result = verifier.visit_origin_response_stage(&ors, &context)?;
+            let result = verifier.visit_origin_response_stage(&ors, context)?;
             Ok(TypedStage::OriginResponse(
                 expect_some_value!(&result.value, PsVerifierContextValue::OriginResponseStage)
                     .clone(),
@@ -1097,7 +1018,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_generic_metadata(&generic, &context)
+            .visit_generic_metadata(&generic, context)
             .expect_err("Could verify CDNI generic metadata with invalid metadata type name");
 
         assert_matches!(*result, WrongGenericMetadataTypeName(expected, actual) if expected == "MI. ..." && actual == "Mi.CachePolicy");
@@ -1108,7 +1029,7 @@ mod test_verify {
         let mtch = expression_match("5 + 4");
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_expression_match(&mtch, &context)
+            .visit_expression_match(&mtch, context)
             .expect_err("Could verify PS expression match with incorrect MEL type");
 
         assert_matches!(*result, ExpressionWrongType(Type::Boolean, Type::Integer))
@@ -1119,7 +1040,7 @@ mod test_verify {
         let xform = request_transform(None, Some("5+4".to_string()), Some(true));
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_request_transform(&xform, &context)
+            .visit_request_transform(&xform, context)
             .expect_err("Could verify PS with incorrect MEL type of expression to calculate URI");
 
         assert_matches!(*result, ExpressionWrongType(Type::String, Type::Integer));
@@ -1130,7 +1051,7 @@ mod test_verify {
         let xform = response_transform(None, Some("404".to_string()), None, None);
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_response_transform(&xform, &context)
+            .visit_response_transform(&xform, context)
             .expect("Could not verify correct PS")
             .value
             .expect("No value in PS Verification Context");
@@ -1155,7 +1076,7 @@ mod test_verify {
         let xform = response_transform(None, Some("400+4".to_string()), Some(true), None);
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_response_transform(&xform, &context)
+            .visit_response_transform(&xform, context)
             .expect("Could not verify correct PS")
             .value
             .expect("No value in PS Verification Context");
@@ -1179,7 +1100,7 @@ mod test_verify {
         let xform = response_transform(None, Some("false".to_string()), Some(true), None);
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_response_transform(&xform, &context)
+            .visit_response_transform(&xform, context)
             .expect_err("Could verify PS response transform with incorrect MEL type of expression to calculate response status");
 
         assert_matches!(*result, ExpressionWrongType(Type::Integer, Type::Boolean));
@@ -1199,7 +1120,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_header_transform(&header_xform, &context)
+            .visit_header_transform(&header_xform, context)
             .expect("Could not verify correct PS")
             .value
             .expect("No value in PS Verification Context");
@@ -1231,7 +1152,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_header_transform(&header_xform, &context)
+            .visit_header_transform(&header_xform, context)
             .expect("Could not verify correct PS")
             .value
             .expect("No value in PS Verification Context");
@@ -1263,7 +1184,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_header_transform(&header_xform, &context)
+            .visit_header_transform(&header_xform, context)
             .expect_err("Could verify PS typed header with incorrect MEL type of expression to calculate header value");
 
         assert_matches!(*result, ExpressionWrongType(Type::String, Type::Integer));
@@ -1282,7 +1203,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_header_transform(&header_xform, &context)
+            .visit_header_transform(&header_xform, context)
             .expect_err("Could verify PS typed header with incorrect MEL type of expression to calculate header value");
 
         assert_matches!(*result, ExpressionWrongType(Type::String, Type::Boolean));
@@ -1298,7 +1219,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_synthetic_response(&srt, &context)
+            .visit_synthetic_response(&srt, context)
             .expect("Could not verify correct PS")
             .value
             .expect("No value in PS Verification Context");
@@ -1329,7 +1250,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_synthetic_response(&srt, &context)
+            .visit_synthetic_response(&srt, context)
             .expect("Could not verify correct PS")
             .value
             .expect("No value in PS Verification Context");
@@ -1366,7 +1287,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_synthetic_response(&srt, &context)
+            .visit_synthetic_response(&srt, context)
             .expect("Could not verify correct PS")
             .value
             .expect("No value in PS Verification Context");
@@ -1403,7 +1324,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_synthetic_response(&srt, &context)
+            .visit_synthetic_response(&srt, context)
             .expect("Could not verify correct PS")
             .value
             .expect("No value in PS Verification Context");
@@ -1434,7 +1355,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_synthetic_response(&srt, &context)
+            .visit_synthetic_response(&srt, context)
             .expect_err("Could verify PS synthetic response with incorrect MEL type of expression to calculate response");
 
         assert_matches!(*result, ExpressionWrongType(Type::Integer, Type::Boolean));
@@ -1450,7 +1371,7 @@ mod test_verify {
 
         let (mut verifier, context) = verifier();
         let result = verifier
-            .visit_synthetic_response(&srt, &context)
+            .visit_synthetic_response(&srt, context)
             .expect_err("Could verify PS synthetic response with incorrect MEL type of expression to calculate body");
 
         assert_matches!(*result, ExpressionWrongType(Type::String, Type::Boolean));

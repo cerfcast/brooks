@@ -20,25 +20,26 @@
 use http::{HeaderName, HeaderValue, StatusCode, Uri, uri::InvalidUri};
 
 use crate::{
-    cdni::ps::{
-        interpret::{
-            PsInterpretMode::HeaderCalculate,
-            PsInterpretValue::{Header, MatchNo, MatchYes},
-            PsInterpretValueType::{MatchResult, SyntheticResponse, Terminate},
+    cdni::{
+        ps::{
+            interpret::{
+                PsInterpretMode::HeaderCalculate,
+                PsInterpretValue::{Header, MatchNo, MatchYes},
+                PsInterpretValueType::{MatchResult, SyntheticResponse, Terminate},
+            },
+            spec::{
+                TypedClientRequestStage, TypedExpressionMatch, TypedHeader, TypedHeaderTransform,
+                TypedMatchGroup, TypedProcessingStages, TypedRequestTransform,
+                TypedResponseTransform, TypedStage, TypedStageMetadata, TypedStageRules,
+                TypedSyntheticResponse,
+            },
+            verify::PsVerificationKey,
+            visit::{PsVisitor, PsVisitorResult},
         },
         spec::{
-            TypedClientRequestStage, TypedExpressionMatch, TypedHeader, TypedHeaderTransform,
-            TypedMatchGroup, TypedProcessingStages, TypedRequestTransform, TypedResponseTransform,
-            TypedStage, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
+            MetadataInformationResultElement, MetadataInformationResultElements,
+            TypedGenericMetadata,
         },
-        verify::PsVerificationKey,
-        visit::{
-            PsGenericMetadataVisitor, PsGenericMetadataVisitorGenerator, PsVisitor, PsVisitorResult,
-        },
-    },
-    cdni::{
-        metadata::{CacheSpecification, CdniMetadata, CdniMetadataElements},
-        spec::TypedGenericMetadata,
     },
     environment::scope::{Scope, Scopes},
     logging::LogMsgs,
@@ -56,11 +57,7 @@ use crate::{
     },
 };
 
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display},
-    sync::Arc,
-};
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Clone)]
 pub enum ProcessableRequestResponseError {
@@ -100,7 +97,7 @@ pub trait ProcessableRequestResponse: Debug {
 }
 
 pub type PsInterpretResult =
-    Result<(PsInterpretValue, CdniMetadataElements), Box<PsInterpretError>>;
+    Result<(PsInterpretValue, MetadataInformationResultElements), Box<PsInterpretError>>;
 
 #[derive(Debug, Clone)]
 pub enum PsInterpretAssertionFailures {
@@ -174,81 +171,15 @@ impl Display for PsInterpretError {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct PsGenericMetadataInterpreter<A: Debug + Clone + Default, O, E> {
-    interpreters: HashMap<String, fn() -> Box<dyn PsGenericMetadataVisitor<A, O, E>>>,
-}
-
-impl<A: Debug + Clone + Default, O, E> Debug for PsGenericMetadataInterpreter<A, O, E> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("PsGenericMetadataInterpreter")
-    }
-}
-
-impl<A: Debug + Clone + Default, O, E> PsGenericMetadataInterpreter<A, O, E> {
-    pub fn add_interpreter(
-        &mut self,
-        tpe: &str,
-        generator: fn() -> Box<dyn PsGenericMetadataVisitor<A, O, E>>,
-    ) {
-        self.interpreters.insert(tpe.to_string(), generator);
-    }
-
-    pub fn get_interpreter(
-        &mut self,
-        tpe: &str,
-    ) -> Option<Box<dyn PsGenericMetadataVisitor<A, O, E>>> {
-        self.interpreters.get(tpe).map(|f| (*f)())
-    }
-}
-
-// CDNI Generic Metadata Interpreters
-
-#[derive(Debug, Clone, Default)]
-struct PsGenericMetadataCachePolicy {}
-impl PsGenericMetadataVisitorGenerator<PsVerificationKey, PsInterpretContext, PsInterpretError>
-    for PsGenericMetadataCachePolicy
-{
-    fn generator(
-        &self,
-    ) -> fn() -> Box<
-        dyn PsGenericMetadataVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError>,
-    > {
-        return || Box::new(PsGenericMetadataCachePolicyVisitor {});
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-struct PsGenericMetadataCachePolicyVisitor {}
-
-impl PsGenericMetadataVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError>
-    for PsGenericMetadataCachePolicyVisitor
-{
-    fn visit_generic_metadata(
-        &self,
-        _v: &TypedGenericMetadata<PsVerificationKey>,
-        c: &PsInterpretContext,
-    ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        Ok(c.update_metadata_elements(Arc::new(CacheSpecification {})))
-    }
-}
-
 // CDNI Processing Stage Interpreter
 
 struct PsInterpreter<'a> {
     pub mel_scope: &'a Option<Scope<TypedValue>>,
-    pub generic_interpreters:
-        PsGenericMetadataInterpreter<PsVerificationKey, PsInterpretContext, PsInterpretError>,
     pub req: &'a mut dyn ProcessableRequestResponse,
 }
 
 impl<'a> PsInterpreter<'a> {
-    fn install_generic_visitors(&mut self) {
-        self.generic_interpreters.add_interpreter(
-            "MI.CachePolicy",
-            PsGenericMetadataCachePolicy {}.generator(),
-        );
-    }
+    fn install_generic_visitors(&mut self) {}
 
     fn scopes_from_req(&self) -> Result<Scopes<TypedValue>, PsInterpretError> {
         let mel_req = http::Request::builder()
@@ -310,24 +241,20 @@ impl<'a> PsInterpreter<'a> {
     fn interpret_match_groups_in_stage(
         &mut self,
         mgs: &Vec<TypedMatchGroup<PsVerificationKey>>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        let mut result: Result<(PsInterpretValue, CdniMetadataElements), PsInterpretError> = Err(
-            PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult),
-        );
+        let mut c = c;
+
         for mg in mgs {
-            let visit_result = self.visit_match_group(mg, &c.clone())?;
-            match visit_result.result {
-                Some(
-                    r @ (PsInterpretValue::Terminate | PsInterpretValue::SyntheticResponse(_)),
-                ) => {
+            c = self.visit_match_group(mg, c)?;
+            match c.result {
+                Some(PsInterpretValue::Terminate | PsInterpretValue::SyntheticResponse(_)) => {
                     // This result stops processing.
-                    result = Ok((r, visit_result.metadata));
                     break;
                 }
-                Some(r @ (PsInterpretValue::MatchYes | PsInterpretValue::MatchNo)) => {
+                Some(PsInterpretValue::MatchYes | PsInterpretValue::MatchNo) => {
                     // This result continues processing.
-                    result = Ok((r, visit_result.metadata));
+                    continue;
                 }
                 Some(r) => {
                     return Err(PsInterpretError::WrongType(
@@ -342,10 +269,16 @@ impl<'a> PsInterpreter<'a> {
                 }
             }
         }
-
-        match result {
-            Ok((result, md)) => Ok(c.update_result(Some(result)).replace_metadata_elements(md)),
-            Err(e) => Err(e),
+        if let Some(result) = c.result {
+            Ok(PsInterpretContext {
+                mode: c.mode,
+                result: Some(result.clone()),
+                metadata: c.metadata,
+            })
+        } else {
+            Err(PsInterpretError::AssertionFailure(
+                PsInterpretAssertionFailures::MissingResult,
+            ))
         }
     }
 }
@@ -406,42 +339,50 @@ impl From<bool> for PsInterpretValue {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 struct PsInterpretContext {
     mode: PsInterpretMode,
     result: Option<PsInterpretValue>,
-    metadata: CdniMetadataElements,
+    metadata: MetadataInformationResultElements,
 }
 
 impl PsInterpretContext {
-    fn update_mode(&self, new_mode: PsInterpretMode) -> PsInterpretContext {
-        let mut nc = self.clone();
+    fn update_mode(self, new_mode: PsInterpretMode) -> PsInterpretContext {
+        let mut nc = self;
         nc.mode = new_mode;
         nc
     }
-    fn update_result(&self, new_result: Option<PsInterpretValue>) -> PsInterpretContext {
-        let mut nc = self.clone();
+    fn update_result(self, new_result: Option<PsInterpretValue>) -> PsInterpretContext {
+        let mut nc = self;
         nc.result = new_result;
         nc
     }
 
-    fn update_metadata_elements(&self, new_element: Arc<dyn CdniMetadata>) -> PsInterpretContext {
-        let mut nc = self.clone();
+    fn update_metadata_elements(
+        self,
+        new_element: Box<dyn MetadataInformationResultElement>,
+    ) -> PsInterpretContext {
+        let mut nc = self;
         nc.metadata.elements.push(new_element);
         nc
     }
-    fn replace_metadata_elements(&self, new_elements: CdniMetadataElements) -> PsInterpretContext {
-        let mut nc = self.clone();
+    fn replace_metadata_elements(
+        self,
+        new_elements: MetadataInformationResultElements,
+    ) -> PsInterpretContext {
+        let mut nc = self;
         nc.metadata = new_elements;
         nc
     }
 }
 
-impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for PsInterpreter<'a> {
+impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, PsInterpretError>
+    for PsInterpreter<'a>
+{
     fn visit_processing_stages(
         &mut self,
         _v: &TypedProcessingStages<PsVerificationKey>,
-        _c: &PsInterpretContext,
+        _c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         todo!()
     }
@@ -449,7 +390,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     fn visit_stage_rules(
         &mut self,
         v: &TypedStageRules<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         let doq = if let Some(mtch) = &v.value.mtch {
             let expr = match &mtch.value.aug {
@@ -473,7 +414,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
         };
 
         if doq {
-            self.visit_stage_metadata(&v.value.stage_metadata, &c.update_result(Some(doq.into())))
+            self.visit_stage_metadata(&v.value.stage_metadata, c.update_result(Some(doq.into())))
         } else {
             Ok(c.update_result(Some(doq.into())))
         }
@@ -482,7 +423,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     fn visit_expression_match(
         &mut self,
         _v: &TypedExpressionMatch<PsVerificationKey>,
-        _c: &PsInterpretContext,
+        _c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         todo!()
     }
@@ -490,24 +431,24 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     fn visit_stage_metadata(
         &mut self,
         v: &TypedStageMetadata<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        let mut c = c.clone();
+        let mut c = c;
         if let Some(generic) = &v.value.generic {
             for generic in generic {
-                c = self.visit_generic_metadata(generic, &c)?;
+                c = self.visit_generic_metadata(generic, c)?;
             }
         }
 
         match &c.mode {
             PsInterpretMode::Request => {
                 if let Some(req_xform) = &v.value.request_xform {
-                    return self.visit_request_transform(req_xform, &c);
+                    return self.visit_request_transform(req_xform, c);
                 }
             }
             PsInterpretMode::Response => {
                 if let Some(res_xform) = &v.value.response_xform {
-                    return self.visit_response_transform(res_xform, &c);
+                    return self.visit_response_transform(res_xform, c);
                 }
             }
             _ => {
@@ -516,21 +457,21 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
                 ));
             }
         }
-        Ok(c.clone())
+        Ok(c)
     }
 
     fn visit_request_transform(
         &mut self,
         v: &TypedRequestTransform<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        let mut c = c.clone();
+        let mut c = c;
         if let Some(header_xform) = &v.value.xform {
             c = self.visit_header_transform(
                 header_xform,
-                &PsInterpretContext {
+                PsInterpretContext {
                     mode: PsInterpretMode::Request,
-                    metadata: c.metadata.clone(),
+                    metadata: c.metadata,
                     result: c.result.clone(),
                 },
             )?;
@@ -565,22 +506,22 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
                 .map_err(PsInterpretError::ProcessableRequestResponseError)?
         }
 
-        Ok(c.clone())
+        Ok(c)
     }
 
     fn visit_response_transform(
         &mut self,
         v: &TypedResponseTransform<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         if let Some(synthetic_response) = &v.value.synthetic {
             return self.visit_synthetic_response(synthetic_response, c);
         }
-        let mut c = c.clone();
+        let mut c = c;
 
         if let Some(header_xform) = &v.value.xform {
             c = self
-                .visit_header_transform(header_xform, &c.update_mode(PsInterpretMode::Response))?;
+                .visit_header_transform(header_xform, c.update_mode(PsInterpretMode::Response))?;
         }
 
         if let Some(new_response) = &v.value.response_status {
@@ -619,27 +560,21 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
             })?;
         }
 
-        Ok(c.clone())
+        Ok(c)
     }
 
     fn visit_generic_metadata(
         &mut self,
         _v: &TypedGenericMetadata<PsVerificationKey>,
-        c: &PsInterpretContext,
+        _c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        match self.generic_interpreters.get_interpreter(&_v.tpe) {
-            Some(interp) => interp.visit_generic_metadata(_v, c),
-            None => Err(PsInterpretError::InvalidResponse(format!(
-                "No generic interpreter available for generic metadata of type {}",
-                _v.tpe
-            ))),
-        }
+        todo!()
     }
 
     fn visit_header_transform(
         &mut self,
         v: &TypedHeaderTransform<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         if let Some(to_delete) = &v.value.delete {
             for htr in to_delete {
@@ -653,7 +588,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
             for htr in to_add {
                 self.visit_header(
                     htr,
-                    &PsInterpretContext {
+                    PsInterpretContext {
                         mode: PsInterpretMode::HeaderAdd,
                         ..Default::default()
                     },
@@ -665,7 +600,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
             for htr in to_replace {
                 self.visit_header(
                     htr,
-                    &PsInterpretContext {
+                    PsInterpretContext {
                         mode: PsInterpretMode::HeaderReplace,
                         ..Default::default()
                     },
@@ -673,13 +608,13 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
             }
         }
 
-        Ok(c.clone())
+        Ok(c)
     }
 
     fn visit_header(
         &mut self,
         v: &TypedHeader<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         let value = if let Some(expr) = &v.value.value_expr
             && *expr
@@ -709,13 +644,13 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
                 self.req
                     .add_header(&v.value.name, &value)
                     .map_err(PsInterpretError::ProcessableRequestResponseError)?;
-                Ok(c.clone())
+                Ok(c)
             }
             PsInterpretMode::HeaderReplace => {
                 self.req
                     .set_header_value(&v.value.name, &value)
                     .map_err(PsInterpretError::ProcessableRequestResponseError)?;
-                Ok(c.clone())
+                Ok(c)
             }
             PsInterpretMode::HeaderCalculate => {
                 Ok(c.update_result(Some(Header(v.value.name.clone(), value))))
@@ -727,26 +662,33 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     fn visit_synthetic_response(
         &mut self,
         v: &TypedSyntheticResponse<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         let mut response = http::Response::builder();
+        let mut c = c;
 
         if let Some(headers) = &v.value.headers {
             for header in headers {
-                let result = self.visit_header(header, &c.update_mode(HeaderCalculate))?;
-                match result.result.ok_or(PsInterpretError::AssertionFailure(
-                    PsInterpretAssertionFailures::MissingAnalyzedExpression,
-                ))? {
-                    PsInterpretValue::Header(name, value) => {
+                //let result = self.visit_header(header, c.update_mode(HeaderCalculate))?;
+
+                c = self.visit_header(header, c.update_mode(HeaderCalculate))?;
+
+                match &c.result {
+                    Some(PsInterpretValue::Header(name, value)) => {
                         response.headers_mut().unwrap().insert(
                             HeaderName::from_bytes(name.as_bytes()).expect("Todo"),
-                            HeaderValue::from_str(&value).expect("Todo"),
+                            HeaderValue::from_str(value).expect("Todo"),
                         );
                     }
-                    r => {
+                    Some(r) => {
                         return Err(PsInterpretError::WrongType(
                             PsInterpretValueType::Header,
-                            r.into(),
+                            r.clone().into(),
+                        ));
+                    }
+                    None => {
+                        return Err(PsInterpretError::AssertionFailure(
+                            PsInterpretAssertionFailures::MissingAnalyzedExpression,
                         ));
                     }
                 }
@@ -816,8 +758,10 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     fn visit_match_group(
         &mut self,
         v: &TypedMatchGroup<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
+        let mut c = c;
+
         let else_ifs = v
             .value
             .else_ifs
@@ -825,19 +769,14 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
             .map(|else_ifs| else_ifs.iter())
             .unwrap_or([].iter());
 
-        let mut result: Result<(PsInterpretValue, CdniMetadataElements), PsInterpretError> = Err(
-            PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult),
-        );
         let rules = [&v.value.if_rule].into_iter().chain(else_ifs);
         for r in rules {
-            let visit_result = self.visit_stage_rules(r, &c.clone())?;
-            match visit_result.result {
-                Some(r @ PsInterpretValue::MatchNo) => {
-                    result = Ok((r, visit_result.metadata));
+            c = self.visit_stage_rules(r, c)?;
+            match &c.result {
+                Some(PsInterpretValue::MatchNo) => {
                     continue; // do the next rule.
                 }
-                Some(r) => {
-                    result = Ok((r, visit_result.metadata));
+                Some(_) => {
                     break; // do _not_ do the next rule in any other case.
                 }
                 None => {
@@ -847,16 +786,23 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
                 }
             };
         }
-        match result {
-            Ok((result, md)) => Ok(c.update_result(Some(result)).replace_metadata_elements(md)),
-            Err(e) => Err(e),
+        if let Some(result) = &c.result {
+            Ok(PsInterpretContext {
+                mode: c.mode,
+                result: Some(result.clone()),
+                metadata: c.metadata,
+            })
+        } else {
+            Err(PsInterpretError::AssertionFailure(
+                PsInterpretAssertionFailures::MissingResult,
+            ))
         }
     }
 
     fn visit_client_request_stage(
         &mut self,
         v: &TypedClientRequestStage<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         self.interpret_match_groups_in_stage(&v.value.match_groups, c)
     }
@@ -864,7 +810,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     fn visit_origin_request_stage(
         &mut self,
         v: &super::spec::TypedOriginRequestStage<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         self.interpret_match_groups_in_stage(&v.value.match_groups, c)
     }
@@ -872,7 +818,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     fn visit_client_response_stage(
         &mut self,
         v: &super::spec::TypedClientResponseStage<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         self.interpret_match_groups_in_stage(&v.value.match_groups, c)
     }
@@ -880,7 +826,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretError> for 
     fn visit_origin_response_stage(
         &mut self,
         v: &super::spec::TypedOriginResponseStage<PsVerificationKey>,
-        c: &PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         self.interpret_match_groups_in_stage(&v.value.match_groups, c)
     }
@@ -895,7 +841,6 @@ pub fn interpret_stage(
     let mut visitor = PsInterpreter {
         mel_scope: mel,
         req,
-        generic_interpreters: Default::default(),
     };
 
     visitor.install_generic_visitors();
@@ -907,16 +852,16 @@ pub fn interpret_stage(
 
     let result = match ts {
         TypedStage::ClientRequest(typed_client_request_stage) => {
-            visitor.visit_client_request_stage(typed_client_request_stage, &context)
+            visitor.visit_client_request_stage(typed_client_request_stage, context)
         }
         TypedStage::ClientResponse(typed_client_response_stage) => {
-            visitor.visit_client_response_stage(typed_client_response_stage, &context)
+            visitor.visit_client_response_stage(typed_client_response_stage, context)
         }
         TypedStage::OriginRequest(typed_origin_request_stage) => {
-            visitor.visit_origin_request_stage(typed_origin_request_stage, &context)
+            visitor.visit_origin_request_stage(typed_origin_request_stage, context)
         }
         TypedStage::OriginResponse(typed_origin_response_stage) => {
-            visitor.visit_origin_response_stage(typed_origin_response_stage, &context)
+            visitor.visit_origin_response_stage(typed_origin_response_stage, context)
         }
     }?;
 
@@ -1012,7 +957,6 @@ mod ps_interpreter_tests {
             verify::{PsVerifierContextValue, verifier, verify_ps_request_stage},
             visit::PsVisitor,
         },
-        cdni::spec::{CachePolicy, TypedCachePolicy, TypedGenericMetadata},
         cdni::tests::test_helpers::{
             client_request_stage, expression_match, match_group, request_transform,
             response_transform, stage_metadata, synthetic_response, typed_header, typed_stage_rule,
@@ -1089,7 +1033,7 @@ mod ps_interpreter_tests {
         let (mut verifier, context) = verifier();
 
         let result = verifier
-            .visit_client_request_stage(&crs, &context)
+            .visit_client_request_stage(&crs, context)
             .expect("Could not verify valid client request")
             .value
             .expect("Could not get value from verified client request");
@@ -1146,7 +1090,7 @@ mod ps_interpreter_tests {
         let (mut verifier, context) = verifier();
 
         let result = verifier
-            .visit_client_request_stage(&crs, &context)
+            .visit_client_request_stage(&crs, context)
             .expect("Could not verify valid client request")
             .value
             .expect("Could not get value from verified client request");
@@ -1217,7 +1161,7 @@ mod ps_interpreter_tests {
         let (mut verifier, context) = verifier();
 
         let result = verifier
-            .visit_client_request_stage(&crs, &context)
+            .visit_client_request_stage(&crs, context)
             .expect("Could not verify valid client request")
             .value
             .expect("Could not get value from verified client request");
@@ -1287,7 +1231,7 @@ mod ps_interpreter_tests {
         let (mut verifier, context) = verifier();
 
         let result = verifier
-            .visit_client_request_stage(&crs, &context)
+            .visit_client_request_stage(&crs, context)
             .expect("Could not verify valid client request")
             .value
             .expect("Could not get value from verified client request");
@@ -1330,7 +1274,7 @@ mod ps_interpreter_tests {
         let (mut verifier, context) = verifier();
 
         let result = verifier
-            .visit_client_request_stage(&crs, &context)
+            .visit_client_request_stage(&crs, context)
             .expect("Could not verify valid client request")
             .value
             .expect("Could not get value from verified client request");
@@ -1380,7 +1324,7 @@ mod ps_interpreter_tests {
         let (mut verifier, context) = verifier();
 
         let result = verifier
-            .visit_client_request_stage(&crs, &context)
+            .visit_client_request_stage(&crs, context)
             .expect("Could not verify valid client request")
             .value
             .expect("Could not get value from verified client request");
@@ -1442,7 +1386,7 @@ mod ps_interpreter_tests {
         let (mut verifier, context) = verifier();
 
         let result = verifier
-            .visit_client_request_stage(&crs, &context)
+            .visit_client_request_stage(&crs, context)
             .expect("Could not verify valid client request")
             .value
             .expect("Could not get value from verified client request");
@@ -1503,7 +1447,7 @@ mod ps_interpreter_tests {
         let (mut verifier, context) = verifier();
 
         let result = verifier
-            .visit_client_request_stage(&crs, &context)
+            .visit_client_request_stage(&crs, context)
             .expect("Could not verify valid client request")
             .value
             .expect("Could not get value from verified client request");
@@ -1559,7 +1503,7 @@ mod ps_interpreter_tests {
         let (mut verifier, context) = verifier();
 
         let result = verifier
-            .visit_client_request_stage(&crs, &context)
+            .visit_client_request_stage(&crs, context)
             .expect("Could not verify valid client request")
             .value
             .expect("Could not get value from verified client request");
@@ -1582,113 +1526,5 @@ mod ps_interpreter_tests {
         assert_eq!(req.log.len(), 0);
         assert_matches!(&result.0, PsInterpretValue::SyntheticResponse(r)
             if r.status() == 404 && r.body() == "This is a test." && r.headers().len() == 2);
-    }
-
-    #[test]
-    fn test_interpret_client_request_stage_response_generic_metadata() {
-        let mut response_xform_true_stage = stage_metadata();
-
-        let response_xform_true_match = expression_match("true");
-        let response_xform_true = response_transform(None, None, None, None);
-        response_xform_true_stage.value.response_xform = Some(response_xform_true);
-
-        let cp = TypedCachePolicy::<()>::typed_value(CachePolicy {
-            policy: "Testing".to_string(),
-            aug: (),
-        });
-
-        let gcp = TypedGenericMetadata {
-            tpe: "MI.CachePolicy".to_string(),
-            value: serde_json::to_value(cp.value).expect("TODO"),
-            aug: (),
-        };
-
-        response_xform_true_stage.value.generic = Some(vec![gcp]);
-
-        let mg = match_group(
-            typed_stage_rule(Some(response_xform_true_match), response_xform_true_stage),
-            None,
-        );
-        let crs = client_request_stage(vec![mg]);
-
-        let (mut verifier, context) = verifier();
-
-        let result = verifier
-            .visit_client_request_stage(&crs, &context)
-            .expect("Could not verify valid client request")
-            .value
-            .expect("Could not get value from verified client request");
-
-        let value = match result {
-            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
-                typed_client_request_stage
-            }
-            _ => todo!(),
-        };
-        let mut req = EffectfulProcessableRequestResponse::default();
-        let result = interpret_stage(
-            &TypedStage::ClientRequest(value),
-            &None,
-            &mut req,
-            PsInterpretMode::Response,
-        )
-        .expect("Could not interpret a valid client request");
-
-        assert_eq!(req.log.len(), 0);
-        assert_eq!(result.1.elements.len(), 1);
-    }
-
-    #[test]
-    fn test_interpret_client_request_stage_request_generic_metadata() {
-        let mut request_xform_true_stage = stage_metadata();
-
-        let request_xform_true_match = expression_match("true");
-        let request_xform_true = request_transform(None, None, None);
-        request_xform_true_stage.value.request_xform = Some(request_xform_true);
-
-        let cp = TypedCachePolicy::<()>::typed_value(CachePolicy {
-            policy: "Testing".to_string(),
-            aug: (),
-        });
-
-        let gcp = TypedGenericMetadata {
-            tpe: "MI.CachePolicy".to_string(),
-            value: serde_json::to_value(cp.value).expect("TODO"),
-            aug: (),
-        };
-
-        request_xform_true_stage.value.generic = Some(vec![gcp]);
-
-        let mg = match_group(
-            typed_stage_rule(Some(request_xform_true_match), request_xform_true_stage),
-            None,
-        );
-        let crs = client_request_stage(vec![mg]);
-
-        let (mut verifier, context) = verifier();
-
-        let result = verifier
-            .visit_client_request_stage(&crs, &context)
-            .expect("Could not verify valid client request")
-            .value
-            .expect("Could not get value from verified client request");
-
-        let value = match result {
-            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
-                typed_client_request_stage
-            }
-            _ => todo!(),
-        };
-        let mut req = EffectfulProcessableRequestResponse::default();
-        let result = interpret_stage(
-            &TypedStage::ClientRequest(value),
-            &None,
-            &mut req,
-            PsInterpretMode::Response,
-        )
-        .expect("Could not interpret a valid client request");
-
-        assert_eq!(req.log.len(), 0);
-        assert_eq!(result.1.elements.len(), 1);
     }
 }
