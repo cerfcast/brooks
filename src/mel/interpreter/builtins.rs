@@ -27,7 +27,7 @@ use crate::{
     environment::scope::Scope,
     mel::{
         interpreter::interpret::{BuiltinFunction, TypedValue, Value},
-        tvs::{
+        types::{
             Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
             IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,
             MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, RealBuiltin,
@@ -83,7 +83,7 @@ impl Path_ElementBuiltin {
                     )))?;
             Ok(TypedValue {
                 value: Value::String(part.to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             })
         } else {
             Err(BuiltinInterpError::RuntimeError(format!(
@@ -115,7 +115,7 @@ impl Path_ElementsBuiltin {
 
         Ok(TypedValue {
             value: Value::String(result.collect::<Vec<_>>().join("/")),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -134,7 +134,7 @@ impl MatchBuiltin {
         };
         Ok(TypedValue {
             value: Value::String(result),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -151,7 +151,7 @@ impl Match_ReplaceBuiltin {
 
         Ok(TypedValue {
             value: Value::String(result.to_string()),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -227,7 +227,7 @@ impl Add_QueryBuiltin {
 
         Ok(TypedValue {
             value: Value::String(pq.to_string()),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -287,7 +287,7 @@ impl Add_Query_MultiBuiltin {
 
         Ok(TypedValue {
             value: Value::String(pq.to_string()),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -301,7 +301,7 @@ impl Remove_QueryBuiltin {
 
         Ok(TypedValue {
             value: Value::String(pq.to_string()),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -317,7 +317,7 @@ impl Remove_Query_MultiBuiltin {
 
         Ok(TypedValue {
             value: Value::String(pq.to_string()),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -339,7 +339,7 @@ impl Keep_Query_MultiBuiltin {
 
         Ok(TypedValue {
             value: Value::String(pq.to_string()),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -349,7 +349,7 @@ impl BooleanBuiltin {
     fn interp(&self, c: &i64) -> BuiltinInterpResult {
         Ok(TypedValue {
             value: Value::Boolean(*c != 0),
-            tipe: Type::Boolean,
+            tpe: Type::Boolean,
         })
     }
 }
@@ -359,7 +359,7 @@ impl UpperBuiltin {
     fn interp(&self, s: &str) -> BuiltinInterpResult {
         Ok(TypedValue {
             value: Value::String(s.to_uppercase()),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -369,7 +369,7 @@ impl LowerBuiltin {
     fn interp(&self, s: &str) -> BuiltinInterpResult {
         Ok(TypedValue {
             value: Value::String(s.to_lowercase()),
-            tipe: Type::String,
+            tpe: Type::String,
         })
     }
 }
@@ -429,7 +429,7 @@ macro_rules! add_builtin_function_interpreter_to_scope {
             &$builtin.name(),
             TypedValue {
                 value: Value::Function(Arc::new($builtin.clone())),
-                tipe: Type::Function(
+                tpe: Type::Function(
                     $builtin.name(),
                     $builtin.return_type_calculator(),
                     $builtin.params_type_checker(),

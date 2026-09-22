@@ -59,7 +59,18 @@ func (blc *BrooksLibConfiguration) ServeHTTP(req *http.Request, caddylogger *zap
 		request = C.brooks_caddy_request_builder_set_header(request, C.CString(hv), C.CString(strings.Join(hn, ",")))
 	}
 
-	request = C.brooks_caddy_request_builder_set_uri(request, C.CString(req.RequestURI))
+	if !req.URL.IsAbs() {
+		req.URL.Host = req.Host
+
+		scheme := "http"
+		if req.TLS != nil {
+			scheme = "https"
+		}
+		req.URL.Scheme = scheme
+	}
+	url := req.URL.String()
+	pinner.Pin(&url)
+	request = C.brooks_caddy_request_builder_set_uri(request, C.CString(url))
 	request = C.brooks_caddy_request_builder_set_method(request, C.CString(req.Method))
 	request = C.brooks_caddy_request_builder_set_host(request, C.CString(req.Host))
 

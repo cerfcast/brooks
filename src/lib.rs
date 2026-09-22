@@ -34,5 +34,11 @@ pub mod integrations;
 #[allow(dead_code)]
 pub mod environment;
 
+#[allow(dead_code)]
+pub mod tools;
+
+#[allow(dead_code)]
+pub mod macros;
+
 #[cfg(test)]
 pub(crate) mod tests;

@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! MEL Types and Values
+
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -23,7 +25,7 @@ use std::{
 use brooks_macros::builtin_function;
 use regex::Regex;
 
-use crate::mel::interpreter::interpret::BuiltinFunction;
+use crate::{mel::interpreter::interpret::BuiltinFunction, tools::prr};
 
 /// Types
 
@@ -374,6 +376,18 @@ pub(crate) fn header_type_from_req<A>(value: &http::Request<A>) -> Struct {
     ht
 }
 
+pub(crate) fn header_type_from_processable_rr<A>(value: &dyn prr::Prr<A>) -> Struct {
+    // Make the header type.
+    let mut ht = Struct::new("h");
+    value.headers().iter().for_each(|header| {
+        ht.insert_field(
+            &header.0.to_string().replace("-", "_").to_lowercase(),
+            Type::String,
+        );
+    });
+    ht
+}
+
 pub(crate) fn uri_type() -> Struct {
     // Make the URI type.
     let mut urit = Struct::new("uri");
@@ -400,7 +414,7 @@ pub(crate) fn req_type(header_type: Struct, uri_type: Struct) -> Struct {
 mod test_struct {
     use regex::Regex;
 
-    use crate::mel::tvs::{Struct, Type};
+    use crate::mel::types::{Struct, Type};
 
     #[test]
     fn test_wild_struct_field() {

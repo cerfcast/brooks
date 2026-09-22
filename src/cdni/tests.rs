@@ -20,6 +20,7 @@ pub mod test_helpers {
     use serde_json::Value;
 
     use crate::cdni::{
+        gmd::spec::{Source, TypedGenericMetadata, TypedSource},
         ps::spec::{
             ClientRequestStage, ExpressionMatch, Header, HeaderTransform, MatchGroup,
             ProcessingStages, RequestTransform, ResponseTransform, StageMetadata, StageRules,
@@ -27,7 +28,6 @@ pub mod test_helpers {
             TypedHeaderTransform, TypedMatchGroup, TypedProcessingStages, TypedRequestTransform,
             TypedResponseTransform, TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
         },
-        spec::{Source, TypedGenericMetadata, TypedSource},
     };
 
     pub fn expression_match(expression: &str) -> TypedExpressionMatch<()> {
@@ -94,7 +94,7 @@ pub mod test_helpers {
 
     pub fn generic_source(endpoints: Vec<&str>, protocol: &str) -> TypedGenericMetadata<()> {
         TypedGenericMetadata {
-            tpe: TypedSource::<()>::typed_generic_metadata_name(),
+            tpe: TypedSource::<()>::typed_cdni_metadata_name(),
             value: serde_json::to_value(Source {
                 endpoints: endpoints.iter().map(|f| f.to_string()).collect(),
                 protocol: protocol.to_string(),
@@ -107,7 +107,7 @@ pub mod test_helpers {
 
     pub fn typed_header(name: &str, value: &str, value_expr: Option<bool>) -> TypedHeader<()> {
         TypedHeader::<()> {
-            tpe: TypedHeader::<()>::typed_generic_metadata_name(),
+            tpe: TypedHeader::<()>::typed_cdni_metadata_name(),
             value: Header {
                 name: name.to_string(),
                 value: value.to_string(),
@@ -123,7 +123,7 @@ pub mod test_helpers {
         replace: Option<Vec<TypedHeader<()>>>,
     ) -> TypedHeaderTransform<()> {
         TypedHeaderTransform::<()> {
-            tpe: TypedHeaderTransform::<()>::typed_generic_metadata_name(),
+            tpe: TypedHeaderTransform::<()>::typed_cdni_metadata_name(),
             value: HeaderTransform {
                 delete,
                 add,
@@ -140,7 +140,7 @@ pub mod test_helpers {
         synthetic: Option<TypedSyntheticResponse<()>>,
     ) -> TypedResponseTransform<()> {
         TypedResponseTransform::<()> {
-            tpe: TypedResponseTransform::<()>::typed_generic_metadata_name(),
+            tpe: TypedResponseTransform::<()>::typed_cdni_metadata_name(),
             value: ResponseTransform {
                 xform,
                 response_status,
@@ -157,7 +157,7 @@ pub mod test_helpers {
         uri_is_expr: Option<bool>,
     ) -> TypedRequestTransform<()> {
         TypedRequestTransform::<()> {
-            tpe: TypedRequestTransform::<()>::typed_generic_metadata_name(),
+            tpe: TypedRequestTransform::<()>::typed_cdni_metadata_name(),
             value: RequestTransform {
                 xform,
                 uri,
@@ -175,7 +175,7 @@ pub mod test_helpers {
         body_expr: Option<bool>,
     ) -> TypedSyntheticResponse<()> {
         TypedSyntheticResponse::<()> {
-            tpe: TypedSyntheticResponse::<()>::typed_generic_metadata_name(),
+            tpe: TypedSyntheticResponse::<()>::typed_cdni_metadata_name(),
             value: SyntheticResponse {
                 headers,
                 response_status,
@@ -192,7 +192,7 @@ pub mod test_helpers {
         sm: TypedStageMetadata<()>,
     ) -> TypedStageRules<()> {
         TypedStageRules {
-            tpe: TypedStageRules::<()>::typed_generic_metadata_name(),
+            tpe: TypedStageRules::<()>::typed_cdni_metadata_name(),
             value: StageRules {
                 mtch,
                 stage_metadata: sm,
@@ -206,7 +206,7 @@ pub mod test_helpers {
         else_ifs: Option<Vec<TypedStageRules<()>>>,
     ) -> TypedMatchGroup<()> {
         TypedMatchGroup {
-            tpe: TypedMatchGroup::<()>::typed_generic_metadata_name(),
+            tpe: TypedMatchGroup::<()>::typed_cdni_metadata_name(),
             value: MatchGroup {
                 if_rule,
                 else_ifs,
@@ -217,7 +217,7 @@ pub mod test_helpers {
 
     pub fn client_request_stage(mgs: Vec<TypedMatchGroup<()>>) -> TypedClientRequestStage<()> {
         TypedClientRequestStage {
-            tpe: TypedClientRequestStage::<()>::typed_generic_metadata_name(),
+            tpe: TypedClientRequestStage::<()>::typed_cdni_metadata_name(),
             value: ClientRequestStage {
                 match_groups: mgs,
                 aug: (),

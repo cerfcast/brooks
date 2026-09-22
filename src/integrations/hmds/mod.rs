@@ -30,7 +30,7 @@ use tokio::{
     net::UnixStream,
 };
 
-use crate::cdni::{spec::HostMetadata, verify::HostMetadataVerificationKey};
+use crate::cdni::md::{spec::HostMetadata, verify::CdniVerificationKey};
 
 #[derive(Debug, Default, Clone)]
 pub struct HmdsServerConfiguration {
@@ -87,13 +87,8 @@ impl HmdsServerConfiguration {
 
 pub(crate) struct HmdsConfiguration {
     pub(crate) hmds_server: HmdsServerConfiguration,
-    pub(crate) hmds_cache: HashMap<
-        String,
-        (
-            chrono::DateTime<Utc>,
-            HostMetadata<HostMetadataVerificationKey>,
-        ),
-    >,
+    pub(crate) hmds_cache:
+        HashMap<String, (chrono::DateTime<Utc>, HostMetadata<CdniVerificationKey>)>,
 }
 
 #[derive(Serialize, Deserialize)]

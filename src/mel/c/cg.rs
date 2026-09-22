@@ -29,7 +29,7 @@ use crate::mel::{
         FunctionCall, IPAddressLiteral, Identifier, NumberLiteral, RegexLiteral, StringLiteral,
         TernaryExpr,
     },
-    tvs::Type,
+    types::Type,
 };
 
 use std::error::Error;

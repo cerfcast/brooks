@@ -73,7 +73,7 @@ pub(crate) struct BrooksCaddyRequestBuilder {
 }
 
 pub(crate) struct BrooksCaddyRequest {
-    pub(crate) request: Request<String>,
+    pub(crate) request: Request<Vec<u8>>,
 }
 
 impl BrooksCaddyRequestBuilder {
@@ -101,7 +101,7 @@ impl BrooksCaddyRequestBuilder {
         }
     }
 
-    pub fn finalize_with_body(self, body: String) -> http::Result<BrooksCaddyRequest> {
+    pub fn finalize_with_body(self, body: Vec<u8>) -> http::Result<BrooksCaddyRequest> {
         Ok(BrooksCaddyRequest {
             request: self.builder.body(body)?,
         })
@@ -183,9 +183,9 @@ pub unsafe extern "C" fn brooks_caddy_request_builder_finalize_with_body(
 ) -> *const c_void {
     let crb = Box::from_raw(crb as *mut BrooksCaddyRequestBuilder);
     let body = if !body.is_null() {
-        CStr::from_ptr(body).to_string_lossy().into_owned()
+        CStr::from_ptr(body).to_bytes().to_vec()
     } else {
-        "".to_string()
+        vec![]
     };
     Box::into_raw(Box::new(crb.finalize_with_body(body))) as *const c_void
 }

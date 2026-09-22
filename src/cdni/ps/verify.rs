@@ -20,33 +20,52 @@
 use serde::Serialize;
 
 use crate::{
-    cdni::ps::{
-        spec::{
-            ClientRequestStage, ClientResponseStage, ExpressionMatch, Header, HeaderTransform,
-            MatchGroup, OriginRequestStage, OriginResponseStage, ProcessingStages,
-            RequestTransform, ResponseTransform, StageMetadata, StageRules, SyntheticResponse,
-            TypedClientRequestStage, TypedClientResponseStage, TypedExpressionMatch,
-            TypedGenericStage, TypedHeader, TypedHeaderTransform, TypedMatchGroup,
-            TypedOriginRequestStage, TypedOriginResponseStage, TypedProcessingStages,
-            TypedRequestTransform, TypedResponseTransform, TypedStage, TypedStageMetadata,
-            TypedStageRules, TypedSyntheticResponse,
+    cdni::{
+        gmd::spec::TypedGenericMetadata,
+        ps::{
+            spec::{
+                ClientRequestStage, ClientResponseStage, ExpressionMatch, Header, HeaderTransform,
+                MatchGroup, OriginRequestStage, OriginResponseStage, ProcessingStages,
+                RequestTransform, ResponseTransform, StageMetadata, StageRules, SyntheticResponse,
+                TypedClientRequestStage, TypedClientResponseStage, TypedExpressionMatch,
+                TypedGenericStage, TypedHeader, TypedHeaderTransform, TypedMatchGroup,
+                TypedOriginRequestStage, TypedOriginResponseStage, TypedProcessingStages,
+                TypedRequestTransform, TypedResponseTransform, TypedStage, TypedStageMetadata,
+                TypedStageRules, TypedSyntheticResponse,
+            },
+            verify::PsVerificationError::ParseError,
+            visit::PsVisitor,
         },
-        verify::PsVerificationError::ParseError,
-        visit::PsVisitor,
     },
-    cdni::spec::TypedGenericMetadata,
     environment::scope::Scopes,
     mel::{
         analysis::{Analyzed, MelAnalysisLocatableError, analyze},
         ast::Expr,
         compiler::{self, compile::MelCompilerLocatableError},
-        tvs::Type,
+        types::Type,
     },
 };
 
 use std::fmt::{Debug, Display};
 
 type PsVisitorResult<T, E> = Result<T, E>;
+
+#[derive(Debug, Clone, Default)]
+pub enum PsVerificationKey {
+    Expr(Expr<Analyzed>),
+    ExprPair(Option<Expr<Analyzed>>, Option<Expr<Analyzed>>),
+    #[default]
+    None,
+}
+
+impl Serialize for PsVerificationKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_none()
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub enum PsVerificationError {
@@ -91,44 +110,27 @@ impl Display for PsVerificationError {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub enum PsVerificationKey {
-    Expr(Expr<Analyzed>),
-    ExprPair(Option<Expr<Analyzed>>, Option<Expr<Analyzed>>),
-    #[default]
-    None,
-}
-
-impl Serialize for PsVerificationKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_none()
-    }
-}
-
 impl TypedGenericStage {
     pub fn typed(&self) -> Result<TypedStage<()>, Box<PsVerificationError>> {
-        if self.tpe == TypedClientRequestStage::<()>::typed_generic_metadata_name() {
+        if self.tpe == TypedClientRequestStage::<()>::typed_cdni_metadata_name() {
             let stages = serde_json::from_str::<TypedClientRequestStage<()>>(
                 &(serde_json::to_string(self).map_err(|_| ParseError)?),
             )
             .map_err(|_| ParseError)?;
             Ok(TypedStage::ClientRequest(stages))
-        } else if self.tpe == TypedClientResponseStage::<()>::typed_generic_metadata_name() {
+        } else if self.tpe == TypedClientResponseStage::<()>::typed_cdni_metadata_name() {
             let stages = serde_json::from_str::<TypedClientResponseStage<()>>(
                 &(serde_json::to_string(self).map_err(|_| ParseError)?),
             )
             .map_err(|_| ParseError)?;
             Ok(TypedStage::ClientResponse(stages))
-        } else if self.tpe == TypedOriginRequestStage::<()>::typed_generic_metadata_name() {
+        } else if self.tpe == TypedOriginRequestStage::<()>::typed_cdni_metadata_name() {
             let stages = serde_json::from_str::<TypedOriginRequestStage<()>>(
                 &(serde_json::to_string(self).map_err(|_| ParseError)?),
             )
             .map_err(|_| ParseError)?;
             Ok(TypedStage::OriginRequest(stages))
-        } else if self.tpe == TypedOriginResponseStage::<()>::typed_generic_metadata_name() {
+        } else if self.tpe == TypedOriginResponseStage::<()>::typed_cdni_metadata_name() {
             let stages = serde_json::from_str::<TypedOriginResponseStage<()>>(
                 &(serde_json::to_string(self).map_err(|_| ParseError)?),
             )
@@ -210,9 +212,9 @@ macro_rules! make_context_value {
 
 macro_rules! check_generic_md_typename {
     ($value:expr, $tn:ident) => {
-        if $value.tpe != $tn::<()>::typed_generic_metadata_name() {
+        if $value.tpe != $tn::<()>::typed_cdni_metadata_name() {
             return Err(Box::new(PsVerificationError::WrongGenericMetadataTypeName(
-                $tn::<()>::typed_generic_metadata_name(),
+                $tn::<()>::typed_cdni_metadata_name(),
                 $value.tpe.clone(),
             )));
         }
@@ -556,13 +558,16 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
 
         Ok(PsVerifierContext {
             scopes: c.scopes.clone(),
-            value: Some(PsVerifierContextValue::GenericMetadata(
+            value: make_context_value!(
                 TypedGenericMetadata {
                     tpe: v.tpe.clone(),
                     value: v.value.clone(),
-                    aug: PsVerificationKey::None,
+                    aug: PsVerificationKey::None
                 },
-            )),
+                PsVerifierContextValue::GenericMetadata,
+                PsVerificationKey,
+                TypedGenericMetadata
+            ),
         })
     }
 
@@ -932,12 +937,12 @@ pub fn verify_ps(
 ///
 pub fn verify_ps_request_stage(
     stage: &TypedGenericStage,
-    scopes: Scopes<Type>,
+    scopes: &Scopes<Type>,
 ) -> Result<TypedStage<PsVerificationKey>, Box<PsVerificationError>> {
     match stage.typed()? {
         TypedStage::ClientRequest(crq) => {
             let (mut verifier, mut context) = verifier();
-            context.scopes = scopes;
+            context.scopes = scopes.clone();
             let result = verifier.visit_client_request_stage(&crq, context)?;
             Ok(TypedStage::ClientRequest(
                 expect_some_value!(&result.value, PsVerifierContextValue::ClientRequestStage)
@@ -946,7 +951,7 @@ pub fn verify_ps_request_stage(
         }
         TypedStage::ClientResponse(crs) => {
             let (mut verifier, mut context) = verifier();
-            context.scopes = scopes;
+            context.scopes = scopes.clone();
             let result = verifier.visit_client_response_stage(&crs, context)?;
             Ok(TypedStage::ClientResponse(
                 expect_some_value!(&result.value, PsVerifierContextValue::ClientResponseStage)
@@ -955,7 +960,7 @@ pub fn verify_ps_request_stage(
         }
         TypedStage::OriginRequest(orq) => {
             let (mut verifier, mut context) = verifier();
-            context.scopes = scopes;
+            context.scopes = scopes.clone();
             let result = verifier.visit_origin_request_stage(&orq, context)?;
             Ok(TypedStage::OriginRequest(
                 expect_some_value!(&result.value, PsVerifierContextValue::OriginRequestStage)
@@ -964,7 +969,7 @@ pub fn verify_ps_request_stage(
         }
         TypedStage::OriginResponse(ors) => {
             let (mut verifier, mut context) = verifier();
-            context.scopes = scopes;
+            context.scopes = scopes.clone();
             let result = verifier.visit_origin_response_stage(&ors, context)?;
             Ok(TypedStage::OriginResponse(
                 expect_some_value!(&result.value, PsVerifierContextValue::OriginResponseStage)
@@ -984,7 +989,7 @@ mod test_verify {
     };
     use crate::cdni::ps::verify::{PsVerifierContextValue, verifier};
     use crate::cdni::ps::visit::PsVisitor;
-    use crate::mel::tvs::Type;
+    use crate::mel::types::Type;
     use crate::{
         cdni::ps::{
             spec::TypedResponseTransform,
@@ -1388,7 +1393,7 @@ mod test_verify_from_json {
     };
     use crate::cdni::ps::verify::verify_ps_request_stage;
     use crate::environment::scope::Scopes;
-    use crate::mel::tvs::Type;
+    use crate::mel::types::Type;
     use crate::tests::read_test_file;
     use crate::{
         cdni::ps::{
@@ -1897,7 +1902,7 @@ mod test_verify_from_json {
         let stages = serde_json::from_str::<TypedGenericStage>(&json)
             .expect("Could not parse JSON test file");
 
-        let result = verify_ps_request_stage(&stages, Scopes::<Type>::default())
+        let result = verify_ps_request_stage(&stages, &Scopes::<Type>::default())
             .expect("Could not verify PS client request stage");
 
         assert_matches!(result, TypedStage::ClientRequest(_))
@@ -1911,7 +1916,7 @@ mod test_verify_from_json {
         let stages = serde_json::from_str::<TypedGenericStage>(&json)
             .expect("Could not parse JSON test file");
 
-        let result = verify_ps_request_stage(&stages, Scopes::<Type>::default())
+        let result = verify_ps_request_stage(&stages, &Scopes::<Type>::default())
             .expect("Could not verify PS client request stage");
 
         assert_matches!(result, TypedStage::ClientRequest(_))

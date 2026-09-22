@@ -30,7 +30,7 @@ use crate::{
 };
 use crate::{
     logging::{LogLevel, LogMsg, LogMsgs},
-    mel::{interpreter::builtins::BuiltinFunctionInterpreter, tvs::BuiltinFunctionType},
+    mel::{interpreter::builtins::BuiltinFunctionInterpreter, types::BuiltinFunctionType},
 };
 
 use crate::mel::{
@@ -45,7 +45,7 @@ use crate::mel::{
     interpreter::interpret::{
         MelInterpAssertion::SuccessWithoutValue, MelInterpError::UnknownIdentifier,
     },
-    tvs::{Struct, Type},
+    types::{Struct, Type},
 };
 
 #[derive(Debug, Clone)]
@@ -72,9 +72,9 @@ impl StructValue {
             .get_field(name)
             .ok_or(MelInterpError::UnknownField(name.to_string()))?;
 
-        if ft != value.tipe {
+        if ft != value.tpe {
             return Err(
-                MelInterpError::MistypedField(name.to_string(), ft.clone(), value.tipe).into(),
+                MelInterpError::MistypedField(name.to_string(), ft.clone(), value.tpe).into(),
             );
         }
 
@@ -125,7 +125,7 @@ pub enum Value {
 #[derive(Default, Debug, Clone)]
 pub struct TypedValue {
     pub value: Value,
-    pub tipe: Type,
+    pub tpe: Type,
 }
 
 impl Display for TypedValue {
@@ -158,19 +158,19 @@ impl From<&CompiledConstant> for TypedValue {
         match value {
             CompiledConstant::Integer(i) => TypedValue {
                 value: Value::Integer(*i),
-                tipe: Type::Integer,
+                tpe: Type::Integer,
             },
             CompiledConstant::String(s) => TypedValue {
                 value: Value::String(s.clone()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
             CompiledConstant::Boolean(b) => TypedValue {
                 value: Value::Boolean(*b),
-                tipe: Type::Boolean,
+                tpe: Type::Boolean,
             },
             CompiledConstant::IPAddress(ip) => TypedValue {
                 value: Value::IPAddress(*ip),
-                tipe: Type::IPAddress,
+                tpe: Type::IPAddress,
             },
         }
     }
@@ -306,7 +306,7 @@ impl MelInterp {
                     l
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::Boolean, left.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::Boolean, left.tpe.clone()).into(),
                     )
                     .into());
                 };
@@ -314,18 +314,18 @@ impl MelInterp {
                     r
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::Boolean, right.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::Boolean, right.tpe.clone()).into(),
                     )
                     .into());
                 };
                 match logic_operator {
                     ast::LogicOperator::And => Ok(TypedValue {
                         value: Value::Boolean(left && right),
-                        tipe: Type::Boolean,
+                        tpe: Type::Boolean,
                     }),
                     ast::LogicOperator::Or => Ok(TypedValue {
                         value: Value::Boolean(left || right),
-                        tipe: Type::Boolean,
+                        tpe: Type::Boolean,
                     }),
                 }
             }
@@ -334,7 +334,7 @@ impl MelInterp {
                     l
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::Integer, left.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::Integer, left.tpe.clone()).into(),
                     )
                     .into());
                 };
@@ -342,30 +342,30 @@ impl MelInterp {
                     r
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::Integer, right.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::Integer, right.tpe.clone()).into(),
                     )
                     .into());
                 };
                 match math_operator {
                     ast::MathOperator::Plus => Ok(TypedValue {
                         value: Value::Integer(left + right),
-                        tipe: Type::Integer,
+                        tpe: Type::Integer,
                     }),
                     ast::MathOperator::Minus => Ok(TypedValue {
                         value: Value::Integer(left - right),
-                        tipe: Type::Integer,
+                        tpe: Type::Integer,
                     }),
                     ast::MathOperator::Multiply => Ok(TypedValue {
                         value: Value::Integer(left * right),
-                        tipe: Type::Integer,
+                        tpe: Type::Integer,
                     }),
                     ast::MathOperator::Divide => Ok(TypedValue {
                         value: Value::Integer(left / right),
-                        tipe: Type::Integer,
+                        tpe: Type::Integer,
                     }),
                     ast::MathOperator::Modulo => Ok(TypedValue {
                         value: Value::Integer(left % right),
-                        tipe: Type::Integer,
+                        tpe: Type::Integer,
                     }),
                 }
             }
@@ -374,7 +374,7 @@ impl MelInterp {
                     l
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::String, left.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::String, left.tpe.clone()).into(),
                     )
                     .into());
                 };
@@ -382,13 +382,13 @@ impl MelInterp {
                     r
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::String, right.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::String, right.tpe.clone()).into(),
                     )
                     .into());
                 };
                 Ok(TypedValue {
                     value: Value::String(left.clone() + right),
-                    tipe: Type::String,
+                    tpe: Type::String,
                 })
             }
             ast::BinaryInfixOperator::Comparison(IP) => {
@@ -396,7 +396,7 @@ impl MelInterp {
                     l
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::IPAddress, left.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::IPAddress, left.tpe.clone()).into(),
                     )
                     .into());
                 };
@@ -404,14 +404,13 @@ impl MelInterp {
                     r
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::IPAddress, right.tipe.clone())
-                            .into(),
+                        MelInterpAssertion::TypeMismatch(Type::IPAddress, right.tpe.clone()).into(),
                     )
                     .into());
                 };
                 Ok(TypedValue {
                     value: Value::Boolean(left == right),
-                    tipe: Type::Boolean,
+                    tpe: Type::Boolean,
                 })
             }
             ast::BinaryInfixOperator::Comparison(Re) => {
@@ -419,7 +418,7 @@ impl MelInterp {
                     l
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::String, left.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::String, left.tpe.clone()).into(),
                     )
                     .into());
                 };
@@ -427,22 +426,22 @@ impl MelInterp {
                     r
                 } else {
                     return Err(MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::Regex, right.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::Regex, right.tpe.clone()).into(),
                     )
                     .into());
                 };
                 Ok(TypedValue {
                     value: Value::Boolean(right.is_match(left)),
-                    tipe: Type::String,
+                    tpe: Type::String,
                 })
             }
-            ast::BinaryInfixOperator::Comparison(cop) => match left.tipe {
+            ast::BinaryInfixOperator::Comparison(cop) => match left.tpe {
                 Type::Boolean => {
                     let left = if let Value::Boolean(l) = left.value {
                         l
                     } else {
                         return Err(MelInterpError::Assertion(
-                            MelInterpAssertion::TypeMismatch(Type::Boolean, left.tipe.clone())
+                            MelInterpAssertion::TypeMismatch(Type::Boolean, left.tpe.clone())
                                 .into(),
                         )
                         .into());
@@ -451,7 +450,7 @@ impl MelInterp {
                         r
                     } else {
                         return Err(MelInterpError::Assertion(
-                            MelInterpAssertion::TypeMismatch(Type::Boolean, right.tipe.clone())
+                            MelInterpAssertion::TypeMismatch(Type::Boolean, right.tpe.clone())
                                 .into(),
                         )
                         .into());
@@ -460,25 +459,25 @@ impl MelInterp {
                     match cop {
                         ComparisonOperator::Eq => Ok(TypedValue {
                             value: Value::Boolean(left == right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         #[allow(clippy::bool_comparison)]
                         ComparisonOperator::Lt => Ok(TypedValue {
                             value: Value::Boolean(left < right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Lte => Ok(TypedValue {
                             value: Value::Boolean(left <= right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         #[allow(clippy::bool_comparison)]
                         ComparisonOperator::Gt => Ok(TypedValue {
                             value: Value::Boolean(left > right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Gte => Ok(TypedValue {
                             value: Value::Boolean(left >= right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         _ => todo!(),
                     }
@@ -488,7 +487,7 @@ impl MelInterp {
                         l
                     } else {
                         return Err(MelInterpError::Assertion(
-                            MelInterpAssertion::TypeMismatch(Type::Integer, left.tipe.clone())
+                            MelInterpAssertion::TypeMismatch(Type::Integer, left.tpe.clone())
                                 .into(),
                         )
                         .into());
@@ -497,7 +496,7 @@ impl MelInterp {
                         r
                     } else {
                         return Err(MelInterpError::Assertion(
-                            MelInterpAssertion::TypeMismatch(Type::Integer, right.tipe.clone())
+                            MelInterpAssertion::TypeMismatch(Type::Integer, right.tpe.clone())
                                 .into(),
                         )
                         .into());
@@ -506,23 +505,23 @@ impl MelInterp {
                     match cop {
                         ComparisonOperator::Eq => Ok(TypedValue {
                             value: Value::Boolean(left == right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Lt => Ok(TypedValue {
                             value: Value::Boolean(left < right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Lte => Ok(TypedValue {
                             value: Value::Boolean(left <= right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Gt => Ok(TypedValue {
                             value: Value::Boolean(left > right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Gte => Ok(TypedValue {
                             value: Value::Boolean(left >= right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         _ => todo!(),
                     }
@@ -532,8 +531,7 @@ impl MelInterp {
                         l
                     } else {
                         return Err(MelInterpError::Assertion(
-                            MelInterpAssertion::TypeMismatch(Type::String, left.tipe.clone())
-                                .into(),
+                            MelInterpAssertion::TypeMismatch(Type::String, left.tpe.clone()).into(),
                         )
                         .into());
                     };
@@ -541,7 +539,7 @@ impl MelInterp {
                         r
                     } else {
                         return Err(MelInterpError::Assertion(
-                            MelInterpAssertion::TypeMismatch(Type::String, right.tipe.clone())
+                            MelInterpAssertion::TypeMismatch(Type::String, right.tpe.clone())
                                 .into(),
                         )
                         .into());
@@ -550,23 +548,23 @@ impl MelInterp {
                     match cop {
                         ComparisonOperator::Eq => Ok(TypedValue {
                             value: Value::Boolean(left == right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Lt => Ok(TypedValue {
                             value: Value::Boolean(left < right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Lte => Ok(TypedValue {
                             value: Value::Boolean(left <= right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Gt => Ok(TypedValue {
                             value: Value::Boolean(left > right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         ComparisonOperator::Gte => Ok(TypedValue {
                             value: Value::Boolean(left >= right),
-                            tipe: Type::Boolean,
+                            tpe: Type::Boolean,
                         }),
                         _ => todo!(),
                     }
@@ -651,9 +649,9 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
         let callee_value = match callee_value {
             TypedValue {
                 value: Value::Function(f),
-                tipe: _,
+                tpe: _,
             } => f,
-            TypedValue { value: _, tipe: t } => {
+            TypedValue { value: _, tpe: t } => {
                 return Err(MelInterpLocatableError {
                     error: MelInterpError::Assertion(
                         MelInterpAssertion::TypeMismatch(ast.callee.tipe(), t.clone()).into(),
@@ -691,9 +689,9 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
         let argument_list_values = match argument_list_values {
             TypedValue {
                 value: f @ Value::ArgumentList(_),
-                tipe: _,
+                tpe: _,
             } => f,
-            TypedValue { value: _, tipe: t } => {
+            TypedValue { value: _, tpe: t } => {
                 return Err(MelInterpLocatableError {
                     error: MelInterpError::Assertion(
                         MelInterpAssertion::TypeMismatch(ast.callee.tipe(), t.clone()).into(),
@@ -795,7 +793,7 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
 
         Ok(context.update_val(Some(TypedValue {
             value: Value::ArgumentList(arg_values),
-            tipe: ast.aug.tipe.clone(),
+            tpe: ast.aug.tipe.clone(),
         })))
     }
 
@@ -834,12 +832,12 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
             }
         };
 
-        if argument_value.tipe != ast.aug.tipe {
+        if argument_value.tpe != ast.aug.tipe {
             return Err(MelInterpLocatableError {
                 error: MelInterpError::Assertion(
                     MelInterpAssertion::TypeMismatch(
                         ast.aug.tipe.clone(),
-                        argument_value.tipe.clone(),
+                        argument_value.tpe.clone(),
                     )
                     .into(),
                 )
@@ -937,30 +935,30 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
         match ast {
             (ast::Literal::Boolean(b), _, _) => Ok(context.update_val(Some(TypedValue {
                 value: Value::Boolean(*b == BooleanLiteral::True),
-                tipe: Type::Boolean,
+                tpe: Type::Boolean,
             }))),
             (ast::Literal::Number(NumberLiteral { literal: l }), _, _) => {
                 Ok(context.update_val(Some(TypedValue {
                     value: Value::Integer(*l as i64),
-                    tipe: Type::Integer,
+                    tpe: Type::Integer,
                 })))
             }
             (ast::Literal::String(StringLiteral { literal: s }), _, _) => {
                 Ok(context.update_val(Some(TypedValue {
                     value: Value::String(s.clone()),
-                    tipe: Type::String,
+                    tpe: Type::String,
                 })))
             }
             (ast::Literal::Regex(RegexLiteral { literal: rl }), _, _) => {
                 Ok(context.update_val(Some(TypedValue {
                     value: Value::Regex(rl.clone()),
-                    tipe: Type::Regex,
+                    tpe: Type::Regex,
                 })))
             }
             (ast::Literal::IPAddress(IPAddressLiteral { literal: rl }), _, _) => Ok(context
                 .update_val(Some(TypedValue {
                     value: Value::IPAddress(*rl),
-                    tipe: Type::IPAddress,
+                    tpe: Type::IPAddress,
                 }))),
         }
     }
@@ -1002,12 +1000,12 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
         let condition_value = match condition_value {
             TypedValue {
                 value: Value::Boolean(b),
-                tipe: Type::Boolean,
+                tpe: Type::Boolean,
             } => b,
             e => {
                 return Err(MelInterpLocatableError {
                     error: MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(Type::Boolean, e.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(Type::Boolean, e.tpe.clone()).into(),
                     )
                     .into(),
                     location: ast.location.clone(),
@@ -1065,10 +1063,10 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
             (context, val)
         };
 
-        if result.tipe != ast.aug.tipe {
+        if result.tpe != ast.aug.tipe {
             return Err(MelInterpLocatableError {
                 error: MelInterpError::Assertion(
-                    MelInterpAssertion::TypeMismatch(ast.aug.tipe.clone(), result.tipe.clone())
+                    MelInterpAssertion::TypeMismatch(ast.aug.tipe.clone(), result.tpe.clone())
                         .into(),
                 )
                 .into(),
@@ -1121,12 +1119,12 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
         let (base_value, base_type) = match base {
             TypedValue {
                 value: Value::Struct(sv),
-                tipe: Type::Struct(st),
+                tpe: Type::Struct(st),
             } => (sv, st),
             t => {
                 return Err(MelInterpLocatableError {
                     error: MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(ast.base.tipe(), t.tipe).into(),
+                        MelInterpAssertion::TypeMismatch(ast.base.tipe(), t.tpe).into(),
                     )
                     .into(),
                     location: ast.base.location(),
@@ -1173,14 +1171,11 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
             }
         };
 
-        if member_type != member_value.tipe {
+        if member_type != member_value.tpe {
             return Err(MelInterpLocatableError {
                 error: MelInterpError::Assertion(
-                    MelInterpAssertion::TypeMismatch(
-                        member_type.clone(),
-                        member_value.tipe.clone(),
-                    )
-                    .into(),
+                    MelInterpAssertion::TypeMismatch(member_type.clone(), member_value.tpe.clone())
+                        .into(),
                 )
                 .into(),
                 location: ast.member.location.clone(),

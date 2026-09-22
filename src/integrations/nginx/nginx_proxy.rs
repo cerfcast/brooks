@@ -17,17 +17,15 @@
 
 use std::{collections::HashMap, marker::PhantomData, ptr::null, str::FromStr};
 
-use http::{HeaderName, HeaderValue, Method, Request, StatusCode, Uri};
+use http::{HeaderName, HeaderValue, Method, Request, StatusCode, Uri, header::HOST};
 use libc::intptr_t;
 use reqwest::Response;
 use tokio::runtime;
 
 use crate::{
+    cdni::md::interpret::{HmdTransformError, MdInterpretError},
     integrations::{
-        common::{
-            BrooksIntegrationTransformError, BrooksIntegrationsProxyError,
-            safe_brooks_integration_handle,
-        },
+        common::safe_brooks_integration_handle,
         hmds::{HmdsConfiguration, HmdsServerConfiguration},
         nginx::{
             nginx_lib::{from_nginx_str, log_nginx_msgs, to_nginx_buf, to_nginx_str},
@@ -81,8 +79,8 @@ pub unsafe extern "C" fn ngx_brooks_configure(
     true
 }
 
-impl TryFrom<ngx_http_request_s> for Request<String> {
-    type Error = Box<BrooksIntegrationTransformError>;
+impl TryFrom<ngx_http_request_s> for Request<Vec<u8>> {
+    type Error = Box<HmdTransformError>;
 
     fn try_from(value: ngx_http_request_s) -> Result<Self, Self::Error> {
         let mut header_part = &value.headers_in.headers.part;
@@ -90,6 +88,8 @@ impl TryFrom<ngx_http_request_s> for Request<String> {
 
         let mut request = Request::builder();
         unsafe {
+            let mut host: Option<String> = None;
+
             let mut i = 0usize;
             loop {
                 if i >= header_part.nelts {
@@ -105,35 +105,51 @@ impl TryFrom<ngx_http_request_s> for Request<String> {
                 let k = from_nginx_str((*header_element).key);
                 let val = from_nginx_str((*header_element).value);
 
-                request = request.header(
-                    HeaderName::from_str(&k)
-                        .map_err(|_| BrooksIntegrationTransformError::BadHeaderName(k))?,
-                    HeaderValue::from_str(&val)
-                        .map_err(|_| BrooksIntegrationTransformError::BadHeaderValue(val))?,
-                );
+                let header_name =
+                    HeaderName::from_str(&k).map_err(|_| HmdTransformError::BadHeaderName(k))?;
+                let header_value = HeaderValue::from_str(&val)
+                    .map_err(|_| HmdTransformError::BadHeaderValue(val.clone()))?;
+                request = request.header(header_name.clone(), header_value.clone());
+
+                if header_name == HOST {
+                    host = Some(val);
+                }
 
                 header_element = header_element.wrapping_add(1);
                 i += 1;
             }
 
+            let host = match host {
+                Some(h) => h,
+                None => return Err(HmdTransformError::BadUrl(from_nginx_str(value.uri)).into()),
+            };
+
+            let http_s = if (*value.http_connection).ssl() != 0 {
+                "https".to_string()
+            } else {
+                "http".to_string()
+            };
+
             let parsed_uri = Uri::from_str(&format!(
-                "{}?{}",
+                "{}://{}{}?{}",
+                http_s,
+                host,
                 from_nginx_str(value.uri),
                 from_nginx_str(value.args)
             ))
-            .map_err(|e| BrooksIntegrationTransformError::BadUri(e.to_string()))?;
+            .map_err(|e| HmdTransformError::BadUri(e.to_string()))?;
 
             request = request.uri(parsed_uri.clone());
 
             request = request.method(
                 Method::from_str(&from_nginx_str(value.method_name))
-                    .map_err(|e| BrooksIntegrationTransformError::BadMethodValue(e.to_string()))?,
+                    .map_err(|e| HmdTransformError::BadMethodValue(e.to_string()))?,
             );
         }
 
         request
-            .body("".to_string())
-            .map_err(|e| Box::new(BrooksIntegrationTransformError::BadBody(e.to_string())))
+            .body(vec![])
+            .map_err(|e| Box::new(HmdTransformError::BadBody(e.to_string())))
     }
 }
 
@@ -141,13 +157,13 @@ unsafe fn try_from_response(
     response: &Response,
     status: StatusCode,
     req: *mut ngx_http_request_s,
-) -> Result<(), Box<BrooksIntegrationTransformError>> {
+) -> Result<(), Box<HmdTransformError>> {
     for (hsh, header) in response.headers().iter().enumerate() {
         let header_name = header.0.to_string();
         let header_value = header
             .1
             .to_str()
-            .map_err(|e| BrooksIntegrationTransformError::BadHeaderValue(e.to_string()))?;
+            .map_err(|e| HmdTransformError::BadHeaderValue(e.to_string()))?;
 
         let he = ngx_list_push(&mut (*req).headers_out.headers) as *mut ngx_table_elt_s;
 
@@ -211,54 +227,55 @@ unsafe fn do_ngx_brooks_proxy(
     req: *mut ngx_http_request_s,
     body: *mut *mut ngx_buf_s,
     log: LogMsgs,
-) -> Result<LogMsgs, (Box<BrooksIntegrationsProxyError>, LogMsgs)> {
+) -> Result<LogMsgs, (Box<MdInterpretError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
     let mel_scope = builtin_builtin_function_interpreters();
 
-    let mut http_req = match TryInto::<Request<String>>::try_into(*req) {
+    let http_req = match TryInto::<Request<Vec<u8>>>::try_into(*req) {
         Ok(o) => o,
-        Err(e) => return Err((BrooksIntegrationsProxyError::TransformError(e).into(), log)),
+        Err(e) => return Err((MdInterpretError::TransformError(e).into(), log)),
     };
 
     let runtime = match runtime::Builder::new_current_thread().enable_all().build() {
         Ok(o) => o,
         Err(e) => {
+            return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
+        }
+    };
+
+    let hmds_key = match http_req.headers().get(HOST) {
+        Some(o) => o,
+        None => {
             return Err((
-                BrooksIntegrationsProxyError::RuntimeError(e.to_string()).into(),
+                MdInterpretError::ProxyError("Could not get host from request".to_string()).into(),
                 log,
             ));
         }
     };
+    let hmds_key = match hmds_key.to_str() {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
+        }
+    };
 
-    let (status, response, log) = safe_brooks_integration_handle(
-        &mut http_req,
+    let (_status, response, log) = safe_brooks_integration_handle(
+        &http_req,
         &Some(mel_scope),
+        hmds_key,
         &mut (*cookie).hmds,
         &runtime,
         log,
     )?;
 
-    if let Err(e) = try_from_response(&response, status, req) {
-        return Err((BrooksIntegrationsProxyError::TransformError(e).into(), log));
-    }
-
-    let result_body = match runtime.block_on(response.bytes()) {
+    *body = match to_nginx_buf(response.body(), (*req).pool) {
         Ok(o) => o,
-        Err(e) => {
-            return Err((
-                BrooksIntegrationsProxyError::ProxyError(e.to_string()).into(),
-                log,
-            ));
-        }
-    };
-
-    *body = match to_nginx_buf(&result_body, (*req).pool) {
-        Ok(o) => o,
-        Err(e) => return Err((BrooksIntegrationsProxyError::TransformError(e).into(), log)),
+        Err(e) => return Err((MdInterpretError::TransformError(e).into(), log)),
     };
 
     // Indicate that the response should use chunked encoding.
     (*req).headers_out.content_length_n = -1;
+    (*req).headers_out.status = _status.as_u16() as usize;
 
     Ok(log)
 }

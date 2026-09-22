@@ -19,7 +19,7 @@
 mod builtin_function_types_tests {
     use std::assert_matches;
 
-    use crate::mel::tvs::{
+    use crate::mel::types::{
         ArgumentTypeList, BuiltinFunctionType, IntegerBuiltin, ParamsTypeCheckerError, Type,
     };
 

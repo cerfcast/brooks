@@ -15,209 +15,164 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! The Source Metadata Information Implementation
-
-use http::Response;
-use reqwest::{
-    Body,
-    dns::{Addrs, Resolve},
-};
+//! The Source Generic Metadata Processing Implementation
 
 use crate::cdni::{
-    processing::{
-        self, MetadataProcessingAnalysisContext, MetadataProcessingAnalysisError,
-        MetadataProcessingAnalysisResult, MetadataProcessingAnalyzed, MetadataProcessingAnalyzer,
-        MetadataProcessingInterpreterContext, MetadataProcessingInterpreterError,
+    gmd::{
+        self,
+        spec::{Source, TypedSource},
     },
-    spec::{self, Source, TypedSource},
+    gmdp::{InterpretationResult, Interpreter, ProcessedRequestResponse, Verifier},
+    md::verify::CdniVerificationKey,
+    mi::MetadataInformationResultElements,
+    processors::{SimpleProcessorsAnalysisContext, SimpleProcessorsInterpreterContext},
+    ps::interpret::PsInterpretValue,
 };
-use std::{fmt::Debug, net::SocketAddr, str::FromStr};
+use crate::{
+    cdni::{
+        gmdp::{AnalysisResult, Error, Stages},
+        md::verify::HostMetadataVerificationError,
+    },
+    tools::prr::{self, Prr},
+};
 
-#[derive(Debug)]
-struct SourceMetadataAnalyzer {}
+use std::fmt::Debug;
+use std::str::FromStr;
+use std::{fmt::Display, net::SocketAddr};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
+pub struct SourceVerificationKey {
+    endpoints: Vec<SocketAddr>,
+    protocol: SourceProtocol,
+}
+
+#[derive(Debug, Clone, Default)]
 pub enum SourceProtocol {
+    #[default]
     Http11,
 }
 
+impl Display for SourceProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceProtocol::Http11 => write!(f, "Http1/1"),
+        }
+    }
+}
+
 impl FromStr for SourceProtocol {
-    type Err = MetadataProcessingAnalysisError;
+    type Err = HostMetadataVerificationError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s == "http/1.1" {
             return Ok(SourceProtocol::Http11);
         }
-        Err(MetadataProcessingAnalysisError::InvalidMetadata(
-            format!("{} is not a valid protocol for Source MI", s).into(),
+        Err(HostMetadataVerificationError::JsonError(format!(
+            "{} is not a valid protocol for Source MI",
+            s
+        )))
+    }
+}
+
+#[derive(Debug)]
+pub struct SourceMetadataAnalyzer {}
+
+impl
+    Interpreter<
+        SimpleProcessorsInterpreterContext<'_>,
+        (PsInterpretValue, MetadataInformationResultElements),
+        Error,
+    > for TypedSource<SourceVerificationKey>
+{
+    fn interpret<'a>(
+        &self,
+        input: SimpleProcessorsInterpreterContext<'a>,
+    ) -> InterpretationResult<
+        SimpleProcessorsInterpreterContext<'a>,
+        (PsInterpretValue, MetadataInformationResultElements),
+        Error,
+    > {
+        let reqres = &*input.rr;
+
+        let req: reqwest::Request = reqres
+            .try_into()
+            .map_err(|e: prr::Error| Error::InvalidInput(e.into()))?;
+
+        let clientb = reqwest::Client::builder();
+        let client = clientb.build().map_err(|e| Error::RuntimeError(e.into()))?;
+
+        let result: Result<ProcessedRequestResponse, Error> = input.runtime.block_on(async {
+            let r = client
+                .execute(req)
+                .await
+                .map_err(|e| Error::RuntimeError(e.into()))?;
+
+            let mut result = ProcessedRequestResponse::new_response(r.url(), &http::Method::GET);
+
+            result
+                .set_status(&r.status().as_u16())
+                .map_err(|_| Error::RuntimeError(prr::Error::BadStatus.into()))?;
+
+            let b = r.bytes().await.map_err(|e| Error::RuntimeError(e.into()))?;
+            result.obody = b.to_vec();
+            Ok(result)
+        });
+
+        Ok((
+            input.with_new_rr(Box::new(result?)),
+            (
+                PsInterpretValue::MatchNo,
+                MetadataInformationResultElements::default(),
+            ),
         ))
     }
-}
 
-#[derive(Debug, Clone)]
-struct SourceMetadataAnalyzed {
-    endpoints: Vec<SocketAddr>,
-    protocol: SourceProtocol,
-}
-
-impl Resolve for SourceMetadataAnalyzed {
-    // When connecting to the source represented by this instance
-    // of SourceMetadataAnalyzed, always use the endpoints to resolve
-    // the name.
-    fn resolve(&self, _: reqwest::dns::Name) -> reqwest::dns::Resolving {
-        let r: Addrs = Box::new(self.endpoints.clone().into_iter());
-        Box::pin(std::future::ready(Ok(r)))
+    fn stage(&self, stage: Stages) -> bool {
+        stage == Stages::Source
     }
 }
 
-impl MetadataProcessingAnalyzed for SourceMetadataAnalyzed {
-    fn interpret(
-        &self,
-        input: processing::MetadataProcessingInterpreterContext,
-    ) -> processing::MetadataProcessingInterpretResult {
-        let request = match input.request {
-            Some(r) => r.clone(),
-            None => {
-                return Err(MetadataProcessingInterpreterError::RuntimeError(
-                    "Missing Input".into(),
-                ));
-            }
-        };
-
-        let client = reqwest::Client::builder()
-            .dns_resolver(self.clone())
-            .build()
-            .map_err(|e| MetadataProcessingInterpreterError::RuntimeError(e.into()))?;
-        let request = reqwest::Request::try_from(request)
-            .map_err(|e| MetadataProcessingInterpreterError::RuntimeError(e.into()))?;
-        let r = input
-            .runtime
-            .block_on(async { client.execute(request).await })
-            .map_err(|e| MetadataProcessingInterpreterError::RuntimeError(e.into()))?;
-        let r = Into::<Response<Body>>::into(r).map(|f| f.as_bytes().unwrap_or_default().to_vec());
-
-        Ok(MetadataProcessingInterpreterContext {
-            request: None,
-            response: Some(r),
-            runtime: input.runtime,
-        })
-    }
-}
-
-impl MetadataProcessingAnalyzer for SourceMetadataAnalyzer {
+impl Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>
+    for SourceMetadataAnalyzer
+{
     fn analyze(
         &self,
-        _v: &spec::TypedGenericMetadata<()>,
-        input: MetadataProcessingAnalysisContext,
-    ) -> MetadataProcessingAnalysisResult {
-        if _v.tpe != TypedSource::<()>::typed_generic_metadata_name() {
-            return Err(MetadataProcessingAnalysisError::InvalidType(
-                TypedSource::<()>::typed_generic_metadata_name(),
-                _v.tpe.clone(),
-            ));
+        v: &gmd::spec::TypedGenericMetadata<()>,
+        input: SimpleProcessorsAnalysisContext,
+    ) -> AnalysisResult<SimpleProcessorsAnalysisContext, HostMetadataVerificationError> {
+        let typed_source = serde_json::from_value::<TypedSource<()>>(
+            serde_json::to_value(v)
+                .map_err(|e| HostMetadataVerificationError::JsonError(e.to_string()))?,
+        )
+        .map_err(|e| HostMetadataVerificationError::JsonError(e.to_string()))?;
+
+        let typed_protocol: SourceProtocol = typed_source.value.protocol.parse()?;
+
+        let mut typed_endpoints: Vec<SocketAddr> = vec![];
+        for ep in typed_source.value.endpoints {
+            typed_endpoints.push(ep.parse().map_err(|_| {
+                HostMetadataVerificationError::JsonError(format!(
+                    "{ep} is not a valid IP/Port combination"
+                ))
+            })?);
         }
 
-        let typed_source: Source<()> = serde_json::from_value(_v.value.clone())
-            .map_err(|e| MetadataProcessingAnalysisError::InvalidMetadata(e.into()))?;
-
-        let typed_source_protocol: SourceProtocol =
-            typed_source.protocol.parse().map_err(|_| {
-                MetadataProcessingAnalysisError::InvalidMetadata(
-                    "Source MI has bad protocol".into(),
-                )
-            })?;
-
-        // Now, try to parse the endpoints -- they must be IP addresses at this point.
-
-        let mut endpoints: Vec<SocketAddr> = vec![];
-        for ep in typed_source.endpoints {
-            let address: SocketAddr = ep.parse().map_err(|_| {
-                MetadataProcessingAnalysisError::InvalidMetadata(
-                    format!("Could not parse {} into IP:port combination", ep).into(),
-                )
-            })?;
-            endpoints.push(address);
-        }
-        Ok((
-            input,
-            Box::new(SourceMetadataAnalyzed {
-                endpoints,
-                protocol: typed_source_protocol,
-            }),
-        ))
-    }
-}
-
-#[cfg(test)]
-mod processor_tests {
-    use std::assert_matches;
-
-    use crate::cdni::{
-        processing::{
-            MetadataProcessingAnalysisContext, MetadataProcessingAnalysisError,
-            MetadataProcessingAnalyzer, MetadataProcessingInterpreterContext,
-        },
-        processors::source::SourceMetadataAnalyzer,
-        tests::test_helpers::generic_source,
-    };
-
-    #[test]
-    fn source_analysis() {
-        let srcv = generic_source(vec!["192.168.0.1:80", "[::1]:80"], "http/1.1");
-        let sma = SourceMetadataAnalyzer {};
-        let input = MetadataProcessingAnalysisContext {};
-
-        assert!(sma.analyze(&srcv, input).is_ok());
-    }
-
-    #[test]
-    fn source_interpreter() {
-        let srcv = generic_source(
-            vec!["172.66.147.243:80", "[2606:4700:10::6814:179a]:80"],
-            "http/1.1",
-        );
-        let sma = SourceMetadataAnalyzer {};
-        let input = MetadataProcessingAnalysisContext {};
-
-        let result = sma.analyze(&srcv, input).expect("TODO");
-
-        let interpreter = result.1;
-
-        let rt = tokio::runtime::Runtime::new().expect("Could not get runtime for testing");
-        let ic = MetadataProcessingInterpreterContext {
-            request: Some(
-                http::Request::get("http://www.example.com")
-                    .body("".to_string().into())
-                    .expect("Could not make basic HTTP request"),
-            ),
-            response: None,
-            runtime: rt,
+        let res = TypedSource {
+            tpe: TypedSource::<()>::typed_cdni_metadata_name(),
+            value: Source {
+                endpoints: vec![],
+                protocol: SourceProtocol::Http11.to_string(),
+                aug: SourceVerificationKey {
+                    endpoints: typed_endpoints,
+                    protocol: typed_protocol,
+                },
+            },
         };
 
-        let result = interpreter.interpret(ic);
-        assert!(result.is_ok())
+        Ok((input, CdniVerificationKey::Source(Box::new(res))))
     }
 
-    #[test]
-    fn source_endpoint_not_ip_address() {
-        let srcv = generic_source(vec!["192.168.0.1:80", "http://www.example.com"], "http/1.1");
-        let sma = SourceMetadataAnalyzer {};
-        let input = MetadataProcessingAnalysisContext {};
-
-        assert_matches!(
-            sma.analyze(&srcv, input),
-            Err(MetadataProcessingAnalysisError::InvalidMetadata(s)) if (*s).to_string() == "Could not parse http://www.example.com into IP:port combination");
-    }
-
-    #[test]
-    fn source_bad_protocol() {
-        let srcv = generic_source(vec!["192.168.0.1", "http://www.example.com"], "http/1.");
-        let sma = SourceMetadataAnalyzer {};
-        let input = MetadataProcessingAnalysisContext {};
-
-        assert_matches!(
-            sma.analyze(&srcv, input),
-            Err(MetadataProcessingAnalysisError::InvalidMetadata(_))
-        );
+    fn type_name(&self, candidate: &str) -> bool {
+        candidate == TypedSource::<()>::typed_cdni_metadata_name()
     }
 }

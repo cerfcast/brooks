@@ -6,6 +6,6 @@
 }
 :8080 {
 	route {
-		brooks * /tmp/brooks/server
+		brooks * http://localhost:8081/
 	}
 }

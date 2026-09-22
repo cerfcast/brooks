@@ -17,5 +17,43 @@
 
 //! Processors for Metadata Information.
 
+use crate::{
+    cdni::ps::interpret::PsInterpretMode,
+    environment::scope::{Scope, Scopes},
+    mel::{interpreter::interpret::TypedValue, types::Type},
+    tools::prr,
+};
+
 #[cfg(feature = "mi_source")]
 pub mod source;
+
+#[cfg(feature = "mi_ps")]
+pub mod ps;
+
+#[derive(Debug, Clone, Default)]
+pub struct SimpleProcessorsAnalysisContext {
+    pub scopes: Scopes<Type>,
+}
+
+#[derive(Debug)]
+pub struct SimpleProcessorsInterpreterContext<'a> {
+    pub scope: Option<&'a Scope<TypedValue>>,
+    pub mode: PsInterpretMode,
+    pub runtime: &'a tokio::runtime::Runtime,
+    pub rr: Box<dyn prr::Prr<Vec<u8>>>,
+}
+
+impl<'a> SimpleProcessorsInterpreterContext<'a> {
+    /// Create an interpreter context based on an existing one, but with a new RR.
+    pub fn with_new_rr(self, new_rr: Box<dyn prr::Prr<Vec<u8>>>) -> Self {
+        Self {
+            scope: self.scope,
+            mode: match new_rr.tpe() {
+                prr::PrrType::Request => PsInterpretMode::Request,
+                prr::PrrType::Response => PsInterpretMode::Response,
+            },
+            runtime: self.runtime,
+            rr: new_rr,
+        }
+    }
+}

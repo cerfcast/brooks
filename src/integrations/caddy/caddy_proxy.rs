@@ -20,21 +20,18 @@ use std::{
     marker::PhantomData,
 };
 
-use http::StatusCode;
+use http::{StatusCode, header::HOST};
 use libc::intptr_t;
-use reqwest::Response;
 use tokio::runtime;
 
 use crate::{
+    cdni::md::interpret::{HmdTransformError, MdInterpretError},
     integrations::{
         caddy::{
             GoInt, caddy_response_set_body, caddy_response_set_header, caddy_response_set_status,
             caddyi::{BrooksCaddyConfiguration, BrooksCaddyRequest, drain_to_caddy_log},
         },
-        common::{
-            BrooksIntegrationTransformError, BrooksIntegrationsProxyError,
-            safe_brooks_integration_handle,
-        },
+        common::safe_brooks_integration_handle,
         hmds::{HmdsConfiguration, HmdsServerConfiguration},
         support::to_null_terminated_str,
     },
@@ -89,17 +86,18 @@ pub unsafe extern "C" fn caddy_brooks_configure(
 }
 
 fn try_from_response(
-    response: &Response,
+    response: &http::Response<Vec<u8>>,
     status: StatusCode,
     reqres: *mut c_void,
-) -> Result<(), Box<BrooksIntegrationTransformError>> {
+) -> Result<(), Box<MdInterpretError>> {
     unsafe {
         for header in response.headers().iter() {
             let header_name = header.0.to_string();
-            let header_value = header
-                .1
-                .to_str()
-                .map_err(|e| BrooksIntegrationTransformError::BadHeaderValue(e.to_string()))?;
+            let header_value = header.1.to_str().map_err(|e| {
+                MdInterpretError::TransformError(
+                    HmdTransformError::BadHeaderValue(e.to_string()).into(),
+                )
+            })?;
 
             caddy_response_set_header(
                 reqres,
@@ -152,45 +150,53 @@ unsafe fn do_brooks_caddy_proxy(
     req: *mut c_void,
     res: *mut c_void,
     log: LogMsgs,
-) -> Result<LogMsgs, (Box<BrooksIntegrationsProxyError>, LogMsgs)> {
+) -> Result<LogMsgs, (Box<MdInterpretError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
     let mel_scope = builtin_builtin_function_interpreters();
 
-    let mut http_req = Box::from_raw(req as *mut BrooksCaddyRequest).request;
+    let http_req = Box::from_raw(req as *mut BrooksCaddyRequest).request;
 
     let runtime = match runtime::Builder::new_current_thread().enable_all().build() {
         Ok(o) => o,
         Err(e) => {
+            return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
+        }
+    };
+
+    let hmds_key = match http_req.headers().get(HOST).cloned() {
+        Some(o) => o,
+        None => {
             return Err((
-                BrooksIntegrationsProxyError::RuntimeError(e.to_string()).into(),
+                MdInterpretError::ProxyError("Could not get host from request".to_string()).into(),
                 log,
             ));
         }
     };
+    let hmds_key = match hmds_key.to_str() {
+        Ok(o) => o,
+        Err(e) => {
+            return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
+        }
+    };
 
     let (status, response, log) = safe_brooks_integration_handle(
-        &mut http_req,
+        &http_req,
         &Some(mel_scope),
+        hmds_key,
         &mut (*cookie).hmds,
         &runtime,
         log,
     )?;
 
     if let Err(e) = try_from_response(&response, status, res) {
-        return Err((BrooksIntegrationsProxyError::TransformError(e).into(), log));
+        return Err((e, log));
     }
 
-    let result_body = match runtime.block_on(response.bytes()) {
-        Ok(o) => o,
-        Err(e) => {
-            return Err((
-                BrooksIntegrationsProxyError::ProxyError(e.to_string()).into(),
-                log,
-            ));
-        }
-    };
-
-    caddy_response_set_body(res, result_body.len() as GoInt, result_body.as_ptr());
+    caddy_response_set_body(
+        res,
+        response.body().len() as GoInt,
+        response.body().as_ptr(),
+    );
 
     Ok(log)
 }

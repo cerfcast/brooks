@@ -1004,7 +1004,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
 #[cfg(test)]
 mod analyzed_serializer_tests {
-    use crate::mel::tvs::{
+    use crate::mel::types::{
         self, SimpleParamTypeChecker, Struct,
         Type::{self, Function},
     };
@@ -1086,7 +1086,7 @@ mod analyzed_serializer_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1426,7 +1426,7 @@ mod analyzed_serializer_tests {
                 || Type::Boolean,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })

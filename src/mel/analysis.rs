@@ -26,7 +26,7 @@ use crate::{
     environment::scope::Scopes,
     mel::{
         compiler::compile::MelCompilerLocatableError,
-        tvs::{ArgumentTypeList, ParamsTypeCheckerError, ParamsTypeCheckerGenerator},
+        types::{ArgumentTypeList, ParamsTypeCheckerError, ParamsTypeCheckerGenerator},
     },
 };
 
@@ -46,7 +46,7 @@ use crate::mel::{
         Expr, FunctionCall, IPAddressLiteral, Identifier, MemberAccessExpression, NumberLiteral,
         StringLiteral, TernaryExpr,
     },
-    tvs::{
+    types::{
         self,
         Type::{self, Struct},
     },
@@ -683,7 +683,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             Type::Struct(struct_type) => struct_type,
             t => {
                 return Err(MelAnalysisLocatableError {
-                    error: MelAnalysisError::Mismatch(Struct(tvs::Struct::new("TODO")), t).into(),
+                    error: MelAnalysisError::Mismatch(Struct(types::Struct::new("TODO")), t).into(),
                     location: ast.base.location(),
                 });
             }
@@ -707,7 +707,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 member: Identifier {
                     identifier: ast.member.identifier.clone(),
                     aug: Analyzed {
-                        tipe: tvs::Type::None,
+                        tipe: types::Type::None,
                         constant: None,
                     },
                     location: ast.location.clone(),
@@ -725,15 +725,15 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 #[cfg(test)]
 mod type_check_tests {
     use crate::common::GrammarLocation;
-    use crate::mel::tvs::Type::IPAddress;
-    use crate::mel::tvs::{
+    use crate::mel::types::Type::IPAddress;
+    use crate::mel::types::{
         BuiltinFunctionType, IntegerBuiltin, RealBuiltin, SimpleParamTypeChecker, StringBuiltin,
     };
     use crate::mel::{
         analysis::{Analyzed, MelAnalysisContext, MelAnalysisError, MelTypeChecker},
         ast::{AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier},
         compiler::compile,
-        tvs::{
+        types::{
             self,
             Type::{self, Boolean, Function, Integer},
         },
@@ -1014,7 +1014,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-                MelAnalysisError::InvalidType(x, tvs::Type::String)
+                MelAnalysisError::InvalidType(x, types::Type::String)
             if x == vec![Integer]
         )
     }
@@ -1309,7 +1309,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1359,7 +1359,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1395,7 +1395,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer, Type::String],
                         },
                     })
@@ -1428,7 +1428,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1478,7 +1478,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer, Type::String],
                         },
                     })
@@ -1528,7 +1528,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer, Type::Integer],
                         },
                     })
@@ -1571,7 +1571,7 @@ mod type_check_tests {
                 || Type::Integer,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -1623,7 +1623,7 @@ mod type_check_tests {
                 || Type::Boolean,
                 || {
                     Box::new(SimpleParamTypeChecker {
-                        p: tvs::ParameterTypesList {
+                        p: types::ParameterTypesList {
                             params: vec![Type::Integer],
                         },
                     })
@@ -2409,7 +2409,7 @@ mod optimizer_tests {
         },
         ast::{AstVisitorDriver, BinaryExpr},
         compiler::compile,
-        tvs::Type,
+        types::Type,
     };
     use std::assert_matches;
 

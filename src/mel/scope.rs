@@ -15,21 +15,21 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use http::uri::Scheme;
-
 use crate::{
     environment::scope::Scope,
     mel::{
         interpreter::interpret::{StructValue, TypedValue, Value},
-        tvs::{
+        types::{
             Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
             IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,
             MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin,
             Remove_QueryBuiltin,
             Type::{self, Function},
-            UpperBuiltin, header_type, header_type_from_req, req_type, uri_type,
+            UpperBuiltin, header_type, header_type_from_processable_rr, header_type_from_req,
+            req_type, uri_type,
         },
     },
+    tools::prr,
 };
 
 /// Create a scope that contains the types of the MEL core variables.
@@ -104,9 +104,9 @@ impl<A> From<http::Request<A>> for Scope<Type> {
 }
 
 /// Create a scope that contains the values of the MEL core variables present in an HTTP request.
-impl<A> From<http::Request<A>> for Scope<TypedValue> {
-    fn from(value: http::Request<A>) -> Self {
-        let ht = header_type_from_req(&value);
+impl<A> From<&dyn prr::Prr<A>> for Scope<TypedValue> {
+    fn from(value: &dyn prr::Prr<A>) -> Self {
+        let ht = header_type_from_processable_rr(value);
         let urit = uri_type();
         let reqt = req_type(ht.clone(), urit.clone());
 
@@ -123,7 +123,7 @@ impl<A> From<http::Request<A>> for Scope<TypedValue> {
                     &header.0.to_string().replace("-", "_").to_lowercase(),
                     TypedValue {
                         value: Value::String(x.to_string()),
-                        tipe: Type::String,
+                        tpe: Type::String,
                     },
                 )
                 .expect("header field value is mistyped");
@@ -135,8 +135,8 @@ impl<A> From<http::Request<A>> for Scope<TypedValue> {
         uriv.insert_field(
             "path",
             TypedValue {
-                value: Value::String(value.uri().path().to_string()),
-                tipe: Type::String,
+                value: Value::String(value.url().expect("Missing URI").path().to_string()),
+                tpe: Type::String,
             },
         )
         .expect("path field value is mistyped.");
@@ -144,8 +144,15 @@ impl<A> From<http::Request<A>> for Scope<TypedValue> {
         uriv.insert_field(
             "query",
             TypedValue {
-                value: Value::String(value.uri().query().unwrap_or_default().to_string()),
-                tipe: Type::String,
+                value: Value::String(
+                    value
+                        .url()
+                        .expect("Missing URI")
+                        .query()
+                        .unwrap_or_default()
+                        .to_string(),
+                ),
+                tpe: Type::String,
             },
         )
         .expect("query field value is mistyped.");
@@ -154,7 +161,7 @@ impl<A> From<http::Request<A>> for Scope<TypedValue> {
             "h",
             TypedValue {
                 value: Value::Struct(hv),
-                tipe: Type::Struct(ht.clone()),
+                tpe: Type::Struct(ht.clone()),
             },
         )
         .expect("h field value is mistyped.");
@@ -163,7 +170,7 @@ impl<A> From<http::Request<A>> for Scope<TypedValue> {
             "uri",
             TypedValue {
                 value: Value::Struct(uriv),
-                tipe: Type::Struct(urit.clone()),
+                tpe: Type::Struct(urit.clone()),
             },
         )
         .expect("uri field value is mistyped.");
@@ -171,8 +178,9 @@ impl<A> From<http::Request<A>> for Scope<TypedValue> {
         reqv.insert_field(
             "method",
             TypedValue {
-                value: Value::String(value.method().to_string()),
-                tipe: Type::String,
+                //value: Value::String(value.method().to_string()),
+                value: Value::String(http::method::Method::GET.to_string()),
+                tpe: Type::String,
             },
         )
         .expect("method field value is mistyped.");
@@ -180,8 +188,8 @@ impl<A> From<http::Request<A>> for Scope<TypedValue> {
         reqv.insert_field(
             "scheme",
             TypedValue {
-                value: Value::String(value.uri().scheme().unwrap_or(&Scheme::HTTP).to_string()),
-                tipe: Type::String,
+                value: Value::String(value.url().expect("Missing URI").scheme().to_string()),
+                tpe: Type::String,
             },
         )
         .expect("Header field value is mistyped.");
@@ -190,7 +198,7 @@ impl<A> From<http::Request<A>> for Scope<TypedValue> {
             "req",
             TypedValue {
                 value: Value::Struct(reqv),
-                tipe: Type::Struct(reqt),
+                tpe: Type::Struct(reqt),
             },
         );
 

@@ -178,9 +178,9 @@ pub fn builtin_function_interpreter(attr: TokenStream, item: TokenStream) -> Tok
                 let #arg_name = match &args[#i] {
                         TypedValue {
                             value: #v(s),
-                            tipe: _,
+                            tpe: _,
                         } => s,
-                        TypedValue { value: _, tipe: t } => {
+                        TypedValue { value: _, tpe: t } => {
                             return Err(BuiltinInterpError::ArgumentMismatch(
                                 #i,
                                 #t,
@@ -277,8 +277,21 @@ pub fn builtin_function(attr: TokenStream, item: TokenStream) -> TokenStream {
     generated.into()
 }
 
-#[proc_macro_derive(TypedGenericMetadata)]
-pub fn derive_typed_generic_metadata(item: TokenStream) -> TokenStream {
+/// Derive Serializer/Deserializer of CDNI Metadata:
+///
+/// 1. There should be a `TypedXXX` for every `XXX`.
+/// 2. The `TypedXXX` should have `tpe` and `value`, where
+///    `value` has the `XXX` type.
+/// 3. Use `TypedGenericMetadata` on the `TypedXXX` version
+///    to get `typed_value` and `typed_generic_metadata_name`
+///    to help the parser verify the JSON.
+/// 4. The name of the type is `MI.XXX` (where `XXX` is from above).
+/// 5. The `XXX` should have a `pub` `aug` whose type is `A: Debug + Clone + Default`
+///    which will hold any augmentation data generated during
+///    verification. Annotate it as `serde(skip)`.
+/// 6. Use `serde(rename=...)` to rename fields to match the spec.
+#[proc_macro_derive(CdniMetadata)]
+pub fn derive_cdni_metadata(item: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(item).unwrap();
     let name = &ast.ident;
     let untyped_name = format_ident!("{}", ast.ident.to_string().trim_start_matches("Typed"));
@@ -315,7 +328,7 @@ pub fn derive_typed_generic_metadata(item: TokenStream) -> TokenStream {
 
     let r = quote! {
     impl #x #name #y #z {
-        pub fn typed_generic_metadata_name() -> String {
+        pub fn typed_cdni_metadata_name() -> String {
             #metadata_type.to_string()
         }
 
@@ -327,7 +340,7 @@ pub fn derive_typed_generic_metadata(item: TokenStream) -> TokenStream {
         }
     }
 
-    impl MetadataInformation for #name<()> {
+    impl IntoCdniMetadata for #name<()> {
         fn metadata_type(&self) -> String {
             #metadata_type.to_string()
         }

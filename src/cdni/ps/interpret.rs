@@ -17,10 +17,12 @@
 
 //! Verification of CDNI JSON
 
-use http::{HeaderName, HeaderValue, StatusCode, Uri, uri::InvalidUri};
+use http::{HeaderName, HeaderValue, StatusCode};
 
 use crate::{
     cdni::{
+        gmd::spec::TypedGenericMetadata,
+        mi::{MetadataInformationResultElement, MetadataInformationResultElements},
         ps::{
             interpret::{
                 PsInterpretMode::HeaderCalculate,
@@ -36,65 +38,27 @@ use crate::{
             verify::PsVerificationKey,
             visit::{PsVisitor, PsVisitorResult},
         },
-        spec::{
-            MetadataInformationResultElement, MetadataInformationResultElements,
-            TypedGenericMetadata,
-        },
     },
     environment::scope::{Scope, Scopes},
     logging::LogMsgs,
     mel::{
+        self,
         analysis::Analyzed,
         ast::Expr,
-        interpreter::{
-            self,
-            interpret::{
-                MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError,
-                TypedValue, Value,
-            },
+        interpreter::interpret::{
+            MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError,
+            TypedValue, Value,
         },
-        tvs::Type,
+        types::Type,
     },
+    tools::prr,
 };
 
-use std::fmt::{Debug, Display};
-
-#[derive(Debug, Clone)]
-pub enum ProcessableRequestResponseError {
-    BadValue,
-    InvalidMode,
-}
-
-impl Display for ProcessableRequestResponseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            ProcessableRequestResponseError::BadValue => write!(f, "Bad value"),
-            ProcessableRequestResponseError::InvalidMode => write!(f, "Invalid mode"),
-        }
-    }
-}
-
-pub type ProcessableRequestResponseResult<T> = Result<T, ProcessableRequestResponseError>;
-
-/// A request that can be manipulated by interpretation processing stages.
-pub trait ProcessableRequestResponse: Debug {
-    fn header_value(&self) -> Option<String>;
-    fn headers(&self) -> Vec<String>;
-
-    fn set_header_value(
-        &mut self,
-        header: &str,
-        value: &str,
-    ) -> ProcessableRequestResponseResult<()>;
-    fn clear_headers(&mut self) -> ProcessableRequestResponseResult<()>;
-    fn remove_header(&mut self, header: &str) -> ProcessableRequestResponseResult<()>;
-    fn add_header(&mut self, header: &str, value: &str) -> ProcessableRequestResponseResult<()>;
-
-    fn uri(&self) -> ProcessableRequestResponseResult<Uri>;
-    fn set_uri(&mut self, uri: &Uri) -> ProcessableRequestResponseResult<()>;
-
-    fn set_response(&mut self, response: &u16) -> ProcessableRequestResponseResult<()>;
-}
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
 pub type PsInterpretResult =
     Result<(PsInterpretValue, MetadataInformationResultElements), Box<PsInterpretError>>;
@@ -131,12 +95,14 @@ pub enum PsInterpretError {
     AssertionFailure(PsInterpretAssertionFailures),
     MelInterpreterError(Box<MelInterpLocatableError>),
     InvalidRequest,
-    InvalidUri(InvalidUri),
+    InvalidUri(url::ParseError),
     InvalidResponse(String),
     WrongType(PsInterpretValueType, PsInterpretValueType),
     WrongMatchGroupValueType(PsInterpretValueType),
-    ProcessableRequestResponseError(ProcessableRequestResponseError),
+    ProcessableRequestResponseError(prr::Error),
 }
+
+impl Error for PsInterpretError {}
 
 impl Display for PsInterpretError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -173,30 +139,20 @@ impl Display for PsInterpretError {
 
 // CDNI Processing Stage Interpreter
 
-struct PsInterpreter<'a> {
-    pub mel_scope: &'a Option<Scope<TypedValue>>,
-    pub req: &'a mut dyn ProcessableRequestResponse,
+pub(crate) struct PsInterpreter<'a> {
+    pub mel_scope: Option<&'a Scope<TypedValue>>,
+    pub rr: &'a mut dyn prr::Prr<Vec<u8>>,
 }
 
 impl<'a> PsInterpreter<'a> {
-    fn install_generic_visitors(&mut self) {}
+    pub fn install_generic_visitors(&mut self) {}
 
     fn scopes_from_req(&self) -> Result<Scopes<TypedValue>, PsInterpretError> {
-        let mel_req = http::Request::builder()
-            .uri(
-                self.req
-                    .uri()
-                    .map_err(|_| PsInterpretError::InvalidRequest)?,
-            )
-            .body("")
-            .map_err(|_| PsInterpretError::InvalidRequest)?;
-
         Ok(Scopes::<TypedValue> {
-            scopes: vec![
-                self.mel_scope
-                    .iter()
-                    .fold(Scope::<TypedValue>::from(mel_req), |c, n| &c + n),
-            ],
+            scopes: vec![self.mel_scope.iter().fold(
+                Scope::<TypedValue>::from(self.rr as &dyn prr::Prr<Vec<u8>>),
+                |c, n| &c + n,
+            )],
         })
     }
 
@@ -211,7 +167,7 @@ impl<'a> PsInterpreter<'a> {
             log: LogMsgs::new(crate::logging::LogLevel::Trace),
         };
 
-        let result_ctxt = interpreter::interpret(expr, expr_context)
+        let result_ctxt = mel::interpreter::interpret(expr, expr_context)
             .map_err(PsInterpretError::MelInterpreterError)?;
 
         let result_val = result_ctxt
@@ -221,13 +177,13 @@ impl<'a> PsInterpreter<'a> {
                 PsInterpretAssertionFailures::MissingInterpreterExpressionValue,
             ))?;
 
-        if result_val.tipe == expected {
+        if result_val.tpe == expected {
             Ok(result_val.clone())
         } else {
             Err(PsInterpretError::MelInterpreterError(
                 MelInterpLocatableError {
                     error: MelInterpError::Assertion(
-                        MelInterpAssertion::TypeMismatch(expected, result_val.tipe.clone()).into(),
+                        MelInterpAssertion::TypeMismatch(expected, result_val.tpe.clone()).into(),
                     )
                     .into(),
                     context: result_ctxt,
@@ -241,10 +197,8 @@ impl<'a> PsInterpreter<'a> {
     fn interpret_match_groups_in_stage(
         &mut self,
         mgs: &Vec<TypedMatchGroup<PsVerificationKey>>,
-        c: PsInterpretContext,
+        mut c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        let mut c = c;
-
         for mg in mgs {
             c = self.visit_match_group(mg, c)?;
             match c.result {
@@ -283,7 +237,7 @@ impl<'a> PsInterpreter<'a> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum PsInterpretMode {
     Request,
     Response,
@@ -315,7 +269,7 @@ impl Display for PsInterpretValueType {
 
 #[derive(Debug, Clone)]
 pub enum PsInterpretValue {
-    SyntheticResponse(http::Response<String>),
+    SyntheticResponse(http::Response<Vec<u8>>),
     Terminate,
     MatchYes,
     MatchNo,
@@ -340,10 +294,10 @@ impl From<bool> for PsInterpretValue {
 }
 
 #[derive(Debug, Default)]
-struct PsInterpretContext {
-    mode: PsInterpretMode,
-    result: Option<PsInterpretValue>,
-    metadata: MetadataInformationResultElements,
+pub(crate) struct PsInterpretContext {
+    pub mode: PsInterpretMode,
+    pub result: Option<PsInterpretValue>,
+    pub metadata: MetadataInformationResultElements,
 }
 
 impl PsInterpretContext {
@@ -404,7 +358,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
             let result = self.evaluate_mel_expr(expr, Type::Boolean)?;
             match result {
                 TypedValue {
-                    tipe: Type::Boolean,
+                    tpe: Type::Boolean,
                     value: Value::Boolean(v),
                 } => v,
                 _ => unreachable!(),
@@ -431,9 +385,8 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     fn visit_stage_metadata(
         &mut self,
         v: &TypedStageMetadata<PsVerificationKey>,
-        c: PsInterpretContext,
+        mut c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        let mut c = c;
         if let Some(generic) = &v.value.generic {
             for generic in generic {
                 c = self.visit_generic_metadata(generic, c)?;
@@ -463,9 +416,8 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     fn visit_request_transform(
         &mut self,
         v: &TypedRequestTransform<PsVerificationKey>,
-        c: PsInterpretContext,
+        mut c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        let mut c = c;
         if let Some(header_xform) = &v.value.xform {
             c = self.visit_header_transform(
                 header_xform,
@@ -492,17 +444,18 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                 let result = self.evaluate_mel_expr(expr, Type::String)?;
                 match result {
                     TypedValue {
-                        tipe: Type::String,
+                        tpe: Type::String,
                         value: Value::String(s),
-                    } => Uri::try_from(s),
+                    } => url::Url::from_str(&s),
                     _ => unreachable!(),
                 }
             } else {
-                Uri::try_from(new_uri.clone())
+                url::Url::from_str(&new_uri.clone())
             }
             .map_err(PsInterpretError::InvalidUri)?;
-            self.req
-                .set_uri(&new_uri)
+
+            self.rr
+                .set_url(&new_uri)
                 .map_err(PsInterpretError::ProcessableRequestResponseError)?
         }
 
@@ -512,12 +465,11 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     fn visit_response_transform(
         &mut self,
         v: &TypedResponseTransform<PsVerificationKey>,
-        c: PsInterpretContext,
+        mut c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         if let Some(synthetic_response) = &v.value.synthetic {
             return self.visit_synthetic_response(synthetic_response, c);
         }
-        let mut c = c;
 
         if let Some(header_xform) = &v.value.xform {
             c = self
@@ -539,7 +491,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                 let result = self.evaluate_mel_expr(expr, Type::Integer)?;
                 match result {
                     TypedValue {
-                        tipe: Type::Integer,
+                        tpe: Type::Integer,
                         value: Value::Integer(i),
                     } => Ok(i),
                     _ => unreachable!(),
@@ -553,10 +505,13 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                     "Could not convert {new_response} to unsigned 16-bit number: {e}"
                 ))
             })?;
-            self.req.set_response(&new_response).map_err(|_| {
-                PsInterpretError::ProcessableRequestResponseError(
-                    ProcessableRequestResponseError::BadValue,
-                )
+            self.rr.set_status(&new_response).map_err(|_| {
+                PsInterpretError::ProcessableRequestResponseError(prr::Error::BadValue(
+                    prr::Value {
+                        tpe: prr::ValueType::Status,
+                        value: Some(new_response.to_string()),
+                    },
+                ))
             })?;
         }
 
@@ -578,7 +533,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         if let Some(to_delete) = &v.value.delete {
             for htr in to_delete {
-                self.req
+                self.rr
                     .remove_header(htr)
                     .map_err(PsInterpretError::ProcessableRequestResponseError)?
             }
@@ -630,7 +585,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
             let result = self.evaluate_mel_expr(expr, Type::String)?;
             match result {
                 TypedValue {
-                    tipe: Type::String,
+                    tpe: Type::String,
                     value: Value::String(s),
                 } => s,
                 _ => unreachable!(),
@@ -641,13 +596,13 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
 
         match c.mode {
             PsInterpretMode::HeaderAdd => {
-                self.req
+                self.rr
                     .add_header(&v.value.name, &value)
                     .map_err(PsInterpretError::ProcessableRequestResponseError)?;
                 Ok(c)
             }
             PsInterpretMode::HeaderReplace => {
-                self.req
+                self.rr
                     .set_header_value(&v.value.name, &value)
                     .map_err(PsInterpretError::ProcessableRequestResponseError)?;
                 Ok(c)
@@ -662,10 +617,9 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     fn visit_synthetic_response(
         &mut self,
         v: &TypedSyntheticResponse<PsVerificationKey>,
-        c: PsInterpretContext,
+        mut c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         let mut response = http::Response::builder();
-        let mut c = c;
 
         if let Some(headers) = &v.value.headers {
             for header in headers {
@@ -710,7 +664,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                 let result = self.evaluate_mel_expr(expr, Type::Integer)?;
                 match result {
                     TypedValue {
-                        tipe: Type::Integer,
+                        tpe: Type::Integer,
                         value: Value::Integer(i),
                     } => StatusCode::from_u16(i as u16),
                     _ => unreachable!(),
@@ -739,16 +693,16 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                     let result = self.evaluate_mel_expr(expr, Type::String)?;
                     match result {
                         TypedValue {
-                            tipe: Type::String,
+                            tpe: Type::String,
                             value: Value::String(s),
-                        } => s,
+                        } => s.into_bytes(),
                         _ => unreachable!(),
                     }
                 } else {
-                    body.clone()
+                    body.to_owned().into_bytes()
                 }
             } else {
-                "".to_string()
+                "".to_string().into_bytes()
             })
             .expect("Could not create HTTP response");
 
@@ -758,10 +712,8 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     fn visit_match_group(
         &mut self,
         v: &TypedMatchGroup<PsVerificationKey>,
-        c: PsInterpretContext,
+        mut c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
-        let mut c = c;
-
         let else_ifs = v
             .value
             .else_ifs
@@ -832,15 +784,16 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     }
 }
 
+/// TODO: Document
 pub fn interpret_stage(
     ts: &TypedStage<PsVerificationKey>,
-    mel: &Option<Scope<TypedValue>>,
-    req: &mut dyn ProcessableRequestResponse,
+    mel: Option<&Scope<TypedValue>>,
+    reqres: &mut dyn prr::Prr<Vec<u8>>,
     mode: PsInterpretMode,
 ) -> PsInterpretResult {
     let mut visitor = PsInterpreter {
         mel_scope: mel,
-        req,
+        rr: reqres,
     };
 
     visitor.install_generic_visitors();
@@ -880,68 +833,103 @@ enum EffectfulRequestActions {
     AddHeader(String, String),
     ClearHeaders,
     SetUri(String),
+    SetBody,
     SetResponse(u16),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct EffectfulProcessableRequestResponse {
     log: Vec<EffectfulRequestActions>,
+    tpe: prr::PrrType,
 }
 
-impl ProcessableRequestResponse for EffectfulProcessableRequestResponse {
-    fn header_value(&self) -> Option<String> {
+impl EffectfulProcessableRequestResponse {
+    fn new_request() -> Self {
+        EffectfulProcessableRequestResponse {
+            log: Default::default(),
+            tpe: prr::PrrType::Request,
+        }
+    }
+
+    fn new_response() -> Self {
+        EffectfulProcessableRequestResponse {
+            log: Default::default(),
+            tpe: prr::PrrType::Response,
+        }
+    }
+}
+
+impl prr::Prr<Vec<u8>> for EffectfulProcessableRequestResponse {
+    fn header_value(&self) -> Option<HeaderValue> {
         None
     }
 
-    fn headers(&self) -> Vec<String> {
+    fn headers(&self) -> Vec<(String, HeaderValue)> {
         vec![]
     }
 
-    fn set_header_value(
-        &mut self,
-        _header: &str,
-        _value: &str,
-    ) -> Result<(), ProcessableRequestResponseError> {
+    fn set_header_value(&mut self, _header: &str, _value: &str) -> Result<(), prr::Error> {
         Ok(())
     }
 
-    fn clear_headers(&mut self) -> ProcessableRequestResponseResult<()> {
+    fn clear_headers(&mut self) -> prr::Result<()> {
         self.log.push(EffectfulRequestActions::ClearHeaders);
         Ok(())
     }
 
-    fn remove_header(&mut self, header: &str) -> Result<(), ProcessableRequestResponseError> {
+    fn remove_header(&mut self, header: &str) -> Result<(), prr::Error> {
         self.log
             .push(EffectfulRequestActions::DeleteHeader(header.to_string()));
         Ok(())
     }
 
-    fn uri(&self) -> Result<Uri, ProcessableRequestResponseError> {
-        Ok(Uri::default())
+    fn url(&self) -> Result<url::Url, prr::Error> {
+        Ok(url::Url::from_str("http://www.example.com/").expect("Could not make default URL"))
     }
 
-    fn set_uri(&mut self, uri: &Uri) -> Result<(), ProcessableRequestResponseError> {
+    fn set_url(&mut self, url: &url::Url) -> Result<(), prr::Error> {
         self.log
-            .push(EffectfulRequestActions::SetUri(uri.to_string()));
+            .push(EffectfulRequestActions::SetUri(url.to_string()));
         Ok(())
     }
 
-    fn set_response(&mut self, response: &u16) -> Result<(), ProcessableRequestResponseError> {
+    fn set_status(&mut self, response: &u16) -> Result<(), prr::Error> {
         self.log
             .push(EffectfulRequestActions::SetResponse(*response));
         Ok(())
     }
 
-    fn add_header(
-        &mut self,
-        header: &str,
-        value: &str,
-    ) -> Result<(), ProcessableRequestResponseError> {
+    fn add_header(&mut self, header: &str, value: &str) -> Result<(), prr::Error> {
         self.log.push(EffectfulRequestActions::AddHeader(
             header.to_string(),
             value.to_string(),
         ));
         Ok(())
+    }
+
+    fn set_body(&mut self, _: &Vec<u8>) -> prr::Result<()> {
+        self.log.push(EffectfulRequestActions::SetBody);
+        Ok(())
+    }
+
+    fn get_body(&self) -> prr::Result<&Vec<u8>> {
+        todo!()
+    }
+
+    fn get_status(&self) -> prr::Result<StatusCode> {
+        todo!()
+    }
+
+    fn tpe(&self) -> prr::PrrType {
+        self.tpe.clone()
+    }
+
+    fn set_method(&mut self, _method: &http::Method) -> prr::Result<()> {
+        todo!()
+    }
+
+    fn get_method(&self) -> http::Method {
+        todo!()
     }
 }
 
@@ -962,7 +950,7 @@ mod ps_interpreter_tests {
             response_transform, stage_metadata, synthetic_response, typed_header, typed_stage_rule,
         },
         environment::scope::Scopes,
-        mel::tvs::Type,
+        mel::types::Type,
         tests::read_test_file,
     };
     use std::assert_matches;
@@ -977,11 +965,11 @@ mod ps_interpreter_tests {
         let result = serde_json::from_str::<TypedGenericStage>(&json)
             .expect("Could not deserialize simple client request stage JSON");
 
-        let result = verify_ps_request_stage(&result, Scopes::<Type>::default())
+        let result = verify_ps_request_stage(&result, &Scopes::<Type>::default())
             .expect("Could not verify valid client request stage JSON");
 
-        let mut req = EffectfulProcessableRequestResponse::default();
-        let result = interpret_stage(&result, &None, &mut req, PsInterpretMode::Request)
+        let mut req = EffectfulProcessableRequestResponse::new_request();
+        let result = interpret_stage(&result, None, &mut req, PsInterpretMode::Request)
             .expect("Could not interpret a valid client request");
 
         assert_eq!(req.log.len(), 2);
@@ -999,10 +987,10 @@ mod ps_interpreter_tests {
         let result = serde_json::from_str::<TypedGenericStage>(&json)
             .expect("Could not deserialize simple client request stage JSON");
 
-        let result = verify_ps_request_stage(&result, Scopes::<Type>::default())
+        let result = verify_ps_request_stage(&result, &Scopes::<Type>::default())
             .expect("Could not verify valid client request stage JSON");
-        let mut req = EffectfulProcessableRequestResponse::default();
-        let result = interpret_stage(&result, &None, &mut req, PsInterpretMode::Request)
+        let mut req = EffectfulProcessableRequestResponse::new_request();
+        let result = interpret_stage(&result, None, &mut req, PsInterpretMode::Request)
             .expect("Could not interpret a valid client request");
 
         assert_eq!(req.log.len(), 2);
@@ -1044,10 +1032,10 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::default();
+        let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            &None,
+            None,
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1101,10 +1089,10 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::default();
+        let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            &None,
+            None,
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1172,10 +1160,10 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::default();
+        let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            &None,
+            None,
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1242,10 +1230,10 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::default();
+        let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            &None,
+            None,
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1285,10 +1273,10 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::default();
+        let mut req = EffectfulProcessableRequestResponse::new_request();
         interpret_stage(
             &TypedStage::ClientRequest(value),
-            &None,
+            None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1335,10 +1323,10 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::default();
+        let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            &None,
+            None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1397,10 +1385,10 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::default();
+        let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            &None,
+            None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1458,10 +1446,10 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::default();
+        let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            &None,
+            None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1514,10 +1502,10 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::default();
+        let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            &None,
+            None,
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1525,6 +1513,6 @@ mod ps_interpreter_tests {
 
         assert_eq!(req.log.len(), 0);
         assert_matches!(&result.0, PsInterpretValue::SyntheticResponse(r)
-            if r.status() == 404 && r.body() == "This is a test." && r.headers().len() == 2);
+            if r.status() == 404 && r.body() == &"This is a test.".to_string().into_bytes() && r.headers().len() == 2);
     }
 }

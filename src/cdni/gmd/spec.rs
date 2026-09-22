@@ -17,18 +17,15 @@
 
 //! All Metadata Information except for what is defined in Processing Stages.
 
-use brooks_macros::TypedGenericMetadata;
+use crate::macros::IntoCdniMetadata;
+use brooks_macros::CdniMetadata;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use std::fmt::Debug;
 
-pub trait MetadataInformation {
-    fn metadata_type(&self) -> String;
-    fn metadata_value(&self) -> Value;
-}
-
-impl<A: Debug + Default + Clone, T: MetadataInformation> From<T> for TypedGenericMetadata<A> {
+impl<A: Debug + Clone + Default, T: IntoCdniMetadata> From<T> for TypedGenericMetadata<A> {
     fn from(value: T) -> Self {
         Self {
             tpe: value.metadata_type(),
@@ -37,6 +34,7 @@ impl<A: Debug + Default + Clone, T: MetadataInformation> From<T> for TypedGeneri
         }
     }
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TypedGenericMetadata<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
@@ -47,6 +45,18 @@ pub struct TypedGenericMetadata<A: Debug + Clone + Default> {
     pub aug: A,
 }
 
+impl<A: Debug + Clone + Default> TypedGenericMetadata<A> {
+    pub fn typed_generic_metadata_name() -> String {
+        "GenericMetadata".to_string()
+    }
+
+    pub fn typed_value<AA: Debug + Default + Clone>(
+        sr: TypedGenericMetadata<AA>,
+    ) -> TypedGenericMetadata<AA> {
+        sr.clone()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source<A: Debug + Clone + Default> {
     pub endpoints: Vec<String>,
@@ -55,7 +65,7 @@ pub struct Source<A: Debug + Clone + Default> {
     pub aug: A,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedSource<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -70,57 +80,10 @@ pub struct CachePolicy<A: Debug + Clone + Default> {
     pub aug: A,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedCachePolicy<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
     pub value: CachePolicy<A>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HostMetadata<A: Debug + Clone + Default> {
-    pub metadata: Vec<TypedGenericMetadata<A>>,
-    #[serde(skip)]
-    pub aug: A,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
-pub struct TypedHostMetadata<A: Debug + Clone + Default> {
-    #[serde(rename = "generic-metadata-type")]
-    pub tpe: String,
-    #[serde(rename = "generic-metadata-value")]
-    pub value: HostMetadata<A>,
-}
-
-#[cfg(test)]
-mod test_parse_host_metadata {
-    use std::path::Path;
-
-    use crate::{
-        cdni::{
-            ps::spec::TypedHeader,
-            spec::{TypedGenericMetadata, TypedHostMetadata},
-            tests::test_helpers::typed_header,
-        },
-        tests::read_test_file,
-    };
-
-    #[test]
-    fn test_verify_bad_generic_md_typename() {
-        let json = read_test_file(Path::new("./src/cdni/tests/host_metadata/all.json"));
-        let host_metadata = serde_json::from_str::<TypedHostMetadata<()>>(&json)
-            .expect("Could not parse JSON test file");
-        assert_eq!(
-            host_metadata.tpe,
-            TypedHostMetadata::<()>::typed_generic_metadata_name()
-        );
-    }
-
-    #[test]
-    fn test_conversion_to_typed_generic_metadata() {
-        let x = typed_header("X-Cache-Control", "true", Some(true));
-        let y: TypedGenericMetadata<()> = x.into();
-        assert_eq!(y.tpe, TypedHeader::<()>::typed_generic_metadata_name());
-    }
 }

@@ -15,33 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Serializer/Deserializer of CDNI Processing Stages JSON:
-//!
-//! This is an implementation of the [CDNI ProcessingStages
-//! Metadata](https://datatracker.ietf.org/doc/draft-ietf-cdni-processing-stages-metadata/)
-//! spec.
-//!
-//! ## Implementation Notes:
-//!
-//! 1. There should be a `TypedXXX` for every `XXX`.
-//! 2. The `TypedXXX` should have `tpe` and `value`, where
-//!    `value` has the `XXX` type.
-//! 3. Use `TypedGenericMetadata` on the `TypedXXX` version
-//!    to get `typed_value` and `typed_generic_metadata_name`
-//!    to help the parser verify the JSON.
-//! 4. The name of the type is `MI.XXX` (where `XXX` is from above).
-//! 5. The `XXX` should have a `pub` `aug` whose type is `A: Debug + Clone + Default`
-//!    which will hold any augmentation data generated during
-//!    verification. Annotate it as `serde(skip)`.
-//! 6. Use `serde(rename=...)` to rename fields to match the spec.
-//!
-
-use brooks_macros::TypedGenericMetadata;
+use crate::macros::IntoCdniMetadata;
+use brooks_macros::CdniMetadata;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::cdni::spec::MetadataInformation;
-use crate::cdni::spec::TypedGenericMetadata;
+use crate::cdni::gmd::spec::TypedGenericMetadata;
 
 use std::fmt::Debug;
 
@@ -68,7 +47,7 @@ pub struct SyntheticResponse<A: Debug + Clone + Default> {
     pub aug: A,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedSyntheticResponse<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -87,7 +66,7 @@ pub struct Header<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedHeader<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -107,7 +86,7 @@ pub struct HeaderTransform<A: Debug + Clone + Default> {
     pub aug: A,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedHeaderTransform<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -131,7 +110,7 @@ pub struct RequestTransform<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedRequestTransform<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -159,7 +138,7 @@ pub struct ResponseTransform<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedResponseTransform<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -184,7 +163,7 @@ pub struct StageMetadata<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, Default, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, CdniMetadata)]
 pub struct TypedStageMetadata<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -198,7 +177,7 @@ pub struct ExpressionMatch<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedExpressionMatch<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -217,7 +196,7 @@ pub struct StageRules<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedStageRules<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -235,7 +214,7 @@ pub struct MatchGroup<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedMatchGroup<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -257,7 +236,7 @@ pub struct ProcessingStages<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedProcessingStages<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -272,7 +251,7 @@ pub struct ClientRequestStage<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedClientRequestStage<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -287,7 +266,7 @@ pub struct ClientResponseStage<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedClientResponseStage<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -302,7 +281,7 @@ pub struct OriginRequestStage<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedOriginRequestStage<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
@@ -317,7 +296,7 @@ pub struct OriginResponseStage<A: Debug + Clone + Default> {
     #[serde(skip)]
     pub aug: A,
 }
-#[derive(Debug, Clone, Serialize, Deserialize, TypedGenericMetadata)]
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
 pub struct TypedOriginResponseStage<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,

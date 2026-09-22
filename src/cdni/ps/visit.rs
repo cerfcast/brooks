@@ -16,13 +16,13 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::cdni::{
+    gmd::spec::TypedGenericMetadata,
     ps::spec::{
         TypedClientRequestStage, TypedClientResponseStage, TypedExpressionMatch, TypedHeader,
         TypedHeaderTransform, TypedMatchGroup, TypedOriginRequestStage, TypedOriginResponseStage,
         TypedProcessingStages, TypedRequestTransform, TypedResponseTransform, TypedStageMetadata,
         TypedStageRules, TypedSyntheticResponse,
     },
-    spec::TypedGenericMetadata,
 };
 
 use std::fmt::Debug;

@@ -15,24 +15,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[allow(dead_code)]
-pub mod analysis;
-#[allow(dead_code)]
-pub mod ast;
-#[allow(dead_code)]
-pub mod c;
-#[allow(dead_code)]
-pub mod compiler;
-#[allow(dead_code)]
-pub mod grammar;
-#[allow(dead_code)]
-pub mod interpreter;
-#[allow(dead_code)]
-pub mod scope;
-#[allow(dead_code)]
-pub mod serializer;
-#[allow(dead_code)]
-pub mod types;
+//! All Metadata Information except for what is defined in Processing Stages.
 
-#[cfg(test)]
-mod tests;
+use std::fmt::Debug;
+
+/// Concrete instances of MI generated during interpretation that may be used to specify post-interpretation behavior.
+pub trait MetadataInformationResultElement: Debug {}
+
+#[derive(Debug, Default)]
+pub struct MetadataInformationResultElements {
+    pub elements: Vec<Box<dyn MetadataInformationResultElement>>,
+}

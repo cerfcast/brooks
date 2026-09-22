@@ -33,7 +33,7 @@ mod interpreter_tests {
                     Value::{self, Struct},
                 },
             },
-            tvs::{
+            types::{
                 self, Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin,
                 BuiltinFunctionType, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,
                 MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin,
@@ -77,7 +77,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::Boolean(false),
-                tipe: Type::Boolean
+                tpe: Type::Boolean
             })
         );
     }
@@ -127,7 +127,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -144,7 +144,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::Boolean(true),
-                tipe: Type::Boolean
+                tpe: Type::Boolean
             })
         );
     }
@@ -193,7 +193,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -210,7 +210,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::Boolean(false),
-                tipe: Type::Boolean
+                tpe: Type::Boolean
             })
         );
     }
@@ -259,7 +259,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -276,7 +276,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "two"
         );
     }
@@ -325,7 +325,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -392,7 +392,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -409,7 +409,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "one/two/three"
         );
     }
@@ -458,7 +458,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -475,7 +475,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "two/three"
         );
     }
@@ -524,7 +524,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -541,7 +541,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "three"
         );
     }
@@ -590,7 +590,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -657,7 +657,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -674,7 +674,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "tingable"
         );
     }
@@ -723,7 +723,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -740,7 +740,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s.is_empty()
         );
     }
@@ -789,7 +789,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -856,7 +856,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -873,7 +873,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "tesREPLACE"
         );
     }
@@ -922,7 +922,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -939,7 +939,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "testingable"
         );
     }
@@ -988,7 +988,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1055,7 +1055,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1072,7 +1072,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "a=b&c&d=e"
         );
     }
@@ -1121,7 +1121,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1138,7 +1138,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "a=b&c=xx&d=dee"
         );
     }
@@ -1187,7 +1187,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1204,7 +1204,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "a&c&d=dee"
         );
     }
@@ -1253,7 +1253,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1270,7 +1270,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "a=b&c&d=d&e=eee&f=ffff"
         );
     }
@@ -1319,7 +1319,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1336,7 +1336,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "a=aa&c=cc&d=d"
         );
     }
@@ -1385,7 +1385,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1402,7 +1402,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "c&d=d"
         );
     }
@@ -1451,7 +1451,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1468,7 +1468,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "a=b&d=d"
         );
     }
@@ -1517,7 +1517,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1534,7 +1534,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "a=b&c&d=d"
         );
     }
@@ -1583,7 +1583,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1600,7 +1600,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "d=d"
         );
     }
@@ -1649,7 +1649,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1666,7 +1666,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "d=d"
         );
     }
@@ -1715,7 +1715,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1732,7 +1732,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s.is_empty()
         );
     }
@@ -1781,7 +1781,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1798,7 +1798,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "a=b&c&d=d"
         );
     }
@@ -1847,7 +1847,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1864,7 +1864,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "a=b&d=d"
         );
     }
@@ -1913,7 +1913,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1930,7 +1930,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s.is_empty()
         );
     }
@@ -1979,7 +1979,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -1996,7 +1996,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "ABCD"
         );
     }
@@ -2045,7 +2045,7 @@ mod interpreter_tests {
             &b.name(),
             TypedValue {
                 value: Value::Function(Arc::new(b.clone())),
-                tipe: Function(
+                tpe: Function(
                     b.name(),
                     b.return_type_calculator(),
                     b.params_type_checker(),
@@ -2062,7 +2062,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "abcd"
         );
     }
@@ -2100,7 +2100,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::Integer(5),
-                tipe: Type::Integer
+                tpe: Type::Integer
             })
         );
     }
@@ -2139,7 +2139,7 @@ mod interpreter_tests {
             "a",
             TypedValue {
                 value: Value::String("Hello".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
         );
         let context = context.update_scopes(&tv_scopes);
@@ -2152,7 +2152,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "Hello"
         );
     }
@@ -2168,7 +2168,7 @@ mod interpreter_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        let mut reqs = tvs::Struct::new("req");
+        let mut reqs = types::Struct::new("req");
 
         reqs.insert_field("incoming", Type::String);
         context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs.clone())));
@@ -2198,7 +2198,7 @@ mod interpreter_tests {
             "incoming".to_string(),
             TypedValue {
                 value: Value::String("X-".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
         );
 
@@ -2208,7 +2208,7 @@ mod interpreter_tests {
             "req",
             TypedValue {
                 value: Struct(reqsv),
-                tipe: Type::Struct(reqs),
+                tpe: Type::Struct(reqs),
             },
         );
         let context = context.update_scopes(&tv_scopes);
@@ -2221,7 +2221,7 @@ mod interpreter_tests {
             result.val,
             Some(TypedValue {
                 value: Value::String(s),
-                tipe: Type::String
+                tpe: Type::String
             }) if s == "X-"
         );
     }
@@ -2237,7 +2237,7 @@ mod interpreter_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        let mut reqs = tvs::Struct::new("req");
+        let mut reqs = types::Struct::new("req");
         reqs.insert_field("incoming", Type::Boolean);
         context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs.clone())));
 
@@ -2267,14 +2267,14 @@ mod interpreter_tests {
             "incoming".to_string(),
             TypedValue {
                 value: Value::String("X-".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
         );
         let tv_scopes = tv_scopes.insert(
             "req",
             TypedValue {
                 value: Struct(reqsv),
-                tipe: Type::Struct(reqs),
+                tpe: Type::Struct(reqs),
             },
         );
         let context = context.update_scopes(&tv_scopes);
@@ -2306,7 +2306,7 @@ mod interpreter_logger_tests {
                 MelInterp, MelInterpContext, StructValue, TypedValue,
                 Value::{self, Struct},
             },
-            tvs::{self, Type},
+            types::{self, Type},
         },
     };
     use std::collections::HashMap;
@@ -2367,7 +2367,7 @@ mod interpreter_logger_tests {
         let visitor = MelTypeChecker {};
         let mut context = MelAnalysisContext::default();
 
-        let mut reqs = tvs::Struct::new("req");
+        let mut reqs = types::Struct::new("req");
 
         reqs.insert_field("incoming", Type::Boolean);
         context = context.update_scopes(&context.scopes.insert("req", Type::Struct(reqs.clone())));
@@ -2404,7 +2404,7 @@ mod interpreter_logger_tests {
             "incoming".to_string(),
             TypedValue {
                 value: Value::Boolean(true),
-                tipe: Type::Boolean,
+                tpe: Type::Boolean,
             },
         );
 
@@ -2412,7 +2412,7 @@ mod interpreter_logger_tests {
             "req",
             TypedValue {
                 value: Struct(reqsv),
-                tipe: Type::Struct(reqs),
+                tpe: Type::Struct(reqs),
             },
         );
         let context = context.update_scopes(&tv_scopes);
@@ -2439,7 +2439,7 @@ mod interpreter_value_tests {
 
     use crate::mel::{
         interpreter::interpret::{MelInterpError, StructValue, TypedValue, Value},
-        tvs::{Struct, Type},
+        types::{Struct, Type},
     };
 
     #[test]
@@ -2455,7 +2455,7 @@ mod interpreter_value_tests {
                 "field1",
                 TypedValue {
                     value: Value::Integer(5),
-                    tipe: Type::Integer,
+                    tpe: Type::Integer,
                 },
             ),
             Ok(_),
@@ -2475,7 +2475,7 @@ mod interpreter_value_tests {
                 "field1",
                 TypedValue {
                     value: Value::Boolean(false),
-                    tipe: Type::Boolean,
+                    tpe: Type::Boolean,
                 },
             )
             .expect_err("Could insert mistyped value into field");
@@ -2502,7 +2502,7 @@ mod builtin_function_interpreter_tests {
                 Value::{self, ArgumentList},
             },
         },
-        tvs::{Add_Query_MultiBuiltin, IntegerBuiltin, Type},
+        types::{Add_Query_MultiBuiltin, IntegerBuiltin, Type},
     };
 
     #[test]
@@ -2512,7 +2512,7 @@ mod builtin_function_interpreter_tests {
 
         let _arg_values = ArgumentList(vec![TypedValue {
             value: Value::Integer(5),
-            tipe: Type::Integer,
+            tpe: Type::Integer,
         }]);
 
         // Update when implemented.
@@ -2526,15 +2526,15 @@ mod builtin_function_interpreter_tests {
         let arg_values = ArgumentList(vec![
             TypedValue {
                 value: Value::String("a=b&c=d".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
             TypedValue {
                 value: Value::String("n=v".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
         ]);
 
-        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tipe: _ }) if s == "a=b&c=d&n=v" );
+        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tpe: _ }) if s == "a=b&c=d&n=v" );
     }
 
     #[test]
@@ -2544,15 +2544,15 @@ mod builtin_function_interpreter_tests {
         let arg_values = ArgumentList(vec![
             TypedValue {
                 value: Value::String("a=b&c=d&x=x".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
             TypedValue {
                 value: Value::String("n=v, x=y".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
         ]);
 
-        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tipe: _ }) if s == "a=b&c=d&x=y&n=v" );
+        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tpe: _ }) if s == "a=b&c=d&x=y&n=v" );
     }
 
     #[test]
@@ -2562,15 +2562,15 @@ mod builtin_function_interpreter_tests {
         let arg_values = ArgumentList(vec![
             TypedValue {
                 value: Value::String("a=b&c=d&x=x".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
             TypedValue {
                 value: Value::String("n=v, x= y ".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
         ]);
 
-        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tipe: _ }) if s == "a=b&c=d&x=y&n=v" );
+        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tpe: _ }) if s == "a=b&c=d&x=y&n=v" );
     }
 
     #[test]
@@ -2580,15 +2580,15 @@ mod builtin_function_interpreter_tests {
         let arg_values = ArgumentList(vec![
             TypedValue {
                 value: Value::String("a=b&c=d&x=x".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
             TypedValue {
                 value: Value::String("n=v, x= \"y is y\"".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
         ]);
 
-        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tipe: _ }) if s == "a=b&c=d&x=\"y is y\"&n=v" );
+        assert_matches!(b.interpw(arg_values), Ok(TypedValue { value: Value::String(s), tpe: _ }) if s == "a=b&c=d&x=\"y is y\"&n=v" );
     }
 
     #[test]
@@ -2598,11 +2598,11 @@ mod builtin_function_interpreter_tests {
         let arg_values = ArgumentList(vec![
             TypedValue {
                 value: Value::Integer(5),
-                tipe: Type::Integer,
+                tpe: Type::Integer,
             },
             TypedValue {
                 value: Value::String("n=v, x= \"y is y\"".to_string()),
-                tipe: Type::String,
+                tpe: Type::String,
             },
         ]);
 

@@ -27,7 +27,7 @@ mod codegen_tests {
                 codegen, codegen_project,
             },
             compiler::compile,
-            tvs::Type,
+            types::Type,
         },
         tests::read_test_file,
     };
