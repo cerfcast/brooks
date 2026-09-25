@@ -63,15 +63,13 @@ impl
     > {
         let reqres = &mut *input.rr;
 
-        let mut visitor = PsInterpreter {
-            mel_scope: input.scope,
-            rr: reqres,
-        };
+        let mut visitor = PsInterpreter { rr: reqres };
 
         visitor.install_generic_visitors();
 
         let context = PsInterpretContext {
             mode: input.mode.clone(),
+            mel_scopes: input.scopes.clone(),
             ..Default::default()
         };
 

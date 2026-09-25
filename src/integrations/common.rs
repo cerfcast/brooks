@@ -39,11 +39,12 @@ use crate::{
         scope::{builtin_function_types, minimal_core_variable_types},
         types::Type,
     },
+    tools::prr,
 };
 
 pub(crate) fn safe_brooks_integration_handle(
     request: &Request<Vec<u8>>,
-    mel: &Option<Scope<TypedValue>>,
+    mel: Scopes<TypedValue>,
     hmds_key: &str,
     hmds_config: &mut HmdsConfiguration,
     runtime: &Runtime,
@@ -137,5 +138,10 @@ pub(crate) fn safe_brooks_integration_handle(
         }
     };
 
-    interpret_metadata(&found, mel, Box::new(processed_http_req), runtime, log)
+    let processed_http_req = Box::new(processed_http_req);
+    let mel_scopes: Scopes<TypedValue> = mel.enter_scope(Into::<Scope<TypedValue>>::into(
+        &*processed_http_req as &dyn prr::Prr<Vec<u8>>,
+    ));
+
+    interpret_metadata(&found, mel_scopes, processed_http_req, runtime, log)
 }

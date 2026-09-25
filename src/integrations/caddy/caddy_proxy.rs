@@ -26,6 +26,7 @@ use tokio::runtime;
 
 use crate::{
     cdni::md::interpret::{HmdTransformError, MdInterpretError},
+    environment::scope::Scopes,
     integrations::{
         caddy::{
             GoInt, caddy_response_set_body, caddy_response_set_header, caddy_response_set_status,
@@ -36,7 +37,7 @@ use crate::{
         support::to_null_terminated_str,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
-    mel::interpreter::builtins::builtin_builtin_function_interpreters,
+    mel::interpreter::{builtins::builtin_builtin_function_interpreters, interpret::TypedValue},
 };
 
 #[allow(clippy::missing_safety_doc)]
@@ -152,7 +153,7 @@ unsafe fn do_brooks_caddy_proxy(
     log: LogMsgs,
 ) -> Result<LogMsgs, (Box<MdInterpretError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
-    let mel_scope = builtin_builtin_function_interpreters();
+    let mel_scope: Scopes<TypedValue> = builtin_builtin_function_interpreters().into();
 
     let http_req = Box::from_raw(req as *mut BrooksCaddyRequest).request;
 
@@ -181,7 +182,7 @@ unsafe fn do_brooks_caddy_proxy(
 
     let (status, response, log) = safe_brooks_integration_handle(
         &http_req,
-        &Some(mel_scope),
+        mel_scope,
         hmds_key,
         &mut (*cookie).hmds,
         &runtime,

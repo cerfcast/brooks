@@ -24,6 +24,7 @@ use tokio::runtime;
 
 use crate::{
     cdni::md::interpret::{HmdTransformError, MdInterpretError},
+    environment::scope::Scopes,
     integrations::{
         common::safe_brooks_integration_handle,
         hmds::{HmdsConfiguration, HmdsServerConfiguration},
@@ -33,7 +34,7 @@ use crate::{
         },
     },
     logging::{LogLevel, LogMsg, LogMsgs},
-    mel::interpreter::builtins::builtin_builtin_function_interpreters,
+    mel::interpreter::{builtins::builtin_builtin_function_interpreters, interpret::TypedValue},
 };
 
 #[repr(C)]
@@ -229,7 +230,7 @@ unsafe fn do_ngx_brooks_proxy(
     log: LogMsgs,
 ) -> Result<LogMsgs, (Box<MdInterpretError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
-    let mel_scope = builtin_builtin_function_interpreters();
+    let mel_scope: Scopes<TypedValue> = builtin_builtin_function_interpreters().into();
 
     let http_req = match TryInto::<Request<Vec<u8>>>::try_into(*req) {
         Ok(o) => o,
@@ -261,7 +262,7 @@ unsafe fn do_ngx_brooks_proxy(
 
     let (_status, response, log) = safe_brooks_integration_handle(
         &http_req,
-        &Some(mel_scope),
+        mel_scope,
         hmds_key,
         &mut (*cookie).hmds,
         &runtime,

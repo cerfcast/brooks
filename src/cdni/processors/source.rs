@@ -17,6 +17,8 @@
 
 //! The Source Generic Metadata Processing Implementation
 
+use reqwest::dns::{Addrs, Resolve};
+
 use crate::cdni::{
     gmd::{
         self,
@@ -74,6 +76,18 @@ impl FromStr for SourceProtocol {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SourceMetadataResolver {
+    addr: SocketAddr,
+}
+
+impl Resolve for SourceMetadataResolver {
+    fn resolve(&self, _name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let addrs: Addrs = Box::new(vec![self.addr].into_iter());
+        Box::pin(std::future::ready(Ok(addrs)))
+    }
+}
+
 #[derive(Debug)]
 pub struct SourceMetadataAnalyzer {}
 
@@ -98,7 +112,21 @@ impl
             .try_into()
             .map_err(|e: prr::Error| Error::InvalidInput(e.into()))?;
 
-        let clientb = reqwest::Client::builder();
+        let mut clientb = reqwest::Client::builder();
+
+        let resolver = SourceMetadataResolver {
+            addr: *self
+                .value
+                .aug
+                .endpoints
+                .first()
+                .ok_or(Error::AssertionFailure(
+                    "Missing endpoints".to_string().into(),
+                ))?,
+        };
+
+        clientb = clientb.dns_resolver(resolver);
+
         let client = clientb.build().map_err(|e| Error::RuntimeError(e.into()))?;
 
         let result: Result<ProcessedRequestResponse, Error> = input.runtime.block_on(async {

@@ -55,9 +55,17 @@ pub struct Scopes<I: Clone + Default> {
     pub scopes: Vec<Scope<I>>,
 }
 
+impl<I: Clone + Default> From<Scope<I>> for Scopes<I> {
+    fn from(value: Scope<I>) -> Self {
+        Scopes {
+            scopes: vec![value],
+        }
+    }
+}
+
 impl<I: Clone + Default> Scopes<I> {
     pub fn lookup(&self, id: &str) -> Option<I> {
-        self.scopes[0].lookup(id)
+        self.scopes.last()?.lookup(id)
     }
 
     pub fn insert(&self, id: &str, value: I) -> Self {
@@ -69,9 +77,21 @@ impl<I: Clone + Default> Scopes<I> {
         Self { scopes: next }
     }
 
+    pub fn leave(&self) -> Scopes<I> {
+        let mut next = self.scopes.clone();
+        next.pop();
+        Self { scopes: next }
+    }
+
     pub fn enter(&self) -> Scopes<I> {
         let mut next = self.scopes.clone();
-        next.extend([Scope::default()]);
+        next.push(Scope::default());
+        Self { scopes: next }
+    }
+
+    pub fn enter_scope(&self, entering: Scope<I>) -> Scopes<I> {
+        let mut next = self.scopes.clone();
+        next.push(entering);
         Self { scopes: next }
     }
 

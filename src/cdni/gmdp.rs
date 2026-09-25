@@ -51,6 +51,7 @@ pub enum Error {
     InvalidMetadata(Box<dyn std::error::Error>),
     NoProcessor(String /* type for which processor is missing */),
     InvalidInput(Box<dyn std::error::Error>),
+    AssertionFailure(Box<dyn std::error::Error>),
     InvalidOutput,
     RuntimeError(Box<dyn std::error::Error>),
 }
@@ -63,7 +64,8 @@ impl Display for Error {
             Error::NoProcessor(_) => write!(f, "No processor"),
             Error::InvalidInput(e) => write!(f, "Invalid input: {e}"),
             Error::InvalidOutput => write!(f, "Invalid output"),
-            Error::RuntimeError(_) => write!(f, "Runtime error"),
+            Error::AssertionFailure(e) => write!(f, "Assertion failure: {e}"),
+            Error::RuntimeError(e) => write!(f, "Runtime error: {e}"),
         }
     }
 }

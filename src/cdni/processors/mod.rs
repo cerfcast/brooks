@@ -19,7 +19,7 @@
 
 use crate::{
     cdni::ps::interpret::PsInterpretMode,
-    environment::scope::{Scope, Scopes},
+    environment::scope::Scopes,
     mel::{interpreter::interpret::TypedValue, types::Type},
     tools::prr,
 };
@@ -37,7 +37,7 @@ pub struct SimpleProcessorsAnalysisContext {
 
 #[derive(Debug)]
 pub struct SimpleProcessorsInterpreterContext<'a> {
-    pub scope: Option<&'a Scope<TypedValue>>,
+    pub scopes: Scopes<TypedValue>,
     pub mode: PsInterpretMode,
     pub runtime: &'a tokio::runtime::Runtime,
     pub rr: Box<dyn prr::Prr<Vec<u8>>>,
@@ -47,7 +47,7 @@ impl<'a> SimpleProcessorsInterpreterContext<'a> {
     /// Create an interpreter context based on an existing one, but with a new RR.
     pub fn with_new_rr(self, new_rr: Box<dyn prr::Prr<Vec<u8>>>) -> Self {
         Self {
-            scope: self.scope,
+            scopes: self.scopes,
             mode: match new_rr.tpe() {
                 prr::PrrType::Request => PsInterpretMode::Request,
                 prr::PrrType::Response => PsInterpretMode::Response,

@@ -26,6 +26,7 @@ use crate::cdni::gmdp::{Error, Interpreter};
 use crate::cdni::md::verify::CdniVerificationKey;
 use crate::cdni::mi::MetadataInformationResultElements;
 use crate::cdni::processors::SimpleProcessorsInterpreterContext;
+use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
 
 use crate::tools::prr;
@@ -37,7 +38,6 @@ use crate::{
             spec::TypedStageTypes,
         },
     },
-    environment::scope::Scope,
     mel::interpreter::interpret::TypedValue,
 };
 
@@ -139,13 +139,13 @@ impl Display for MdInterpretError {
 /// Interpret given Host Metadata for the given request.
 pub fn interpret_metadata(
     hmd: &HostMetadata<CdniVerificationKey>,
-    mel_values: &Option<Scope<TypedValue>>,
+    mel_scopes: Scopes<TypedValue>,
     request: Box<dyn prr::Prr<Vec<u8>>>,
     runtime: &tokio::runtime::Runtime,
     mut log: LogMsgs,
 ) -> HmdInterpretResult {
     let mut request_context = SimpleProcessorsInterpreterContext {
-        scope: mel_values.as_ref(),
+        scopes: mel_scopes,
         mode: PsInterpretMode::Request,
         runtime,
         rr: request,
@@ -197,7 +197,7 @@ pub fn interpret_metadata(
     log = debug!(log, "Start: processing source stages.");
 
     let source_context = SimpleProcessorsInterpreterContext {
-        scope: mel_values.as_ref(),
+        scopes: request_context.scopes,
         mode: PsInterpretMode::Request,
         rr: request_context.rr,
         runtime: request_context.runtime,
@@ -269,7 +269,7 @@ pub fn interpret_metadata(
     log = debug!(log, "The result from the source is a result!");
 
     let mut response_context = SimpleProcessorsInterpreterContext {
-        scope: mel_values.as_ref(),
+        scopes: source_result_context.scopes,
         mode: PsInterpretMode::Response,
         rr: source_result_context.rr,
         runtime: source_result_context.runtime,

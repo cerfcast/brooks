@@ -39,7 +39,7 @@ use crate::{
             visit::{PsVisitor, PsVisitorResult},
         },
     },
-    environment::scope::{Scope, Scopes},
+    environment::scope::Scopes,
     logging::LogMsgs,
     mel::{
         self,
@@ -140,30 +140,21 @@ impl Display for PsInterpretError {
 // CDNI Processing Stage Interpreter
 
 pub(crate) struct PsInterpreter<'a> {
-    pub mel_scope: Option<&'a Scope<TypedValue>>,
     pub rr: &'a mut dyn prr::Prr<Vec<u8>>,
 }
 
 impl<'a> PsInterpreter<'a> {
     pub fn install_generic_visitors(&mut self) {}
 
-    fn scopes_from_req(&self) -> Result<Scopes<TypedValue>, PsInterpretError> {
-        Ok(Scopes::<TypedValue> {
-            scopes: vec![self.mel_scope.iter().fold(
-                Scope::<TypedValue>::from(self.rr as &dyn prr::Prr<Vec<u8>>),
-                |c, n| &c + n,
-            )],
-        })
-    }
-
     fn evaluate_mel_expr(
         &self,
+        mel_scopes: Scopes<TypedValue>,
         expr: &Expr<Analyzed>,
         expected: Type,
     ) -> Result<TypedValue, PsInterpretError> {
         let expr_context = MelInterpContext {
             val: None,
-            scopes: self.scopes_from_req()?,
+            scopes: mel_scopes,
             log: LogMsgs::new(crate::logging::LogLevel::Trace),
         };
 
@@ -228,6 +219,7 @@ impl<'a> PsInterpreter<'a> {
                 mode: c.mode,
                 result: Some(result.clone()),
                 metadata: c.metadata,
+                mel_scopes: c.mel_scopes,
             })
         } else {
             Err(PsInterpretError::AssertionFailure(
@@ -298,6 +290,7 @@ pub(crate) struct PsInterpretContext {
     pub mode: PsInterpretMode,
     pub result: Option<PsInterpretValue>,
     pub metadata: MetadataInformationResultElements,
+    pub mel_scopes: Scopes<TypedValue>,
 }
 
 impl PsInterpretContext {
@@ -355,7 +348,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                     ));
                 }
             };
-            let result = self.evaluate_mel_expr(expr, Type::Boolean)?;
+            let result = self.evaluate_mel_expr(c.mel_scopes.clone(), expr, Type::Boolean)?;
             match result {
                 TypedValue {
                     tpe: Type::Boolean,
@@ -425,6 +418,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                     mode: PsInterpretMode::Request,
                     metadata: c.metadata,
                     result: c.result.clone(),
+                    mel_scopes: c.mel_scopes,
                 },
             )?;
         }
@@ -441,7 +435,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                         ));
                     }
                 };
-                let result = self.evaluate_mel_expr(expr, Type::String)?;
+                let result = self.evaluate_mel_expr(c.mel_scopes.clone(), expr, Type::String)?;
                 match result {
                     TypedValue {
                         tpe: Type::String,
@@ -488,7 +482,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                         ));
                     }
                 };
-                let result = self.evaluate_mel_expr(expr, Type::Integer)?;
+                let result = self.evaluate_mel_expr(c.mel_scopes.clone(), expr, Type::Integer)?;
                 match result {
                     TypedValue {
                         tpe: Type::Integer,
@@ -529,7 +523,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     fn visit_header_transform(
         &mut self,
         v: &TypedHeaderTransform<PsVerificationKey>,
-        c: PsInterpretContext,
+        mut c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         if let Some(to_delete) = &v.value.delete {
             for htr in to_delete {
@@ -541,25 +535,13 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
 
         if let Some(to_add) = &v.value.add {
             for htr in to_add {
-                self.visit_header(
-                    htr,
-                    PsInterpretContext {
-                        mode: PsInterpretMode::HeaderAdd,
-                        ..Default::default()
-                    },
-                )?;
+                c = self.visit_header(htr, c.update_mode(PsInterpretMode::HeaderAdd))?;
             }
         }
 
         if let Some(to_replace) = &v.value.replace {
             for htr in to_replace {
-                self.visit_header(
-                    htr,
-                    PsInterpretContext {
-                        mode: PsInterpretMode::HeaderReplace,
-                        ..Default::default()
-                    },
-                )?;
+                c = self.visit_header(htr, c.update_mode(PsInterpretMode::HeaderReplace))?;
             }
         }
 
@@ -582,7 +564,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                     ));
                 }
             };
-            let result = self.evaluate_mel_expr(expr, Type::String)?;
+            let result = self.evaluate_mel_expr(c.mel_scopes.clone(), expr, Type::String)?;
             match result {
                 TypedValue {
                     tpe: Type::String,
@@ -661,7 +643,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                         ));
                     }
                 };
-                let result = self.evaluate_mel_expr(expr, Type::Integer)?;
+                let result = self.evaluate_mel_expr(c.mel_scopes.clone(), expr, Type::Integer)?;
                 match result {
                     TypedValue {
                         tpe: Type::Integer,
@@ -690,7 +672,8 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                             ));
                         }
                     };
-                    let result = self.evaluate_mel_expr(expr, Type::String)?;
+                    let result =
+                        self.evaluate_mel_expr(c.mel_scopes.clone(), expr, Type::String)?;
                     match result {
                         TypedValue {
                             tpe: Type::String,
@@ -743,6 +726,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                 mode: c.mode,
                 result: Some(result.clone()),
                 metadata: c.metadata,
+                mel_scopes: c.mel_scopes,
             })
         } else {
             Err(PsInterpretError::AssertionFailure(
@@ -787,18 +771,16 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
 /// TODO: Document
 pub fn interpret_stage(
     ts: &TypedStage<PsVerificationKey>,
-    mel: Option<&Scope<TypedValue>>,
+    mel_scopes: &Scopes<TypedValue>,
     reqres: &mut dyn prr::Prr<Vec<u8>>,
     mode: PsInterpretMode,
 ) -> PsInterpretResult {
-    let mut visitor = PsInterpreter {
-        mel_scope: mel,
-        rr: reqres,
-    };
+    let mut visitor = PsInterpreter { rr: reqres };
 
     visitor.install_generic_visitors();
 
     let context = PsInterpretContext {
+        mel_scopes: mel_scopes.clone(),
         mode,
         ..Default::default()
     };
@@ -969,8 +951,13 @@ mod ps_interpreter_tests {
             .expect("Could not verify valid client request stage JSON");
 
         let mut req = EffectfulProcessableRequestResponse::new_request();
-        let result = interpret_stage(&result, None, &mut req, PsInterpretMode::Request)
-            .expect("Could not interpret a valid client request");
+        let result = interpret_stage(
+            &result,
+            &Scopes { scopes: vec![] },
+            &mut req,
+            PsInterpretMode::Request,
+        )
+        .expect("Could not interpret a valid client request");
 
         assert_eq!(req.log.len(), 2);
         assert_matches!(req.log[0], EffectfulRequestActions::DeleteHeader(_));
@@ -990,8 +977,13 @@ mod ps_interpreter_tests {
         let result = verify_ps_request_stage(&result, &Scopes::<Type>::default())
             .expect("Could not verify valid client request stage JSON");
         let mut req = EffectfulProcessableRequestResponse::new_request();
-        let result = interpret_stage(&result, None, &mut req, PsInterpretMode::Request)
-            .expect("Could not interpret a valid client request");
+        let result = interpret_stage(
+            &result,
+            &Scopes { scopes: vec![] },
+            &mut req,
+            PsInterpretMode::Request,
+        )
+        .expect("Could not interpret a valid client request");
 
         assert_eq!(req.log.len(), 2);
         assert_matches!(req.log[0], EffectfulRequestActions::DeleteHeader(_));
@@ -1035,7 +1027,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            None,
+            &Scopes { scopes: vec![] },
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1092,7 +1084,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            None,
+            &Scopes { scopes: vec![] },
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1163,7 +1155,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            None,
+            &Scopes { scopes: vec![] },
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1233,7 +1225,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            None,
+            &Scopes { scopes: vec![] },
             &mut req,
             PsInterpretMode::Request,
         )
@@ -1276,7 +1268,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::new_request();
         interpret_stage(
             &TypedStage::ClientRequest(value),
-            None,
+            &Scopes { scopes: vec![] },
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1326,7 +1318,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            None,
+            &Scopes { scopes: vec![] },
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1388,7 +1380,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            None,
+            &Scopes { scopes: vec![] },
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1449,7 +1441,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            None,
+            &Scopes { scopes: vec![] },
             &mut req,
             PsInterpretMode::Response,
         )
@@ -1505,7 +1497,7 @@ mod ps_interpreter_tests {
         let mut req = EffectfulProcessableRequestResponse::new_request();
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
-            None,
+            &Scopes { scopes: vec![] },
             &mut req,
             PsInterpretMode::Response,
         )
