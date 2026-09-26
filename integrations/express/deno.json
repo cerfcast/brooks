@@ -1,0 +1,8 @@
+{
+  "tasks": {
+    "demo": "deno run --allow-all demo.ts"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1"
+  }
+}

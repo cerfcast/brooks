@@ -76,6 +76,19 @@ jobs:
       - run: tree-sitter generate
         working-directory: ./parser
       - run: cargo build -F nginx
+  library-integration-express-build:
+    name: Library Integration - Express Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: tree-sitter/setup-action@v2
+      # Because our tree-sitter code is in a subdirectory,
+      # and working-directory does not apply to uses, we
+      # are forced to specify calls to the CI ourselves.
+      # See https://github.com/orgs/community/discussions/25742
+      - run: tree-sitter generate
+        working-directory: ./parser
+      - run: cargo build -F express
   library-format-tests:
     name: Library Format Tests
     runs-on: ubuntu-latest

@@ -15,21 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[allow(dead_code)]
-#[cfg(feature = "nginx")]
-pub mod nginx;
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(non_snake_case)]
+#![allow(unsafe_op_in_unsafe_fn)]
+#![allow(unnecessary_transmutes)]
 
-#[allow(dead_code)]
-#[cfg(feature = "caddy")]
-pub mod caddy;
-
-#[allow(dead_code)]
-#[cfg(feature = "express")]
-pub mod express;
-
-#[cfg(feature = "hmds")]
-pub mod common;
-#[cfg(feature = "hmds")]
-pub mod hmds;
-#[cfg(feature = "hmds")]
-pub mod support;
+pub mod express_proxy;
+pub mod expressi;

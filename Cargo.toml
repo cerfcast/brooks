@@ -38,6 +38,7 @@ serializable_logs = []
 hmds = ["dep:reqwest"]
 nginx = ["hmds", "dep:reqwest"]
 caddy = ["hmds", "dep:reqwest"]
+express = ["hmds", "dep:reqwest"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
