@@ -1,8 +1,9 @@
 {
   "tasks": {
-    "demo": "deno run --allow-all demo.ts"
+    "brooks-express": "deno run --allow-all brooks_express.ts"
   },
   "imports": {
-    "@std/assert": "jsr:@std/assert@1"
+    "@std/assert": "jsr:@std/assert@1",
+    "express": "npm:express@^5.2.1"
   }
 }

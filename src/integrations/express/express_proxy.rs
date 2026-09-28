@@ -20,15 +20,17 @@ use std::{
     marker::PhantomData,
 };
 
-use http::header::HOST;
+use http::{StatusCode, header::HOST};
 use tokio::runtime;
 
 use crate::{
-    cdni::md::interpret::MdInterpretError,
+    cdni::md::interpret::{HmdTransformError, MdInterpretError},
     environment::scope::Scopes,
     integrations::{
         common::safe_brooks_integration_handle,
-        express::expressi::{BrooksExpressConfiguration, BrooksExpressRequest},
+        express::expressi::{
+            BrooksExpressConfiguration, BrooksExpressRequest, BrooksExpressResponseConfig,
+        },
         hmds::{HmdsConfiguration, HmdsServerConfiguration},
         support::to_null_terminated_str,
     },
@@ -64,6 +66,34 @@ unsafe fn drain_to_express_log(express_log: BrooksExpressLoggerCallback, log: &L
             );
         }
     }
+}
+
+fn try_from_response(
+    response: &http::Response<Vec<u8>>,
+    status: StatusCode,
+    res: BrooksExpressResponseConfig,
+) -> Result<(), Box<MdInterpretError>> {
+    unsafe {
+        for header in response.headers().iter() {
+            let header_name = header.0.to_string();
+            let header_value = header.1.to_str().map_err(|e| {
+                MdInterpretError::TransformError(
+                    HmdTransformError::BadHeaderValue(e.to_string()).into(),
+                )
+            })?;
+
+            (res.set_header)(
+                to_null_terminated_str(&header_name).as_ptr() as *const i8,
+                to_null_terminated_str(header_value).as_ptr() as *const i8,
+            );
+        }
+
+        (res.set_status)(status.as_u16());
+
+        (res.set_body)(response.body().as_ptr(), response.body().len() as u32)
+    }
+
+    Ok(())
 }
 
 #[allow(clippy::missing_safety_doc)]
@@ -119,7 +149,7 @@ pub unsafe extern "C" fn express_brooks_configure(
 pub unsafe extern "C" fn brooks_express_proxy(
     cookie: *mut BrooksExpressConfiguration,
     req: *mut c_void,
-    res: *mut c_void,
+    res: BrooksExpressResponseConfig,
     express_log_cb: BrooksExpressLoggerCallback,
 ) -> usize {
     let log = LogMsgs::new_with_prefix("brooks proxy", crate::logging::LogLevel::Debug);
@@ -150,7 +180,7 @@ pub unsafe extern "C" fn brooks_express_proxy(
 unsafe fn do_brooks_express_proxy(
     cookie: *mut BrooksExpressConfiguration,
     req: *mut c_void,
-    res: *mut c_void,
+    res: BrooksExpressResponseConfig,
     log: LogMsgs,
 ) -> Result<LogMsgs, (Box<MdInterpretError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
@@ -190,17 +220,9 @@ unsafe fn do_brooks_express_proxy(
         log,
     )?;
 
-    /*
     if let Err(e) = try_from_response(&response, status, res) {
         return Err((e, log));
     }
 
-    caddy_response_set_body(
-        res,
-        response.body().len() as GoInt,
-        response.body().as_ptr(),
-    );
-
-    */
     Ok(log)
 }

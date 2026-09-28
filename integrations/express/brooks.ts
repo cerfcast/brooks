@@ -20,12 +20,22 @@ export function isError(x: any): x is Error {
 }
 
 export function toCString(str: string): Deno.PointerValue {
-  return Deno.UnsafePointer.of(new Uint8ClampedArray([
-    ...Array.from(str).map((v: string): number => {
-      return v.charCodeAt(0);
-    }),
-    0,
-  ]));
+  return Deno.UnsafePointer.of(
+    new Uint8ClampedArray([
+      ...Array.from(str).map((v: string): number => {
+        return v.charCodeAt(0);
+      }),
+      0,
+    ]),
+  );
+}
+
+export function toBodyPointer(body: any): Deno.PointerValue {
+  if (body instanceof ArrayBuffer) {
+    return Deno.UnsafePointer.of(body)
+  } else {
+    return Deno.UnsafePointer.of(new Uint8Array())
+  }
 }
 
 export function make_logger(): Deno.UnsafeCallback<
@@ -77,7 +87,152 @@ export class OutputPointer {
   }
 }
 
-export function configure_brooks():
+export const BrooksResponseConfiguration = {
+  struct: [
+    "function", /* set header */
+    "function", /* clear header */
+    "function", /* set body */
+    "function", /* set status */
+  ],
+} as const;
+
+export type BrooksResponseConfigurationSetHeaderCB<T> = (
+  slf: T,
+  header_name: string,
+  header_value: string,
+) => void;
+export type BrooksResponseConfigurationClearHeaderCB<T> = (
+  slf: T,
+  header_name: string,
+) => void;
+export type BrooksResponseConfigurationSetBodyCB<T> = (
+  slf: T,
+  body: Uint8Array,
+) => void;
+export type BrooksResponseConfigurationSetStatusCB<T> = (
+  slf: T,
+  status: number,
+) => void;
+
+export class BrooksResponseConfigurationBuilder<T> {
+  private slf: T;
+
+  private set_header: BrooksResponseConfigurationSetHeaderCB<T>;
+  private clear_header: BrooksResponseConfigurationClearHeaderCB<T>;
+  private set_body: BrooksResponseConfigurationSetBodyCB<T>;
+  private set_status: BrooksResponseConfigurationSetStatusCB<T>;
+
+  constructor(
+    slf: T,
+    set_header: BrooksResponseConfigurationSetHeaderCB<T>,
+    clear_header: BrooksResponseConfigurationClearHeaderCB<T>,
+    set_body: BrooksResponseConfigurationSetBodyCB<T>,
+    set_status: BrooksResponseConfigurationSetStatusCB<T>,
+  ) {
+    this.slf = slf;
+    this.set_header = set_header;
+    this.clear_header = clear_header;
+    this.set_body = set_body;
+    this.set_status = set_status;
+  }
+
+  public get_configuration(): any {
+    const clear_header_cb = new Deno.UnsafeCallback(
+      {
+        parameters: ["pointer"],
+        result: "void",
+      } as const,
+      (name: Deno.PointerValue): void => {
+        const header_name = (new Deno.UnsafePointerView(name!)).getCString();
+        this.clear_header(this.slf, header_name);
+      },
+    );
+
+    const set_header_cb = new Deno.UnsafeCallback(
+      {
+        parameters: ["pointer", "pointer"],
+        result: "void",
+      } as const,
+      (name: Deno.PointerValue, value: Deno.PointerValue): void => {
+        const header_name = (new Deno.UnsafePointerView(name!)).getCString();
+        const header_value = (new Deno.UnsafePointerView(value!)).getCString();
+        this.set_header(this.slf, header_name, header_value);
+      },
+    );
+
+    const set_body_cb = new Deno.UnsafeCallback(
+      {
+        parameters: ["pointer", "u32"],
+        result: "void",
+      } as const,
+      (body: Deno.PointerValue, len: number): void => {
+        // Check that this copy is necessary -- I think that it is.
+        const response_body = new Uint8Array(len)
+        new Deno.UnsafePointerView(body!).copyInto(response_body)
+        this.set_body(this.slf, response_body);
+      },
+    );
+
+    const set_status_cb = new Deno.UnsafeCallback(
+      {
+        parameters: ["u16"],
+        result: "void",
+      } as const,
+      (status: number): void => {
+        this.set_status(this.slf, status);
+      },
+    );
+
+    const cbs = new BigInt64Array(
+      [
+        set_header_cb.pointer,
+        clear_header_cb.pointer,
+        set_body_cb.pointer,
+        set_status_cb.pointer,
+      ].map((v) => {
+        return Deno.UnsafePointer.value(v);
+      }),
+    );
+
+    return new Uint8Array(cbs.buffer);
+  }
+}
+export type BrooksLib = Deno.DynamicLibrary<{
+  brooks_express_request_builder_new: {
+    parameters: [];
+    result: "pointer";
+  };
+  brooks_express_request_builder_set_header: {
+    parameters: ["pointer", "pointer", "pointer"];
+    result: "pointer";
+  };
+  brooks_express_request_builder_set_host: {
+    parameters: ["pointer", "pointer"];
+    result: "pointer";
+  };
+  brooks_express_request_builder_set_method: {
+    parameters: ["pointer", "pointer"];
+    result: "pointer";
+  };
+  brooks_express_request_builder_set_uri: {
+    parameters: ["pointer", "pointer"];
+    result: "pointer";
+  };
+  brooks_express_request_builder_finalize_with_body: {
+    parameters: ["pointer", "pointer"];
+    result: "pointer";
+  };
+  express_brooks_configure: {
+    parameters: ["pointer", "pointer", /* out */ "function"];
+    result: "bool";
+  };
+  brooks_express_proxy: {
+    parameters: ["pointer", "pointer", any, "function"];
+    result: "usize";
+  };
+}>;
+
+export function load_brooks():
   | Deno.DynamicLibrary<{
     brooks_express_request_builder_new: {
       parameters: [];
@@ -108,7 +263,7 @@ export function configure_brooks():
       result: "bool";
     };
     brooks_express_proxy: {
-      parameters: ["pointer", "pointer", "pointer", "function"];
+      parameters: ["pointer", "pointer", any, "function"];
       result: "usize";
     };
   }>
@@ -146,7 +301,12 @@ export function configure_brooks():
           result: "bool",
         } as const,
         brooks_express_proxy: {
-          parameters: ["pointer", "pointer", "pointer", "function"],
+          parameters: [
+            "pointer",
+            "pointer",
+            BrooksResponseConfiguration,
+            "function",
+          ],
           result: "usize",
         },
       },

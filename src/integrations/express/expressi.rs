@@ -176,67 +176,20 @@ pub unsafe extern "C" fn brooks_express_request_builder_finalize_with_body(
     Box::into_raw(Box::new(crb.finalize_with_body(body))) as *const c_void
 }
 
-#[derive(Debug)]
-pub(crate) struct BrooksCaddyResponseBuilder {
-    builder: ResponseBuilder,
-}
+pub type BrooksExpressResponseSetHeaderCB = unsafe extern "C" fn(
+    *const c_char, /* header name */
+    *const c_char, /* header value */
+);
+pub type BrooksExpressResponseClearHeaderCB =
+    unsafe extern "C" fn(*const c_char /* header name */);
+pub type BrooksExpressResponseSetBodyCB =
+    unsafe extern "C" fn(*const u8 /* body */, u32 /* body length */);
+pub type BrooksExpressResponseSetStatus = unsafe extern "C" fn(u16);
 
-pub(crate) struct BrooksCaddyResponse {
-    pub(crate) response: Response<String>,
-}
-
-impl BrooksCaddyResponseBuilder {
-    pub fn new() -> Self {
-        BrooksCaddyResponseBuilder {
-            builder: ResponseBuilder::new(),
-        }
-    }
-
-    pub fn set_header(self, hn: HeaderName, hv: HeaderValue) -> Self {
-        BrooksCaddyResponseBuilder {
-            builder: self.builder.header(hn, hv),
-        }
-    }
-
-    pub fn finalize_with_body(self, body: String) -> http::Result<BrooksCaddyResponse> {
-        Ok(BrooksCaddyResponse {
-            response: self.builder.body(body)?,
-        })
-    }
-}
-
-#[allow(clippy::missing_safety_doc)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn brooks_express_response_builder_new() -> *const c_void {
-    Box::into_raw(Box::new(BrooksCaddyResponseBuilder::new())) as *const c_void
-}
-
-#[allow(clippy::missing_safety_doc)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn brooks_express_response_builder_set_header(
-    crb: *mut c_void,
-    raw_hn: *const c_char,
-    raw_hv: *const c_char,
-) -> *const c_void {
-    let crb = Box::from_raw(crb as *mut BrooksCaddyResponseBuilder);
-    let maybe_header_name = CStr::from_ptr(raw_hn).to_string_lossy().into_owned();
-    let maybe_header_value = CStr::from_ptr(raw_hv).to_string_lossy().into_owned();
-    let header_name = ok_or_null!(HeaderName::try_from(maybe_header_name));
-    let header_value = ok_or_null!(HeaderValue::try_from(maybe_header_value));
-    Box::into_raw(Box::new(crb.set_header(header_name, header_value))) as *const c_void
-}
-
-#[allow(clippy::missing_safety_doc)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn brooks_express_response_builder_finalize_with_body(
-    crb: *mut c_void,
-    body: *const c_char,
-) -> *const c_void {
-    let crb = Box::from_raw(crb as *mut BrooksCaddyResponseBuilder);
-    let body = if !body.is_null() {
-        CStr::from_ptr(body).to_string_lossy().into_owned()
-    } else {
-        "".to_string()
-    };
-    Box::into_raw(Box::new(crb.finalize_with_body(body))) as *const c_void
+#[repr(C)]
+pub struct BrooksExpressResponseConfig {
+    pub set_header: BrooksExpressResponseSetHeaderCB,
+    pub clear_header: BrooksExpressResponseClearHeaderCB,
+    pub set_body: BrooksExpressResponseSetBodyCB,
+    pub set_status: BrooksExpressResponseSetStatus,
 }
