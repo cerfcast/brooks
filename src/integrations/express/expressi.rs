@@ -22,11 +22,13 @@ use std::{
 };
 
 use http::{
-    HeaderName, HeaderValue, Method, Request, Response, Uri, header::HOST,
-    request::Builder as RequestBuilder, response::Builder as ResponseBuilder,
+    HeaderName, HeaderValue, Method, Request, Uri, header::HOST, request::Builder as RequestBuilder,
 };
 
-use crate::{integrations::hmds::HmdsConfiguration, logging::LogLevel};
+use crate::{
+    integrations::{hmds::HmdsConfiguration, support::to_null_terminated_str},
+    logging::{LogLevel, LogMsgs},
+};
 
 #[repr(C)]
 pub struct BrooksExpressConfiguration {
@@ -34,21 +36,35 @@ pub struct BrooksExpressConfiguration {
     pub(crate) _marker: core::marker::PhantomData<*mut u8>,
 }
 
+pub type BrooksExpressLoggerCallback = unsafe extern "C" fn(u8, *const c_char);
+
 #[repr(u8)]
-pub(crate) enum BrooksCaddyLogLevel {
+pub(crate) enum BrooksExpressLogLevel {
     Trace = 0,
     Debug,
     Warn,
     Error,
 }
 
-impl From<LogLevel> for BrooksCaddyLogLevel {
+impl From<LogLevel> for BrooksExpressLogLevel {
     fn from(value: LogLevel) -> Self {
         match value {
-            LogLevel::Trace => BrooksCaddyLogLevel::Trace,
-            LogLevel::Debug => BrooksCaddyLogLevel::Debug,
-            LogLevel::Warn => BrooksCaddyLogLevel::Warn,
-            LogLevel::Error => BrooksCaddyLogLevel::Error,
+            LogLevel::Trace => BrooksExpressLogLevel::Trace,
+            LogLevel::Debug => BrooksExpressLogLevel::Debug,
+            LogLevel::Warn => BrooksExpressLogLevel::Warn,
+            LogLevel::Error => BrooksExpressLogLevel::Error,
+        }
+    }
+}
+
+#[allow(clippy::missing_safety_doc)]
+pub unsafe fn drain_to_express_log(express_log: BrooksExpressLoggerCallback, log: &LogMsgs) {
+    for msg in log.use_msgs() {
+        unsafe {
+            express_log(
+                Into::<BrooksExpressLogLevel>::into(msg.level()) as u8,
+                to_null_terminated_str(&msg.msg()).as_ptr() as *const i8,
+            );
         }
     }
 }

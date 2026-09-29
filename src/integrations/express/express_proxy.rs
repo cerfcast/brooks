@@ -16,7 +16,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
-    ffi::{CStr, c_char, c_void},
+    ffi::{CStr, c_void},
     marker::PhantomData,
 };
 
@@ -29,7 +29,8 @@ use crate::{
     integrations::{
         common::safe_brooks_integration_handle,
         express::expressi::{
-            BrooksExpressConfiguration, BrooksExpressRequest, BrooksExpressResponseConfig,
+            BrooksExpressConfiguration, BrooksExpressLoggerCallback, BrooksExpressRequest,
+            BrooksExpressResponseConfig, drain_to_express_log,
         },
         hmds::{HmdsConfiguration, HmdsServerConfiguration},
         support::to_null_terminated_str,
@@ -37,36 +38,6 @@ use crate::{
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::interpreter::{builtins::builtin_builtin_function_interpreters, interpret::TypedValue},
 };
-
-pub type BrooksExpressLoggerCallback = unsafe extern "C" fn(u8, *const c_char);
-
-pub(crate) enum BrooksExpressLogLevel {
-    Trace = 0,
-    Debug,
-    Warn,
-    Error,
-}
-
-impl From<LogLevel> for BrooksExpressLogLevel {
-    fn from(value: LogLevel) -> Self {
-        match value {
-            LogLevel::Trace => BrooksExpressLogLevel::Trace,
-            LogLevel::Debug => BrooksExpressLogLevel::Debug,
-            LogLevel::Warn => BrooksExpressLogLevel::Warn,
-            LogLevel::Error => BrooksExpressLogLevel::Error,
-        }
-    }
-}
-unsafe fn drain_to_express_log(express_log: BrooksExpressLoggerCallback, log: &LogMsgs) {
-    for msg in log.use_msgs() {
-        unsafe {
-            express_log(
-                Into::<BrooksExpressLogLevel>::into(msg.level()) as u8,
-                to_null_terminated_str(&msg.msg()).as_ptr() as *const i8,
-            );
-        }
-    }
-}
 
 fn try_from_response(
     response: &http::Response<Vec<u8>>,
