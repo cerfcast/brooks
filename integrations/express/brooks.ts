@@ -32,27 +32,34 @@ export function toCString(str: string): Deno.PointerValue {
 
 export function toBodyPointer(body: any): Deno.PointerValue {
   if (body instanceof ArrayBuffer) {
-    return Deno.UnsafePointer.of(body)
+    return Deno.UnsafePointer.of(body);
   } else {
-    return Deno.UnsafePointer.of(new Uint8Array())
+    return Deno.UnsafePointer.of(new Uint8Array());
   }
 }
 
-export function make_logger(): Deno.UnsafeCallback<
+type BrooksLogNativeCB = Deno.UnsafeCallback<
   { parameters: ["u8", "pointer"]; result: "void" }
-> {
+>;
+
+function make_logger(
+  error: BrooksLogFunctionCB,
+  warn: BrooksLogFunctionCB,
+  debug: BrooksLogFunctionCB,
+  trace: BrooksLogFunctionCB,
+): BrooksLogNativeCB {
   const logit = new Map<number, (...data: any) => void>([
     [3, function (...data: any): void {
-      console.error(`Error: ${data}`);
+      error(`Error: ${data}`);
     }],
     [2, function (...data: any): void {
-      console.warn(`Warn: ${data}`);
+      warn(`Warn: ${data}`);
     }],
     [1, function (...data: any): void {
-      console.debug(`Debug: ${data}`);
+      debug(`Debug: ${data}`);
     }],
     [0, function (...data: any): void {
-      console.trace(`Trace: ${data}`);
+      trace(`Trace: ${data}`);
     }],
   ]);
 
@@ -62,6 +69,24 @@ export function make_logger(): Deno.UnsafeCallback<
       logit.get(level)!((new Deno.UnsafePointerView(value!)).getCString());
     },
   );
+}
+
+export type BrooksLogFunctionCB = (...data: any) => void;
+
+export class BrooksLogger {
+  protected _native_cb: BrooksLogNativeCB;
+  public constructor(
+    error: BrooksLogFunctionCB,
+    warn: BrooksLogFunctionCB,
+    debug: BrooksLogFunctionCB,
+    trace: BrooksLogFunctionCB,
+  ) {
+    this._native_cb = make_logger(error, warn, debug, trace);
+  }
+
+  public get pointer() {
+    return this._native_cb.pointer;
+  }
 }
 
 export class OutputPointer {
@@ -77,7 +102,7 @@ export class OutputPointer {
     return this._raw.buffer;
   }
 
-  public ptr(): Deno.PointerValue {
+  public get pointer() {
     return this._ptr;
   }
 
@@ -87,7 +112,7 @@ export class OutputPointer {
   }
 }
 
-export const BrooksResponseConfiguration = {
+export const BrooksResponseConfigurationNative = {
   struct: [
     "function", /* set header */
     "function", /* clear header */
@@ -114,7 +139,7 @@ export type BrooksResponseConfigurationSetStatusCB<T> = (
   status: number,
 ) => void;
 
-export class BrooksResponseConfigurationBuilder<T> {
+export class BrooksResponseConfiguration<T> {
   private slf: T;
 
   private set_header: BrooksResponseConfigurationSetHeaderCB<T>;
@@ -136,7 +161,7 @@ export class BrooksResponseConfigurationBuilder<T> {
     this.set_status = set_status;
   }
 
-  public get_configuration(): any {
+  public get_configuration(): Uint8Array {
     const clear_header_cb = new Deno.UnsafeCallback(
       {
         parameters: ["pointer"],
@@ -167,8 +192,8 @@ export class BrooksResponseConfigurationBuilder<T> {
       } as const,
       (body: Deno.PointerValue, len: number): void => {
         // Check that this copy is necessary -- I think that it is.
-        const response_body = new Uint8Array(len)
-        new Deno.UnsafePointerView(body!).copyInto(response_body)
+        const response_body = new Uint8Array(len);
+        new Deno.UnsafePointerView(body!).copyInto(response_body);
         this.set_body(this.slf, response_body);
       },
     );
@@ -197,7 +222,8 @@ export class BrooksResponseConfigurationBuilder<T> {
     return new Uint8Array(cbs.buffer);
   }
 }
-export type BrooksLib = Deno.DynamicLibrary<{
+
+type BrooksLib = Deno.DynamicLibrary<{
   brooks_express_request_builder_new: {
     parameters: [];
     result: "pointer";
@@ -232,42 +258,7 @@ export type BrooksLib = Deno.DynamicLibrary<{
   };
 }>;
 
-export function load_brooks():
-  | Deno.DynamicLibrary<{
-    brooks_express_request_builder_new: {
-      parameters: [];
-      result: "pointer";
-    };
-    brooks_express_request_builder_set_header: {
-      parameters: ["pointer", "pointer", "pointer"];
-      result: "pointer";
-    };
-    brooks_express_request_builder_set_host: {
-      parameters: ["pointer", "pointer"];
-      result: "pointer";
-    };
-    brooks_express_request_builder_set_method: {
-      parameters: ["pointer", "pointer"];
-      result: "pointer";
-    };
-    brooks_express_request_builder_set_uri: {
-      parameters: ["pointer", "pointer"];
-      result: "pointer";
-    };
-    brooks_express_request_builder_finalize_with_body: {
-      parameters: ["pointer", "pointer"];
-      result: "pointer";
-    };
-    express_brooks_configure: {
-      parameters: ["pointer", "pointer", /* out */ "function"];
-      result: "bool";
-    };
-    brooks_express_proxy: {
-      parameters: ["pointer", "pointer", any, "function"];
-      result: "usize";
-    };
-  }>
-  | Error {
+export function load_brooks(): BrooksLib | Error {
   try {
     return Deno.dlopen(
       "libbrooks_lib.so",
@@ -304,7 +295,7 @@ export function load_brooks():
           parameters: [
             "pointer",
             "pointer",
-            BrooksResponseConfiguration,
+            BrooksResponseConfigurationNative,
             "function",
           ],
           result: "usize",
@@ -313,5 +304,107 @@ export function load_brooks():
     );
   } catch (err) {
     return new Error(`Failed to load Brooks library: ${err}`);
+  }
+}
+
+export class BrooksRequestBuilder {
+  public lib: BrooksLib;
+  public req: Deno.PointerValue;
+
+  public constructor(lib: BrooksLib) {
+    this.lib = lib;
+    this.req = lib.symbols.brooks_express_request_builder_new();
+  }
+
+  public set_header(name: string, value: string) {
+    this.req = this.lib.symbols.brooks_express_request_builder_set_header(
+      this.req,
+      toCString(name),
+      toCString(value),
+    );
+  }
+
+  public set_host(host: string) {
+    this.req = this.lib.symbols.brooks_express_request_builder_set_host(
+      this.req,
+      toCString(host),
+    );
+  }
+
+  public set_uri(uri: string) {
+    this.req = this.lib.symbols.brooks_express_request_builder_set_uri(
+      this.req,
+      toCString(uri),
+    );
+  }
+
+  public set_method(method: string) {
+    this.req = this.lib.symbols.brooks_express_request_builder_set_method(
+      this.req,
+      toCString(method),
+    );
+  }
+
+  public finalize(body: ArrayBuffer): Deno.PointerValue {
+    return this.lib.symbols
+      .brooks_express_request_builder_finalize_with_body(
+        this.req,
+        toBodyPointer(body),
+      );
+  }
+}
+
+export class Brooks {
+  private lib: BrooksLib;
+  private logger: BrooksLogger;
+  private configuration: Deno.PointerValue;
+
+  private constructor(
+    lib: BrooksLib,
+    logger: BrooksLogger,
+    configuration: Deno.PointerValue,
+  ) {
+    this.lib = lib;
+    this.logger = logger;
+    this.configuration = configuration;
+  }
+
+  public static New(path: string, logger: BrooksLogger): Brooks | Error {
+    const maybe_brooks = load_brooks();
+
+    if (isError(maybe_brooks)) {
+      return maybe_brooks;
+    }
+
+    const brooks = maybe_brooks;
+    const brooks_configuration = new OutputPointer();
+
+    const configure_result = brooks.symbols.express_brooks_configure(
+      toCString(path),
+      brooks_configuration.pointer,
+      logger.pointer,
+    );
+
+    if (!configure_result) {
+      return new Error(`Error configuring Brooks`);
+    }
+
+    return new Brooks(maybe_brooks, logger, brooks_configuration.dereference());
+  }
+
+  public make_request_builder(): BrooksRequestBuilder {
+    return new BrooksRequestBuilder(this.lib)
+  }
+
+  public proxy<T>(
+    request: Deno.PointerValue,
+    response_configuration: BrooksResponseConfiguration<T>,
+  ): bigint {
+    return this.lib.symbols.brooks_express_proxy(
+      this.configuration,
+      request,
+      response_configuration.get_configuration(),
+      this.logger.pointer,
+    );
   }
 }
