@@ -52,32 +52,37 @@ pub unsafe extern "C" fn ngx_brooks_configure(
 ) -> bool {
     let mut log = LogMsgs::new_with_prefix("brooks analysis", crate::logging::LogLevel::Debug);
 
-    let config_str = from_nginx_str(config_str);
-    let server_config = match HmdsServerConfiguration::new_by_sense(&config_str) {
-        Ok(o) => o,
-        Err(e) => {
-            log = error!(
-                log,
-                &format!(
-                    "Could not determine HMDS configuration from given string ({config_str}: {e}"
-                )
-            );
-            log_nginx_msgs(nlx, &log);
-            return false;
-        }
-    };
+    // So that it is possible to always drain the log, even if the configuration fails early,
+    // put the remaining work inside an IIFE.
+    let (result, log) = (move || {
+        let config_str = from_nginx_str(config_str);
+        let server_config = match HmdsServerConfiguration::new_by_sense(&config_str) {
+            Ok(o) => o,
+            Err(e) => {
+                log = error!(
+                    log,
+                    &format!(
+                        "Could not determine HMDS configuration from given string ({config_str}: {e}"
+                    )
+                );
+                return (false, log);
+            }
+        };
 
-    *cookie = Box::into_raw(Box::new(NginxBrooksConfiguration {
-        hmds: HmdsConfiguration {
-            hmds_server: server_config,
-            hmds_cache: HashMap::new(),
-        },
-        _marker: PhantomData {},
-    }));
+        *cookie = Box::into_raw(Box::new(NginxBrooksConfiguration {
+            hmds: HmdsConfiguration {
+                hmds_server: server_config,
+                hmds_cache: HashMap::new(),
+            },
+            _marker: PhantomData {},
+        }));
+
+        (true, log)
+    })();
 
     log_nginx_msgs(nlx, &log);
 
-    true
+    result
 }
 
 impl TryFrom<ngx_http_request_s> for Request<Vec<u8>> {

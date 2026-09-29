@@ -49,41 +49,45 @@ pub unsafe extern "C" fn caddy_brooks_configure(
 ) -> bool {
     let mut log = LogMsgs::new_with_prefix("brooks configure", crate::logging::LogLevel::Debug);
 
-    let config_str = match CStr::from_ptr(config_str).to_str() {
-        Ok(o) => o,
-        Err(e) => {
-            log = error!(
-                log,
-                &format!("Could not convert given path into Rust string: {e}")
-            );
-            drain_to_caddy_log(caddy_log_cb, &log);
-            return false;
-        }
-    };
+    // So that it is possible to always drain the log, even if the configuration fails early,
+    // put the remaining work inside an IIFE.
+    let (result, log) = (move || {
+        let config_str = match CStr::from_ptr(config_str).to_str() {
+            Ok(o) => o,
+            Err(e) => {
+                log = error!(
+                    log,
+                    &format!("Could not convert given path into Rust string: {e}")
+                );
+                return (false, log);
+            }
+        };
 
-    let server_config = match HmdsServerConfiguration::new_by_sense(config_str) {
-        Ok(o) => o,
-        Err(e) => {
-            log = error!(
-                log,
-                &format!(
-                    "Could not determine HMDS configuration from given string ({config_str}: {e}"
-                )
-            );
-            drain_to_caddy_log(caddy_log_cb, &log);
-            return false;
-        }
-    };
+        let server_config = match HmdsServerConfiguration::new_by_sense(config_str) {
+            Ok(o) => o,
+            Err(e) => {
+                log = error!(
+                    log,
+                    &format!(
+                        "Could not determine HMDS configuration from given string ({config_str}: {e}"
+                    )
+                );
+                return (false, log);
+            }
+        };
 
-    *cookie = Box::into_raw(Box::new(BrooksCaddyConfiguration {
-        hmds: HmdsConfiguration {
-            hmds_server: server_config,
-            hmds_cache: Default::default(),
-        },
-        _marker: PhantomData {},
-    }));
+        *cookie = Box::into_raw(Box::new(BrooksCaddyConfiguration {
+            hmds: HmdsConfiguration {
+                hmds_server: server_config,
+                hmds_cache: Default::default(),
+            },
+            _marker: PhantomData {},
+        }));
+        (true, log)
+    })();
 
-    true
+    drain_to_caddy_log(caddy_log_cb, &log);
+    result
 }
 
 fn try_from_response(

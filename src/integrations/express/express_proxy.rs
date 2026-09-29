@@ -76,43 +76,47 @@ pub unsafe extern "C" fn express_brooks_configure(
 ) -> bool {
     let mut log = LogMsgs::new_with_prefix("brooks configure", crate::logging::LogLevel::Debug);
 
-    let config_str = config_str as *mut i8;
+    // So that it is possible to always drain the log, even if the configuration fails early,
+    // put the remaining work inside an IIFE.
+    let (result, log) = (move || {
+        let config_str = config_str as *mut i8;
 
-    let config_str = match CStr::from_ptr(config_str).to_str() {
-        Ok(o) => o,
-        Err(e) => {
-            log = error!(
-                log,
-                &format!("Could not convert given path into Rust string: {e}")
-            );
-            drain_to_express_log(express_log_cb, &log);
-            return false;
-        }
-    };
+        let config_str = match CStr::from_ptr(config_str).to_str() {
+            Ok(o) => o,
+            Err(e) => {
+                log = error!(
+                    log,
+                    &format!("Could not convert given path into Rust string: {e}")
+                );
+                return (false, log);
+            }
+        };
 
-    let server_config = match HmdsServerConfiguration::new_by_sense(config_str) {
-        Ok(o) => o,
-        Err(e) => {
-            log = error!(
-                log,
-                &format!(
-                    "Could not determine HMDS configuration from given string ({config_str}: {e}"
-                )
-            );
-            drain_to_express_log(express_log_cb, &log);
-            return false;
-        }
-    };
+        let server_config = match HmdsServerConfiguration::new_by_sense(config_str) {
+            Ok(o) => o,
+            Err(e) => {
+                log = error!(
+                    log,
+                    &format!(
+                        "Could not determine HMDS configuration from given string ({config_str}: {e}"
+                    )
+                );
+                return (false, log);
+            }
+        };
 
-    *result = Box::into_raw(Box::new(BrooksExpressConfiguration {
-        hmds: HmdsConfiguration {
-            hmds_server: server_config,
-            hmds_cache: Default::default(),
-        },
-        _marker: PhantomData {},
-    })) as *mut c_void;
+        *result = Box::into_raw(Box::new(BrooksExpressConfiguration {
+            hmds: HmdsConfiguration {
+                hmds_server: server_config,
+                hmds_cache: Default::default(),
+            },
+            _marker: PhantomData {},
+        })) as *mut c_void;
+        (true, log)
+    })();
 
-    true
+    drain_to_express_log(express_log_cb, &log);
+    result
 }
 
 #[allow(clippy::missing_safety_doc)]
