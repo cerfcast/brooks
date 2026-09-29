@@ -21,22 +21,27 @@ use std::fmt::Display;
 
 use http::StatusCode;
 
+#[cfg(feature = "mi_source")]
 use crate::cdni::gmd::spec::TypedSource;
-use crate::cdni::gmdp::{Error, Interpreter};
+
+#[cfg(any(feature = "mi_source", feature = "mi_ps"))]
+use crate::cdni::gmdp::Interpreter;
+
+use crate::cdni::gmdp::Error;
 use crate::cdni::md::verify::CdniVerificationKey;
 use crate::cdni::mi::MetadataInformationResultElements;
 use crate::cdni::processors::SimpleProcessorsInterpreterContext;
 use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
 
+#[cfg(feature = "mi_ps")]
+use crate::cdni::ps::spec::TypedStageTypes;
+
 use crate::tools::prr;
 use crate::{
     cdni::{
         md::spec::HostMetadata,
-        ps::{
-            interpret::{PsInterpretMode, PsInterpretValue},
-            spec::TypedStageTypes,
-        },
+        ps::interpret::{PsInterpretMode, PsInterpretValue},
     },
     mel::interpreter::interpret::TypedValue,
 };
@@ -144,6 +149,7 @@ pub fn interpret_metadata(
     runtime: &tokio::runtime::Runtime,
     mut log: LogMsgs,
 ) -> HmdInterpretResult {
+    #[allow(unused_mut)]
     let mut request_context = SimpleProcessorsInterpreterContext {
         scopes: mel_scopes,
         mode: PsInterpretMode::Request,
@@ -153,6 +159,7 @@ pub fn interpret_metadata(
 
     // For any of the host metadata entries that are client requests,
     // do them now.
+    #[cfg(feature = "mi_ps")]
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         #[allow(clippy::collapsible_if)]
@@ -178,6 +185,7 @@ pub fn interpret_metadata(
 
     // For any of the host metadata entries that are origin requests,
     // do them now.
+    #[cfg(feature = "mi_ps")]
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         #[allow(clippy::collapsible_if)]
@@ -203,84 +211,98 @@ pub fn interpret_metadata(
         runtime: request_context.runtime,
     };
 
-    let source_stage_processing_result = hmd
-        .metadata
-        .iter()
-        .map_while(|stage| {
-            if let CdniVerificationKey::Source(s) = &stage.aug {
-                Some(s)
-            } else {
-                None
-            }
-        })
-        .fold(
-            (Some(source_context), None),
-            |(source_context, result), next| {
-                if result.is_none()
-                    && let Some(source_context) = source_context
-                {
-                    match next.interpret(source_context) {
-                        Ok((updated_context, result)) => (Some(updated_context), Some(Ok(result))),
-                        Err(e) => (
-                            None,
-                            Some(Err(MdInterpretError::MetadataProcessingError(e))),
-                        ),
-                    }
+    #[cfg(feature = "mi_source")]
+    let mut response_context = {
+        let source_stage_processing_result = hmd
+            .metadata
+            .iter()
+            .map_while(|stage| {
+                if let CdniVerificationKey::Source(s) = &stage.aug {
+                    Some(s)
                 } else {
-                    (source_context, result)
+                    None
                 }
-            },
-        );
+            })
+            .fold(
+                (Some(source_context), None),
+                |(source_context, result), next| {
+                    if result.is_none()
+                        && let Some(source_context) = source_context
+                    {
+                        match next.interpret(source_context) {
+                            Ok((updated_context, result)) => {
+                                (Some(updated_context), Some(Ok(result)))
+                            }
+                            Err(e) => (
+                                None,
+                                Some(Err(MdInterpretError::MetadataProcessingError(e))),
+                            ),
+                        }
+                    } else {
+                        (source_context, result)
+                    }
+                },
+            );
 
-    log = debug!(log, "Done: processing source stages.");
+        log = debug!(log, "Done: processing source stages.");
 
-    // TODO: Handle Source stages that generate MI.
-    let (source_result_context, (_source_result_psiv, _source_result_mdire)) =
-        match source_stage_processing_result {
-            (Some(source_result_context), Some(Ok(result))) => (source_result_context, result),
-            (Some(_), Some(Err(e))) => {
-                return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
-            }
-            (_, _) => {
-                return Err((
-                    MdInterpretError::MetadataProcessingError(
-                        Error::NoProcessor(TypedSource::<()>::typed_cdni_metadata_name()).into(),
-                    )
-                    .into(),
-                    log,
-                ));
-            }
+        // TODO: Handle Source stages that generate MI.
+        let (source_result_context, (_source_result_psiv, _source_result_mdire)) =
+            match source_stage_processing_result {
+                (Some(source_result_context), Some(Ok(result))) => (source_result_context, result),
+                (Some(_), Some(Err(e))) => {
+                    return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
+                }
+                (_, _) => {
+                    return Err((
+                        MdInterpretError::MetadataProcessingError(
+                            Error::NoProcessor(TypedSource::<()>::typed_cdni_metadata_name())
+                                .into(),
+                        )
+                        .into(),
+                        log,
+                    ));
+                }
+            };
+
+        log = debug!(log, "A result exists from the source!");
+
+        // Check that the resulting processable request/response has the right type.
+
+        if source_result_context.rr.tpe() != prr::PrrType::Response {
+            return Err((
+                MdInterpretError::MetadataProcessingError(
+                    Error::InvalidInput(prr::Error::InvalidMode.into()).into(),
+                )
+                .into(),
+                log,
+            ));
         };
 
-    log = debug!(log, "A result exists from the source!");
+        log = debug!(log, "The result from the source is a result!");
 
-    // Check that the resulting processable request/response has the right type.
-
-    if source_result_context.rr.tpe() != prr::PrrType::Response {
-        return Err((
-            MdInterpretError::MetadataProcessingError(
-                Error::InvalidInput(prr::Error::InvalidMode.into()).into(),
-            )
-            .into(),
-            log,
-        ));
+        SimpleProcessorsInterpreterContext {
+            scopes: source_result_context.scopes,
+            mode: PsInterpretMode::Response,
+            rr: source_result_context.rr,
+            runtime: source_result_context.runtime,
+        }
     };
 
-    log = debug!(log, "The result from the source is a result!");
+    #[cfg(not(feature = "mi_source"))]
+    #[allow(unused_mut)]
+    let mut response_context = source_context;
 
-    let mut response_context = SimpleProcessorsInterpreterContext {
-        scopes: source_result_context.scopes,
-        mode: PsInterpretMode::Response,
-        rr: source_result_context.rr,
-        runtime: source_result_context.runtime,
-    };
+    #[allow(unused_mut)]
     let mut response_result: Option<(PsInterpretValue, MetadataInformationResultElements)> = None;
 
     log = debug!(log, "Start: processing origin response stages.");
     // For any of the host metadata entries that are origin requests or origin responses,
     // do them now. Remember: The *Request metadata objects can contain response transformations, too.
+    #[cfg(feature = "mi_ps")]
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
+
         if let CdniVerificationKey::Stage(stge) = &stage.aug
             && (TypedStageTypes::OriginRequest == (&**stge).into()
                 || TypedStageTypes::OriginResponse == (&**stge).into())
@@ -323,6 +345,7 @@ pub fn interpret_metadata(
     // For any of the host metadata entries that are client requests or client responses,
     // do them now. Remember: The *Client metadata objects can contain response transformations, too.
     // do them now.
+    #[cfg(feature = "mi_ps")]
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         if let CdniVerificationKey::Stage(stge) = &stage.aug

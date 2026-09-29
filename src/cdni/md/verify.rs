@@ -21,20 +21,21 @@ use std::fmt::Display;
 use serde::Serialize;
 
 #[cfg(feature = "mi_source")]
-use crate::cdni::processors::source::SourceVerificationKey;
+use crate::cdni::{
+    gmd::spec::TypedSource,
+    processors::source::{SourceMetadataAnalyzer, SourceVerificationKey},
+};
+
+#[cfg(feature = "mi_ps")]
+use crate::cdni::{
+    processors::ps::PsMetadataAnalyzer,
+    ps::{spec::TypedStage, verify::PsVerificationKey},
+};
 
 use crate::{
     cdni::{
-        gmd::spec::{TypedGenericMetadata, TypedSource},
-        gmdp::Verifier,
-        md::spec::HostMetadata,
-        processors::{
-            SimpleProcessorsAnalysisContext, ps::PsMetadataAnalyzer, source::SourceMetadataAnalyzer,
-        },
-        ps::{
-            spec::TypedStage,
-            verify::{PsVerificationError, PsVerificationKey},
-        },
+        gmd::spec::TypedGenericMetadata, gmdp::Verifier, md::spec::HostMetadata,
+        processors::SimpleProcessorsAnalysisContext, ps::verify::PsVerificationError,
     },
     environment::scope::Scopes,
     mel::types::Type,
@@ -59,6 +60,7 @@ pub enum CdniVerifiedMetadataTypes {
 
 #[derive(Debug, Clone, Default)]
 pub enum CdniVerificationKey {
+    #[cfg(feature = "mi_ps")]
     Stage(Box<TypedStage<PsVerificationKey>>),
     #[cfg(feature = "mi_source")]
     Source(Box<TypedSource<SourceVerificationKey>>),
@@ -69,7 +71,9 @@ pub enum CdniVerificationKey {
 impl From<&CdniVerificationKey> for CdniVerifiedMetadataTypes {
     fn from(value: &CdniVerificationKey) -> Self {
         match value {
+            #[cfg(feature = "mi_ps")]
             CdniVerificationKey::Stage(_) => CdniVerifiedMetadataTypes::ProcessingStages,
+            #[cfg(feature = "mi_source")]
             CdniVerificationKey::Source(_) => CdniVerifiedMetadataTypes::Source,
             CdniVerificationKey::None => CdniVerifiedMetadataTypes::None,
         }
@@ -109,17 +113,25 @@ pub fn verify_metadata(
 ) -> Result<HostMetadata<CdniVerificationKey>, Box<HostMetadataVerificationError>> {
     let mut stages: Vec<TypedGenericMetadata<CdniVerificationKey>> = vec![];
 
-    let processors: &[&dyn Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>] =
-        &[
-            &PsMetadataAnalyzer {}
-                as &dyn Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>,
-            &SourceMetadataAnalyzer {}
-                as &dyn Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>,
-        ];
+    #[allow(clippy::vec_init_then_push)]
+    #[allow(unused_mut)]
+    let mut processors: Vec<
+        &dyn Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>,
+    > = vec![];
+
+    #[allow(clippy::vec_init_then_push)]
+    #[cfg(feature = "mi_ps")]
+    processors.push(&PsMetadataAnalyzer {}
+        as &dyn Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>);
+
+    #[allow(clippy::vec_init_then_push)]
+    #[cfg(feature = "mi_source")]
+    processors.push(&SourceMetadataAnalyzer {}
+        as &dyn Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>);
 
     for md in &metadata.metadata {
         let mut no_processor = true;
-        for processor in processors {
+        for processor in &processors {
             if !processor.type_name(&md.tpe) {
                 continue;
             }

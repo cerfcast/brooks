@@ -19,7 +19,7 @@ serde_json = { version = "1.0.150" }
 http = "1.4.2"
 tempfile = "3.27.0"
 libc = "0.2.189"
-reqwest = { version = "0.13.4", optional = true }
+reqwest = { version = "0.13.4" }
 tokio = {version = "1.53.1", features=["rt-multi-thread"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 url = "2.5.8"
@@ -28,17 +28,17 @@ url = "2.5.8"
 default = ["mi_all_processors"]
 
 # The MI Processors
-mi_source = ["dep:reqwest"]
+mi_source = []
 mi_cache = []
 mi_ps = []
 mi_all_processors = ["mi_source", "mi_cache", "mi_ps"]
 
 domain = []
 serializable_logs = []
-hmds = ["dep:reqwest"]
-nginx = ["hmds", "dep:reqwest"]
-caddy = ["hmds", "dep:reqwest"]
-express = ["hmds", "dep:reqwest"]
+hmds = []
+nginx = ["hmds"]
+caddy = ["hmds"]
+express = ["hmds"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
