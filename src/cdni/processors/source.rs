@@ -112,6 +112,9 @@ impl
             .try_into()
             .map_err(|e: prr::Error| Error::InvalidInput(e.into()))?;
 
+        let req_method = req.method().clone();
+        let req_url = req.url().clone();
+
         let mut clientb = reqwest::Client::builder();
 
         let resolver = SourceMetadataResolver {
@@ -135,7 +138,9 @@ impl
                 .await
                 .map_err(|e| Error::RuntimeError(e.into()))?;
 
-            let mut result = ProcessedRequestResponse::new_response(r.url(), &http::Method::GET);
+            let mut result = ProcessedRequestResponse::new_response(&req_url, &req_method);
+
+            result.oheaders = r.headers().clone();
 
             result
                 .set_status(&r.status().as_u16())
