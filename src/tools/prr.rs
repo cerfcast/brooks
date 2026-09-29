@@ -96,7 +96,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub trait Prr<Body>: Debug {
     // Header Manipulation and Access
 
-    fn header_value(&self) -> Option<HeaderValue>;
     fn headers(&self) -> Vec<(String, HeaderValue)>;
     fn set_header_value(&mut self, header: &str, value: &str) -> Result<()>;
     fn clear_headers(&mut self) -> Result<()>;

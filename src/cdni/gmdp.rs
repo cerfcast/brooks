@@ -168,10 +168,6 @@ impl TryFrom<&http::Request<Vec<u8>>> for ProcessedRequestResponse {
 }
 
 impl prr::Prr<Vec<u8>> for ProcessedRequestResponse {
-    fn header_value(&self) -> Option<HeaderValue> {
-        todo!()
-    }
-
     fn headers(&self) -> Vec<(String, HeaderValue)> {
         self.oheaders
             .iter()

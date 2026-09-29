@@ -842,10 +842,6 @@ impl EffectfulProcessableRequestResponse {
 }
 
 impl prr::Prr<Vec<u8>> for EffectfulProcessableRequestResponse {
-    fn header_value(&self) -> Option<HeaderValue> {
-        None
-    }
-
     fn headers(&self) -> Vec<(String, HeaderValue)> {
         vec![]
     }
