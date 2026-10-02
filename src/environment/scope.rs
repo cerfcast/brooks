@@ -65,7 +65,12 @@ impl<I: Clone + Default> From<Scope<I>> for Scopes<I> {
 
 impl<I: Clone + Default> Scopes<I> {
     pub fn lookup(&self, id: &str) -> Option<I> {
-        self.scopes.last()?.lookup(id)
+        for scope in self.scopes.iter().rev() {
+            if let Some(id) = scope.lookup(id) {
+                return Some(id);
+            }
+        }
+        None
     }
 
     pub fn insert(&self, id: &str, value: I) -> Self {
