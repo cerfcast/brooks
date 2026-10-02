@@ -28,6 +28,7 @@ use crate::cdni::gmd::spec::TypedSource;
 use crate::cdni::gmdp::Interpreter;
 
 use crate::cdni::gmdp::Error;
+use crate::cdni::gmdp::ProcessedRequestResponse;
 use crate::cdni::md::verify::CdniVerificationKey;
 use crate::cdni::mi::MetadataInformationResultElements;
 use crate::cdni::processors::SimpleProcessorsInterpreterContext;
@@ -369,11 +370,7 @@ pub fn interpret_metadata(
                     log,
                     "Got a synthetic response from an client response stage."
                 );
-                return Ok((
-                    updated_response_context.rr.get_status().expect("TODO"),
-                    sr,
-                    log,
-                ));
+                return Ok((sr.status(), sr, log));
             }
 
             // TODO: Handle other values from the PS Interpreter that indicate
