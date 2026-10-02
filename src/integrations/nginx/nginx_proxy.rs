@@ -160,7 +160,7 @@ impl TryFrom<ngx_http_request_s> for Request<Vec<u8>> {
 }
 
 unsafe fn try_from_response(
-    response: &Response,
+    response: &http::Response<Vec<u8>>,
     status: StatusCode,
     req: *mut ngx_http_request_s,
 ) -> Result<(), Box<HmdTransformError>> {
@@ -178,6 +178,8 @@ unsafe fn try_from_response(
         (*he).value = to_nginx_str(header_value, (*req).pool);
     }
 
+    // Indicate that the response should use chunked encoding.
+    (*req).headers_out.content_length_n = -1;
     (*req).headers_out.status = status.as_u16() as usize;
 
     Ok(())
@@ -265,7 +267,7 @@ unsafe fn do_ngx_brooks_proxy(
         }
     };
 
-    let (_status, response, log) = safe_brooks_integration_handle(
+    let (status, response, log) = safe_brooks_integration_handle(
         &http_req,
         mel_scope,
         hmds_key,
@@ -274,14 +276,14 @@ unsafe fn do_ngx_brooks_proxy(
         log,
     )?;
 
+    if let Err(e) = try_from_response(&response, status, req) {
+        return Err((MdInterpretError::TransformError(e).into(), log));
+    }
+
     *body = match to_nginx_buf(response.body(), (*req).pool) {
         Ok(o) => o,
         Err(e) => return Err((MdInterpretError::TransformError(e).into(), log)),
     };
-
-    // Indicate that the response should use chunked encoding.
-    (*req).headers_out.content_length_n = -1;
-    (*req).headers_out.status = _status.as_u16() as usize;
 
     Ok(log)
 }
