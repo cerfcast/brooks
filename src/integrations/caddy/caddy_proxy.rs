@@ -161,7 +161,7 @@ unsafe fn do_brooks_caddy_proxy(
 
     let http_req = Box::from_raw(req as *mut BrooksCaddyRequest).request;
 
-    let runtime = match runtime::Builder::new_current_thread().enable_all().build() {
+    let runtime = match runtime::Builder::new_multi_thread().enable_all().build() {
         Ok(o) => o,
         Err(e) => {
             return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
@@ -189,7 +189,7 @@ unsafe fn do_brooks_caddy_proxy(
         mel_scope,
         hmds_key,
         &mut (*cookie).hmds,
-        &runtime,
+        runtime.handle(),
         log,
     )?;
 

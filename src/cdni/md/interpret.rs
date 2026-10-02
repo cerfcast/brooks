@@ -146,7 +146,7 @@ pub fn interpret_metadata(
     hmd: &HostMetadata<CdniVerificationKey>,
     mel_scopes: Scopes<TypedValue>,
     request: Box<dyn prr::Prr<Vec<u8>>>,
-    runtime: &tokio::runtime::Runtime,
+    runtime: &tokio::runtime::Handle,
     mut log: LogMsgs,
 ) -> HmdInterpretResult {
     #[allow(unused_mut)]

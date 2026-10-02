@@ -39,7 +39,7 @@ pub struct SimpleProcessorsAnalysisContext {
 pub struct SimpleProcessorsInterpreterContext<'a> {
     pub scopes: Scopes<TypedValue>,
     pub mode: PsInterpretMode,
-    pub runtime: &'a tokio::runtime::Runtime,
+    pub runtime: &'a tokio::runtime::Handle,
     pub rr: Box<dyn prr::Prr<Vec<u8>>>,
 }
 

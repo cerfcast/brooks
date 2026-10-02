@@ -17,7 +17,7 @@
 
 use chrono::Utc;
 use http::Request;
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 
 use crate::{
     cdni::{
@@ -47,7 +47,7 @@ pub fn safe_brooks_integration_handle(
     mel: Scopes<TypedValue>,
     hmds_key: &str,
     hmds_config: &mut HmdsConfiguration,
-    runtime: &Runtime,
+    runtime: &Handle,
     mut log: LogMsgs,
 ) -> Result<HmdInterpretValue, HmdInterpretResultError> {
     // First, try to find the query in the cache.

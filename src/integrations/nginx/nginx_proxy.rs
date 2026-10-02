@@ -242,7 +242,7 @@ unsafe fn do_ngx_brooks_proxy(
         Err(e) => return Err((MdInterpretError::TransformError(e).into(), log)),
     };
 
-    let runtime = match runtime::Builder::new_current_thread().enable_all().build() {
+    let runtime = match runtime::Builder::new_multi_thread().enable_all().build() {
         Ok(o) => o,
         Err(e) => {
             return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
@@ -270,7 +270,7 @@ unsafe fn do_ngx_brooks_proxy(
         mel_scope,
         hmds_key,
         &mut (*cookie).hmds,
-        &runtime,
+        runtime.handle(),
         log,
     )?;
 
