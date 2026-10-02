@@ -71,6 +71,15 @@ The brooks Caddy module source code is in `integrations/caddy/module`.
 
 Additional documentation for this feature is coming soon and will be located in the [`./integrations/caddy/module`](./integrations/caddy/module/) directory.
 
+##### TypeScript/Express
+
+Brooks can be built with support for exposing the Processing Stages interpreter to code written in [TypeScript](https://www.typescriptlang.org/)
+and running in [Deno](https://deno.com/). Select the `express` feature when importing this library to select that feature.
+When the `express` feature is enabled, the library will have interfaces exposed to integrate
+with the TypeScript libraries in `integrations/express/`. 
+
+Additional documentation for this feature is coming soon and will be located in the [`./integrations/express`](./integrations/express/) directory.
+
 ### Documentation
 
 The core of Brooks is a Rust library for parsing and manipulating expressions of the MEL. The most up-to-date
