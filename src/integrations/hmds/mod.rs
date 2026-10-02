@@ -53,7 +53,7 @@ impl HmdsServerConfiguration {
             let exists = fs::exists(&path)?;
             if !exists {
                 return Err(io::Error::other(format!(
-                    "Could not open connection to server over UNIX domain socket at path {config_str}"
+                    "Could not open connection to HMD server over UNIX domain socket at path {config_str}"
                 )));
             }
 
