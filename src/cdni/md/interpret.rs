@@ -247,23 +247,29 @@ pub fn interpret_metadata(
         log = debug!(log, "Done: processing source stages.");
 
         // TODO: Handle Source stages that generate MI.
-        let (source_result_context, (_source_result_psiv, _source_result_mdire)) =
-            match source_stage_processing_result {
-                (Some(source_result_context), Some(Ok(result))) => (source_result_context, result),
-                (Some(_), Some(Err(e))) => {
-                    return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
-                }
-                (_, _) => {
-                    return Err((
-                        MdInterpretError::MetadataProcessingError(
-                            Error::NoProcessor(TypedSource::<()>::typed_cdni_metadata_name())
-                                .into(),
-                        )
-                        .into(),
-                        log,
-                    ));
-                }
-            };
+        let source_result_context = match source_stage_processing_result {
+            (Some(source_result_context), Some(Ok(_))) => source_result_context,
+            (Some(_), Some(Err(e))) => {
+                return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
+            }
+            (Some(source_result_context), None) => {
+                log = warn!(log, "There was no source stage processing information");
+                let url = source_result_context.rr.url().expect("TODO");
+                let method = source_result_context.rr.get_method();
+                source_result_context.with_new_rr(Box::new(ProcessedRequestResponse::new_response(
+                    &url, &method,
+                )))
+            }
+            (_, _) => {
+                return Err((
+                    MdInterpretError::MetadataProcessingError(
+                        Error::NoProcessor(TypedSource::<()>::typed_cdni_metadata_name()).into(),
+                    )
+                    .into(),
+                    log,
+                ));
+            }
+        };
 
         log = debug!(log, "A result exists from the source!");
 
