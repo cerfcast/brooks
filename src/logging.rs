@@ -20,6 +20,8 @@ use std::fmt::{Debug, Display};
 #[cfg(feature = "serializable_logs")]
 use serde::{Serialize, ser::SerializeStruct};
 
+use crate::mel::c;
+
 pub trait Location: Display + Debug {}
 
 pub trait Formatter<T> {
@@ -65,6 +67,18 @@ impl Display for LogLevel {
             LogLevel::Debug => write!(f, "Debug"),
             LogLevel::Warn => write!(f, "Warn"),
             LogLevel::Error => write!(f, "Error"),
+        }
+    }
+}
+
+#[cfg(feature = "logger")]
+impl From<LogLevel> for log::Level {
+    fn from(value: LogLevel) -> Self {
+        match value {
+            LogLevel::Trace => log::Level::Trace,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Error => log::Level::Error,
         }
     }
 }
