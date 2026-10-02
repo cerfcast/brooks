@@ -85,10 +85,19 @@ impl HmdsServerConfiguration {
     }
 }
 
-pub(crate) struct HmdsConfiguration {
+pub struct HmdsConfiguration {
     pub(crate) hmds_server: HmdsServerConfiguration,
     pub(crate) hmds_cache:
         HashMap<String, (chrono::DateTime<Utc>, HostMetadata<CdniVerificationKey>)>,
+}
+
+impl From<HmdsServerConfiguration> for HmdsConfiguration {
+    fn from(value: HmdsServerConfiguration) -> Self {
+        HmdsConfiguration {
+            hmds_server: value,
+            hmds_cache: HashMap::new(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

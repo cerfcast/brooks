@@ -42,7 +42,7 @@ use crate::{
     tools::prr,
 };
 
-pub(crate) fn safe_brooks_integration_handle(
+pub fn safe_brooks_integration_handle(
     request: &Request<Vec<u8>>,
     mel: Scopes<TypedValue>,
     hmds_key: &str,
