@@ -19,7 +19,6 @@ use std::{collections::HashMap, marker::PhantomData, ptr::null, str::FromStr};
 
 use http::{HeaderName, HeaderValue, Method, Request, StatusCode, Uri, header::HOST};
 use libc::intptr_t;
-use reqwest::Response;
 use tokio::runtime;
 
 use crate::{
