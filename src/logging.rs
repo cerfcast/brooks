@@ -20,8 +20,6 @@ use std::fmt::{Debug, Display};
 #[cfg(feature = "serializable_logs")]
 use serde::{Serialize, ser::SerializeStruct};
 
-use crate::mel::c;
-
 pub trait Location: Display + Debug {}
 
 pub trait Formatter<T> {
