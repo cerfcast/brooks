@@ -34,10 +34,16 @@ pub struct LogMsgFormatter {
 
 impl Formatter<LogMsg> for LogMsgFormatter {
     fn format(&self, value: &LogMsg) -> String {
-        if let Some(location) = &value.location {
+        let msg = if let Some(location) = &value.location {
             format!("{location}: {}", value.msg)
         } else {
             value.msg.clone()
+        };
+
+        if self.show_level {
+            value.level().to_string() + ": " + &msg
+        } else {
+            msg
         }
     }
 }
