@@ -25,7 +25,6 @@ use libc::intptr_t;
 use tokio::runtime;
 
 use crate::{
-    cdni::md::interpret::{HmdTransformError, MdInterpretError},
     environment::scope::Scopes,
     integrations::{
         caddy::{
@@ -38,6 +37,7 @@ use crate::{
     },
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::interpreter::{builtins::builtin_builtin_function_interpreters, interpret::TypedValue},
+    processing::imdi::{HmdTransformError, MdInterpretError},
 };
 
 #[allow(clippy::missing_safety_doc)]

@@ -15,37 +15,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Interpret CDNI Metadata
+//! Interpret CDNI Interconnection Metadata
 
 use std::fmt::Display;
 
 use http::StatusCode;
 
-#[cfg(feature = "mi_source")]
-use crate::cdni::gmd::spec::TypedSource;
-
-#[cfg(any(feature = "mi_source", feature = "mi_ps"))]
-use crate::cdni::gmdp::Interpreter;
-
-use crate::cdni::gmdp::Error;
-use crate::cdni::gmdp::ProcessedRequestResponse;
-use crate::cdni::md::verify::CdniVerificationKey;
-use crate::cdni::mi::MetadataInformationResultElements;
-use crate::cdni::processors::SimpleProcessorsInterpreterContext;
+use crate::cdni::original::spec::TypedSource;
 use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
+use crate::processing::interpret::{Error, Interpreter, ProcessedRequestResponse};
+use crate::verifying::verify::CdniVerificationKey;
 
-#[cfg(feature = "mi_ps")]
 use crate::cdni::ps::spec::TypedStageTypes;
 
-use crate::tools::prr;
-use crate::{
-    cdni::{
-        md::spec::HostMetadata,
-        ps::interpret::{PsInterpretMode, PsInterpretValue},
-    },
-    mel::interpreter::interpret::TypedValue,
-};
+use crate::processing::interpret::MetadataInformationResultElements;
+use crate::processing::processors::SimpleProcessorsInterpreterContext;
+use crate::processing::processors::ps::{PsInterpretMode, PsInterpretValue};
+use crate::prr;
+use crate::{cdni::imd::spec::HostMetadata, mel::interpreter::interpret::TypedValue};
 
 pub type HmdInterpretValue = (StatusCode, http::Response<Vec<u8>>, LogMsgs);
 pub type HmdInterpretResultError = (Box<MdInterpretError>, LogMsgs);
@@ -143,7 +131,9 @@ impl Display for MdInterpretError {
 }
 
 /// Interpret given Host Metadata for the given request.
-pub fn interpret_metadata(
+///
+/// TODO: Make clear in the documentation that this function is a _major_ entry point for library clients.
+pub fn interpret_interconnection_metadata(
     hmd: &HostMetadata<CdniVerificationKey>,
     mel_scopes: Scopes<TypedValue>,
     request: Box<dyn prr::Prr<Vec<u8>>>,
@@ -160,7 +150,6 @@ pub fn interpret_metadata(
 
     // For any of the host metadata entries that are client requests,
     // do them now.
-    #[cfg(feature = "mi_ps")]
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         #[allow(clippy::collapsible_if)]
@@ -186,7 +175,6 @@ pub fn interpret_metadata(
 
     // For any of the host metadata entries that are origin requests,
     // do them now.
-    #[cfg(feature = "mi_ps")]
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         #[allow(clippy::collapsible_if)]
@@ -212,7 +200,6 @@ pub fn interpret_metadata(
         runtime: request_context.runtime,
     };
 
-    #[cfg(feature = "mi_source")]
     let mut response_context = {
         let source_stage_processing_result = hmd
             .metadata
@@ -296,17 +283,12 @@ pub fn interpret_metadata(
         }
     };
 
-    #[cfg(not(feature = "mi_source"))]
-    #[allow(unused_mut)]
-    let mut response_context = source_context;
-
     #[allow(unused_mut)]
     let mut response_result: Option<(PsInterpretValue, MetadataInformationResultElements)> = None;
 
     log = debug!(log, "Start: processing origin response stages.");
     // For any of the host metadata entries that are origin requests or origin responses,
     // do them now. Remember: The *Request metadata objects can contain response transformations, too.
-    #[cfg(feature = "mi_ps")]
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
 
@@ -352,7 +334,6 @@ pub fn interpret_metadata(
     // For any of the host metadata entries that are client requests or client responses,
     // do them now. Remember: The *Client metadata objects can contain response transformations, too.
     // do them now.
-    #[cfg(feature = "mi_ps")]
     for stage in &hmd.metadata {
         // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
         if let CdniVerificationKey::Stage(stge) = &stage.aug

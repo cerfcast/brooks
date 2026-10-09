@@ -30,7 +30,7 @@ use tokio::{
     net::UnixStream,
 };
 
-use crate::cdni::md::{spec::HostMetadata, verify::CdniVerificationKey};
+use crate::{cdni::imd::spec::HostMetadata, verifying::verify::CdniVerificationKey};
 
 #[derive(Debug, Default, Clone)]
 pub struct HmdsServerConfiguration {

@@ -27,7 +27,10 @@ use crate::cdni::{
 
 use std::fmt::Debug;
 
+/// TODO
 pub type PsVisitorResult<T, E> = Result<T, E>;
+
+/// TODO
 pub trait PsVisitor<A: Debug + Clone + Default, C, O, E> {
     fn visit_processing_stages(
         &mut self,

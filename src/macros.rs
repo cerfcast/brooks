@@ -17,7 +17,7 @@
 
 use serde_json::Value;
 
-pub trait IntoCdniMetadata {
+pub(crate) trait IntoCdniMetadata {
     fn metadata_type(&self) -> String;
     fn metadata_value(&self) -> Value;
 }

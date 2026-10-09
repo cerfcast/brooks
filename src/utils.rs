@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 pub fn strip_quotes(str: &str) -> String {
     let result = str.strip_prefix("\"").unwrap_or(str);
     result.strip_suffix("\"").unwrap_or(result).into()
@@ -22,4 +24,12 @@ pub fn strip_quotes(str: &str) -> String {
 
 pub fn sanitize_error_message(str: &str) -> String {
     str.replace("\n", "")
+}
+
+pub fn try_to_url<A: ToString>(from: A) -> Result<url::Url, url::ParseError> {
+    url::Url::from_str(&from.to_string())
+}
+
+pub fn try_to_uri<A: ToString>(from: A) -> Result<http::Uri, http::uri::InvalidUri> {
+    http::Uri::from_str(&from.to_string())
 }

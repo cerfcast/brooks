@@ -20,7 +20,8 @@ pub mod test_helpers {
     use serde_json::Value;
 
     use crate::cdni::{
-        gmd::spec::{Source, TypedGenericMetadata, TypedSource},
+        gmd::spec::TypedGenericMetadata,
+        original::spec::{Source, TypedSource},
         ps::spec::{
             ClientRequestStage, ExpressionMatch, Header, HeaderTransform, MatchGroup,
             ProcessingStages, RequestTransform, ResponseTransform, StageMetadata, StageRules,

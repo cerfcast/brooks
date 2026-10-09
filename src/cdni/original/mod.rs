@@ -15,8 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! CDNI Interconnection Metadata
+//! Metadata Specified In Original Interconnection Specification
 
-pub mod interpret;
 pub mod spec;
-pub mod verify;

@@ -16,11 +16,11 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    cdni::md::interpret::HmdTransformError,
     integrations::nginx::{
         ngx_buf_s, ngx_log_error_core, ngx_log_s, ngx_pcalloc, ngx_pool_s, ngx_str_t,
     },
     logging::{LogLevel, LogMsgs},
+    processing::imdi::HmdTransformError,
 };
 
 /// Create an owned String from an nginx string.

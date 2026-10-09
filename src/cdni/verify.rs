@@ -15,34 +15,33 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! All Metadata Information except for what is defined in Processing Stages.
+
+use std::fmt::Debug;
+
+use crate::{environment::scope::Scopes, mel::types::Type};
+
 use std::error::Error;
 use std::fmt::Display;
 
 use serde::Serialize;
 
-#[cfg(feature = "mi_source")]
-use crate::cdni::{
-    gmd::spec::TypedSource,
-    processors::source::{SourceMetadataAnalyzer, SourceVerificationKey},
-};
+use crate::cdni::gmd::spec::TypedSource;
+use crate::cdni::gmd::verify::{SourceMetadataAnalyzer, SourceVerificationKey};
+use crate::cdni::ps::verify::PsVerificationKey;
+use crate::cdni::ps::verify::{PsMetadataAnalyzer, PsVerificationError};
 
-#[cfg(feature = "mi_ps")]
-use crate::cdni::{
-    processors::ps::PsMetadataAnalyzer,
-    ps::{spec::TypedStage, verify::PsVerificationKey},
-};
+use crate::cdni::ps::spec::TypedStage;
 
-use crate::{
-    cdni::{
-        gmd::spec::TypedGenericMetadata, gmdp::Verifier, md::spec::HostMetadata,
-        processors::SimpleProcessorsAnalysisContext, ps::verify::PsVerificationError,
-    },
-    environment::scope::Scopes,
-    mel::types::Type,
-};
+use crate::cdni::{gmd::spec::TypedGenericMetadata, imd::spec::HostMetadata};
 
 #[derive(Debug, Clone, Default)]
-pub enum HostMetadataVerificationError {
+pub struct MetadataAnalysisContext {
+    pub scopes: Scopes<Type>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub enum MetadataVerificationError {
     #[default]
     NoError,
     NotProcessingStage,
@@ -60,9 +59,7 @@ pub enum CdniVerifiedMetadataTypes {
 
 #[derive(Debug, Clone, Default)]
 pub enum CdniVerificationKey {
-    #[cfg(feature = "mi_ps")]
     Stage(Box<TypedStage<PsVerificationKey>>),
-    #[cfg(feature = "mi_source")]
     Source(Box<TypedSource<SourceVerificationKey>>),
     #[default]
     None,
@@ -71,9 +68,7 @@ pub enum CdniVerificationKey {
 impl From<&CdniVerificationKey> for CdniVerifiedMetadataTypes {
     fn from(value: &CdniVerificationKey) -> Self {
         match value {
-            #[cfg(feature = "mi_ps")]
             CdniVerificationKey::Stage(_) => CdniVerifiedMetadataTypes::ProcessingStages,
-            #[cfg(feature = "mi_source")]
             CdniVerificationKey::Source(_) => CdniVerifiedMetadataTypes::Source,
             CdniVerificationKey::None => CdniVerifiedMetadataTypes::None,
         }
@@ -89,45 +84,52 @@ impl Serialize for CdniVerificationKey {
     }
 }
 
-impl Error for HostMetadataVerificationError {}
+impl Error for MetadataVerificationError {}
 
-impl Display for HostMetadataVerificationError {
+impl Display for MetadataVerificationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            HostMetadataVerificationError::NoError => write!(f, "No error!"),
-            HostMetadataVerificationError::NotProcessingStage => {
+            MetadataVerificationError::NoError => write!(f, "No error!"),
+            MetadataVerificationError::NotProcessingStage => {
                 write!(f, "Value was not a processing stage!")
             }
-            HostMetadataVerificationError::NoProcessor(tpe) => {
+            MetadataVerificationError::NoProcessor(tpe) => {
                 write!(f, "No processor registered for Metadata with type {tpe}")
             }
-            HostMetadataVerificationError::PsVerificationError(pse) => write!(f, "{pse}"),
-            HostMetadataVerificationError::JsonError(je) => write!(f, "JSON error: {je}"),
+            MetadataVerificationError::PsVerificationError(pse) => write!(f, "{pse}"),
+            MetadataVerificationError::JsonError(je) => write!(f, "JSON error: {je}"),
         }
     }
+}
+
+pub type AnalysisResult<Ck, Error> = Result<(Ck, CdniVerificationKey), Box<Error>>;
+
+/// Generate a validated representation of a given piece of Metadata Information, if possible.
+pub trait Verifier<Ck, Error>: Debug {
+    fn analyze(&self, v: &TypedGenericMetadata<()>, input: Ck) -> AnalysisResult<Ck, Error>;
+
+    fn type_name(&self, candidate: &str) -> bool;
 }
 
 pub fn verify_metadata(
     metadata: &HostMetadata<()>,
     scopes: Scopes<Type>,
-) -> Result<HostMetadata<CdniVerificationKey>, Box<HostMetadataVerificationError>> {
+) -> Result<HostMetadata<CdniVerificationKey>, Box<MetadataVerificationError>> {
     let mut stages: Vec<TypedGenericMetadata<CdniVerificationKey>> = vec![];
 
     #[allow(clippy::vec_init_then_push)]
     #[allow(unused_mut)]
-    let mut processors: Vec<
-        &dyn Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>,
-    > = vec![];
+    let mut processors: Vec<&dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>> =
+        vec![];
 
     #[allow(clippy::vec_init_then_push)]
-    #[cfg(feature = "mi_ps")]
-    processors.push(&PsMetadataAnalyzer {}
-        as &dyn Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>);
+    processors
+        .push(&PsMetadataAnalyzer {}
+            as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>);
 
     #[allow(clippy::vec_init_then_push)]
-    #[cfg(feature = "mi_source")]
     processors.push(&SourceMetadataAnalyzer {}
-        as &dyn Verifier<SimpleProcessorsAnalysisContext, HostMetadataVerificationError>);
+        as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>);
 
     for md in &metadata.metadata {
         let mut no_processor = true;
@@ -140,7 +142,7 @@ pub fn verify_metadata(
 
             let (_, analyzed) = processor.analyze(
                 md,
-                SimpleProcessorsAnalysisContext {
+                MetadataAnalysisContext {
                     scopes: scopes.clone(),
                 },
             )?;
@@ -153,7 +155,7 @@ pub fn verify_metadata(
         }
 
         if no_processor {
-            return Err(HostMetadataVerificationError::NoProcessor(md.tpe.clone()).into());
+            return Err(MetadataVerificationError::NoProcessor(md.tpe.clone()).into());
         }
     }
 

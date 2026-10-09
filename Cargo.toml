@@ -19,28 +19,24 @@ serde_json = { version = "1.0.150" }
 http = "1.4.2"
 tempfile = "3.27.0"
 libc = "0.2.189"
-reqwest = { version = "0.13.4" }
-tokio = {version = "1.53.1", features=["rt-multi-thread"] }
+reqwest = { version = "0.13.4", optional = true }
+tokio = {version = "1.53.1", features=["rt-multi-thread"], optional = true }
 chrono = { version = "0.4.45", features = ["serde"] }
 url = "2.5.8"
-log = { version = "0.4.34", optional = true }
+log = { version = "0.4.34" }
 
 [features]
-default = ["mi_all_processors"]
-
-# The MI Processors
-mi_source = []
-mi_cache = []
-mi_ps = []
-mi_all_processors = ["mi_source", "mi_cache", "mi_ps"]
+default = ["processing"]
 
 domain = []
-serializable_logs = []
 hmds = []
-nginx = ["hmds"]
-caddy = ["hmds"]
-express = ["hmds"]
-logger = ["dep:log"]
+nginx = ["hmds", "processing"]
+caddy = ["hmds", "processing"]
+express = ["hmds", "processing"]
+
+mel = []
+verifying = ["mel"]
+processing = ["verifying", "dep:reqwest", "dep:tokio"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

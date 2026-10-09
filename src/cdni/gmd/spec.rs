@@ -18,7 +18,6 @@
 //! All Metadata Information except for what is defined in Processing Stages.
 
 use crate::macros::IntoCdniMetadata;
-use brooks_macros::CdniMetadata;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -55,35 +54,4 @@ impl<A: Debug + Clone + Default> TypedGenericMetadata<A> {
     ) -> TypedGenericMetadata<AA> {
         sr.clone()
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Source<A: Debug + Clone + Default> {
-    pub endpoints: Vec<String>,
-    pub protocol: String,
-    #[serde(skip)]
-    pub aug: A,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
-pub struct TypedSource<A: Debug + Clone + Default> {
-    #[serde(rename = "generic-metadata-type")]
-    pub tpe: String,
-    #[serde(rename = "generic-metadata-value")]
-    pub value: Source<A>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CachePolicy<A: Debug + Clone + Default> {
-    pub policy: String,
-    #[serde(skip)]
-    pub aug: A,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
-pub struct TypedCachePolicy<A: Debug + Clone + Default> {
-    #[serde(rename = "generic-metadata-type")]
-    pub tpe: String,
-    #[serde(rename = "generic-metadata-value")]
-    pub value: CachePolicy<A>,
 }

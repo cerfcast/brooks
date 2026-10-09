@@ -47,7 +47,7 @@ mod test_parse_host_metadata {
 
     use crate::{
         cdni::{
-            gmd::spec::TypedGenericMetadata, md::spec::TypedHostMetadata, ps::spec::TypedHeader,
+            gmd::spec::TypedGenericMetadata, imd::spec::TypedHostMetadata, ps::spec::TypedHeader,
             tests::test_helpers::typed_header,
         },
         tests::read_test_file,

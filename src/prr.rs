@@ -17,11 +17,10 @@
 
 use std::error;
 use std::fmt::{Debug, Display};
-use std::str::FromStr;
 
-use http::{HeaderName, HeaderValue, Method, StatusCode};
+use http::{HeaderValue, Method, StatusCode};
 
-use crate::cdni::gmdp::try_to_uri;
+use crate::utils::try_to_uri;
 
 #[derive(Debug, Clone)]
 pub enum ValueType {
@@ -124,46 +123,6 @@ pub trait Prr<Body>: Debug {
 
     /// Get the type of processable request/response.
     fn tpe(&self) -> PrrType;
-}
-
-impl TryFrom<&dyn Prr<Vec<u8>>> for reqwest::Request {
-    type Error = Error;
-
-    fn try_from(value: &dyn Prr<Vec<u8>>) -> std::result::Result<Self, Self::Error> {
-        if value.tpe() != PrrType::Request {
-            return Err(Error::InvalidMode);
-        }
-
-        let url = value
-            .url()
-            .map_err(|_| Error::MissingValue(ValueType::Url))?;
-
-        let mut request = reqwest::Request::new(reqwest::Method::GET, url);
-
-        // Put in the headers.
-        for (header_key, header_value) in value.headers() {
-            request.headers_mut().insert(
-                HeaderName::from_str(&header_key).map_err(|_| {
-                    Error::BadValue(Value {
-                        tpe: ValueType::HeaderName,
-                        value: Some(header_key.clone()),
-                    })
-                })?,
-                header_value,
-            );
-        }
-
-        // Configure the body.
-        request.body_mut().replace(
-            value
-                .get_body()
-                .map_err(|_| Error::MissingValue(ValueType::Body))?
-                .clone()
-                .into(),
-        );
-
-        Ok(request)
-    }
 }
 
 impl TryFrom<&dyn Prr<Vec<u8>>> for http::Request<Vec<u8>> {

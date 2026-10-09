@@ -18,22 +18,13 @@
 //! Processors for Metadata Information.
 
 use crate::{
-    cdni::ps::interpret::PsInterpretMode,
-    environment::scope::Scopes,
-    mel::{interpreter::interpret::TypedValue, types::Type},
-    tools::prr,
+    environment::scope::Scopes, mel::interpreter::interpret::TypedValue,
+    processing::processors::ps::PsInterpretMode, prr,
 };
 
-#[cfg(feature = "mi_source")]
 pub mod source;
 
-#[cfg(feature = "mi_ps")]
 pub mod ps;
-
-#[derive(Debug, Clone, Default)]
-pub struct SimpleProcessorsAnalysisContext {
-    pub scopes: Scopes<Type>,
-}
 
 #[derive(Debug)]
 pub struct SimpleProcessorsInterpreterContext<'a> {

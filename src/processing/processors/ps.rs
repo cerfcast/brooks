@@ -15,53 +15,41 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Verification of CDNI JSON
+//! The Processing Stages Generic Metadata Processing Implementation
 
-use http::{HeaderName, HeaderValue, StatusCode};
+use std::error;
+use std::fmt::{Debug, Display};
+use std::str::FromStr;
 
-use crate::{
-    cdni::{
-        gmd::spec::TypedGenericMetadata,
-        mi::{MetadataInformationResultElement, MetadataInformationResultElements},
-        ps::{
-            interpret::{
-                PsInterpretMode::HeaderCalculate,
-                PsInterpretValue::{Header, MatchNo, MatchYes},
-                PsInterpretValueType::{MatchResult, SyntheticResponse, Terminate},
-            },
-            spec::{
-                TypedClientRequestStage, TypedExpressionMatch, TypedHeader, TypedHeaderTransform,
-                TypedMatchGroup, TypedProcessingStages, TypedRequestTransform,
-                TypedResponseTransform, TypedStage, TypedStageMetadata, TypedStageRules,
-                TypedSyntheticResponse,
-            },
-            verify::PsVerificationKey,
-            visit::{PsVisitor, PsVisitorResult},
-        },
-    },
-    environment::scope::Scopes,
-    logging::LogMsgs,
-    mel::{
-        self,
-        analysis::Analyzed,
-        ast::Expr,
-        interpreter::interpret::{
-            MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError,
-            TypedValue, Value,
-        },
-        types::Type,
-    },
-    tools::prr,
+use crate::cdni::gmd::spec::TypedGenericMetadata;
+use crate::cdni::ps::spec::{
+    TypedClientRequestStage, TypedClientResponseStage, TypedExpressionMatch, TypedHeader,
+    TypedHeaderTransform, TypedMatchGroup, TypedOriginRequestStage, TypedOriginResponseStage,
+    TypedProcessingStages, TypedRequestTransform, TypedResponseTransform, TypedStage,
+    TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
 };
-
-use std::{
-    error::Error,
-    fmt::{Debug, Display},
-    str::FromStr,
+use crate::environment::scope::Scopes;
+use crate::logging::LogMsgs;
+use crate::mel::analysis::Analyzed;
+use crate::mel::ast::Expr;
+use crate::mel::interpreter::interpret::{
+    MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError, TypedValue,
+    Value,
 };
+use crate::mel::types::Type;
+use crate::processing::interpret;
+use crate::processing::processors::SimpleProcessorsInterpreterContext;
+use crate::verifying::ps::verify::PsVerificationKey;
+use crate::visitors::{PsVisitor, PsVisitorResult};
+use crate::{mel, prr};
 
-pub type PsInterpretResult =
-    Result<(PsInterpretValue, MetadataInformationResultElements), Box<PsInterpretError>>;
+pub type PsInterpretResult = Result<
+    (
+        PsInterpretValue,
+        interpret::MetadataInformationResultElements,
+    ),
+    Box<PsInterpretError>,
+>;
 
 #[derive(Debug, Clone)]
 pub enum PsInterpretAssertionFailures {
@@ -102,7 +90,7 @@ pub enum PsInterpretError {
     ProcessableRequestResponseError(prr::Error),
 }
 
-impl Error for PsInterpretError {}
+impl error::Error for PsInterpretError {}
 
 impl Display for PsInterpretError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -251,9 +239,9 @@ pub enum PsInterpretValueType {
 impl Display for PsInterpretValueType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
-            SyntheticResponse => write!(f, "Synthetic response"),
-            Terminate => write!(f, "Terminate"),
-            MatchResult => write!(f, "Match result"),
+            PsInterpretValueType::SyntheticResponse => write!(f, "Synthetic response"),
+            PsInterpretValueType::Terminate => write!(f, "Terminate"),
+            PsInterpretValueType::MatchResult => write!(f, "Match result"),
             PsInterpretValueType::Header => write!(f, "Header"),
         }
     }
@@ -271,9 +259,11 @@ pub enum PsInterpretValue {
 impl From<PsInterpretValue> for PsInterpretValueType {
     fn from(value: PsInterpretValue) -> Self {
         match value {
-            PsInterpretValue::SyntheticResponse(_) => SyntheticResponse,
-            PsInterpretValue::Terminate => Terminate,
-            MatchYes | MatchNo => MatchResult,
+            PsInterpretValue::SyntheticResponse(_) => PsInterpretValueType::SyntheticResponse,
+            PsInterpretValue::Terminate => PsInterpretValueType::Terminate,
+            PsInterpretValue::MatchYes | PsInterpretValue::MatchNo => {
+                PsInterpretValueType::MatchResult
+            }
             PsInterpretValue::Header(_, _) => PsInterpretValueType::Header,
         }
     }
@@ -281,7 +271,11 @@ impl From<PsInterpretValue> for PsInterpretValueType {
 
 impl From<bool> for PsInterpretValue {
     fn from(value: bool) -> Self {
-        if value { MatchYes } else { MatchNo }
+        if value {
+            PsInterpretValue::MatchYes
+        } else {
+            PsInterpretValue::MatchNo
+        }
     }
 }
 
@@ -289,7 +283,7 @@ impl From<bool> for PsInterpretValue {
 pub(crate) struct PsInterpretContext {
     pub mode: PsInterpretMode,
     pub result: Option<PsInterpretValue>,
-    pub metadata: MetadataInformationResultElements,
+    pub metadata: interpret::MetadataInformationResultElements,
     pub mel_scopes: Scopes<TypedValue>,
 }
 
@@ -307,7 +301,7 @@ impl PsInterpretContext {
 
     fn update_metadata_elements(
         self,
-        new_element: Box<dyn MetadataInformationResultElement>,
+        new_element: Box<dyn interpret::MetadataInformationResultElement>,
     ) -> PsInterpretContext {
         let mut nc = self;
         nc.metadata.elements.push(new_element);
@@ -315,7 +309,7 @@ impl PsInterpretContext {
     }
     fn replace_metadata_elements(
         self,
-        new_elements: MetadataInformationResultElements,
+        new_elements: interpret::MetadataInformationResultElements,
     ) -> PsInterpretContext {
         let mut nc = self;
         nc.metadata = new_elements;
@@ -590,7 +584,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                 Ok(c)
             }
             PsInterpretMode::HeaderCalculate => {
-                Ok(c.update_result(Some(Header(v.value.name.clone(), value))))
+                Ok(c.update_result(Some(PsInterpretValue::Header(v.value.name.clone(), value))))
             }
             _ => todo!(),
         }
@@ -607,13 +601,13 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
             for header in headers {
                 //let result = self.visit_header(header, c.update_mode(HeaderCalculate))?;
 
-                c = self.visit_header(header, c.update_mode(HeaderCalculate))?;
+                c = self.visit_header(header, c.update_mode(PsInterpretMode::HeaderCalculate))?;
 
                 match &c.result {
                     Some(PsInterpretValue::Header(name, value)) => {
                         response.headers_mut().unwrap().insert(
-                            HeaderName::from_bytes(name.as_bytes()).expect("Todo"),
-                            HeaderValue::from_str(value).expect("Todo"),
+                            http::HeaderName::from_bytes(name.as_bytes()).expect("Todo"),
+                            http::HeaderValue::from_str(value).expect("Todo"),
                         );
                     }
                     Some(r) => {
@@ -648,15 +642,15 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                     TypedValue {
                         tpe: Type::Integer,
                         value: Value::Integer(i),
-                    } => StatusCode::from_u16(i as u16),
+                    } => http::StatusCode::from_u16(i as u16),
                     _ => unreachable!(),
                 }
             } else {
-                new_response.parse::<StatusCode>()
+                new_response.parse::<http::StatusCode>()
             }
             .map_err(|e| PsInterpretError::InvalidResponse(e.to_string()))?
         } else {
-            StatusCode::OK
+            http::StatusCode::OK
         });
 
         let response = response
@@ -745,7 +739,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
 
     fn visit_origin_request_stage(
         &mut self,
-        v: &super::spec::TypedOriginRequestStage<PsVerificationKey>,
+        v: &TypedOriginRequestStage<PsVerificationKey>,
         c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         self.interpret_match_groups_in_stage(&v.value.match_groups, c)
@@ -753,7 +747,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
 
     fn visit_client_response_stage(
         &mut self,
-        v: &super::spec::TypedClientResponseStage<PsVerificationKey>,
+        v: &TypedClientResponseStage<PsVerificationKey>,
         c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         self.interpret_match_groups_in_stage(&v.value.match_groups, c)
@@ -761,7 +755,7 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
 
     fn visit_origin_response_stage(
         &mut self,
-        v: &super::spec::TypedOriginResponseStage<PsVerificationKey>,
+        v: &TypedOriginResponseStage<PsVerificationKey>,
         c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         self.interpret_match_groups_in_stage(&v.value.match_groups, c)
@@ -810,7 +804,7 @@ pub fn interpret_stage(
 }
 
 #[derive(Debug)]
-enum EffectfulRequestActions {
+pub(crate) enum EffectfulRequestActions {
     DeleteHeader(String),
     AddHeader(String, String),
     ClearHeaders,
@@ -842,7 +836,7 @@ impl EffectfulProcessableRequestResponse {
 }
 
 impl prr::Prr<Vec<u8>> for EffectfulProcessableRequestResponse {
-    fn headers(&self) -> Vec<(String, HeaderValue)> {
+    fn headers(&self) -> Vec<(String, http::HeaderValue)> {
         vec![]
     }
 
@@ -894,7 +888,7 @@ impl prr::Prr<Vec<u8>> for EffectfulProcessableRequestResponse {
         todo!()
     }
 
-    fn get_status(&self) -> prr::Result<StatusCode> {
+    fn get_status(&self) -> prr::Result<http::StatusCode> {
         todo!()
     }
 
@@ -911,25 +905,93 @@ impl prr::Prr<Vec<u8>> for EffectfulProcessableRequestResponse {
     }
 }
 
+impl
+    interpret::Interpreter<
+        SimpleProcessorsInterpreterContext<'_>,
+        (
+            PsInterpretValue,
+            interpret::MetadataInformationResultElements,
+        ),
+        interpret::Error,
+    > for TypedStage<PsVerificationKey>
+{
+    fn interpret<'a>(
+        &self,
+        mut input: SimpleProcessorsInterpreterContext<'a>,
+    ) -> interpret::InterpretationResult<
+        SimpleProcessorsInterpreterContext<'a>,
+        (
+            PsInterpretValue,
+            interpret::MetadataInformationResultElements,
+        ),
+        interpret::Error,
+    > {
+        let reqres = &mut *input.rr;
+
+        let mut visitor = PsInterpreter { rr: reqres };
+
+        visitor.install_generic_visitors();
+
+        let context = PsInterpretContext {
+            mode: input.mode.clone(),
+            mel_scopes: input.scopes.clone(),
+            ..Default::default()
+        };
+
+        let result = match self {
+            TypedStage::ClientRequest(typed_client_request_stage) => {
+                visitor.visit_client_request_stage(typed_client_request_stage, context)
+            }
+            TypedStage::ClientResponse(typed_client_response_stage) => {
+                visitor.visit_client_response_stage(typed_client_response_stage, context)
+            }
+            TypedStage::OriginRequest(typed_origin_request_stage) => {
+                visitor.visit_origin_request_stage(typed_origin_request_stage, context)
+            }
+            TypedStage::OriginResponse(typed_origin_response_stage) => {
+                visitor.visit_origin_response_stage(typed_origin_response_stage, context)
+            }
+        }
+        .map_err(|e| interpret::Error::RuntimeError(e.into()))?;
+
+        let md = result.metadata;
+        let result = result.result.ok_or(interpret::Error::RuntimeError(
+            PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult).into(),
+        ))?;
+        Ok((input, (result, md)))
+    }
+
+    fn stage(&self, stage: interpret::Stages) -> bool {
+        stage
+            == match self {
+                TypedStage::ClientRequest(_) => interpret::Stages::ClientRequest,
+                TypedStage::ClientResponse(_) => interpret::Stages::ClientResponse,
+                TypedStage::OriginRequest(_) => interpret::Stages::OriginRequest,
+                TypedStage::OriginResponse(_) => interpret::Stages::OriginResponse,
+            }
+    }
+}
+
 #[cfg(test)]
 mod ps_interpreter_tests {
     use crate::{
-        cdni::ps::{
-            interpret::{
-                EffectfulProcessableRequestResponse, EffectfulRequestActions, PsInterpretMode,
-                PsInterpretValue, interpret_stage,
+        cdni::{
+            ps::spec::{TypedGenericStage, TypedStage},
+            tests::test_helpers::{
+                client_request_stage, expression_match, match_group, request_transform,
+                response_transform, stage_metadata, synthetic_response, typed_header,
+                typed_stage_rule,
             },
-            spec::{TypedGenericStage, TypedStage},
-            verify::{PsVerifierContextValue, verifier, verify_ps_request_stage},
-            visit::PsVisitor,
-        },
-        cdni::tests::test_helpers::{
-            client_request_stage, expression_match, match_group, request_transform,
-            response_transform, stage_metadata, synthetic_response, typed_header, typed_stage_rule,
         },
         environment::scope::Scopes,
         mel::types::Type,
+        processing::processors::ps::{
+            EffectfulProcessableRequestResponse, EffectfulRequestActions, PsInterpretMode,
+            PsInterpretValue, interpret_stage,
+        },
         tests::read_test_file,
+        verifying::ps::verify::{PsVerifierContextValue, verifier, verify_ps_request_stage},
+        visitors::PsVisitor,
     };
     use std::assert_matches;
     use std::path::Path;
@@ -937,7 +999,7 @@ mod ps_interpreter_tests {
     #[test]
     fn test_interpret_client_request_stage() {
         let json = read_test_file(Path::new(
-            "./src/cdni/ps/tests/client_request_stage/if.json",
+            "./tests/data/processing/client_request_stage/if.json",
         ));
 
         let result = serde_json::from_str::<TypedGenericStage>(&json)
@@ -964,7 +1026,7 @@ mod ps_interpreter_tests {
     #[test]
     fn test_interpret_client_request_stage_request_response_header_transform() {
         let json = read_test_file(Path::new(
-            "./src/cdni/ps/tests/client_request_stage/request_response_header_transform.json",
+            "./tests/data/processing/client_request_stage/request_response_header_transform.json",
         ));
 
         let result = serde_json::from_str::<TypedGenericStage>(&json)
@@ -1034,6 +1096,7 @@ mod ps_interpreter_tests {
         assert_matches!(result.0, PsInterpretValue::MatchYes);
     }
 
+    #[test]
     fn test_interpret_client_request_stage_request_uri_transform_if() {
         let mut request_xform_false_stage = stage_metadata();
         let mut request_xform_true_stage = stage_metadata();
@@ -1274,6 +1337,7 @@ mod ps_interpreter_tests {
         assert_matches!(&req.log[0], EffectfulRequestActions::SetResponse(9));
     }
 
+    #[test]
     fn test_interpret_client_request_stage_response_status_transform_if() {
         let mut response_xform_false_stage = stage_metadata();
         let mut response_xform_true_stage = stage_metadata();

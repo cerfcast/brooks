@@ -15,8 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod spec;
+//! Processing Stages Metadata
 
-pub mod interpret;
-pub mod verify;
-pub(crate) mod visit;
+pub mod spec;

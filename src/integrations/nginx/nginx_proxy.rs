@@ -22,7 +22,6 @@ use libc::intptr_t;
 use tokio::runtime;
 
 use crate::{
-    cdni::md::interpret::{HmdTransformError, MdInterpretError},
     environment::scope::Scopes,
     integrations::{
         common::safe_brooks_integration_handle,
@@ -34,6 +33,7 @@ use crate::{
     },
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::interpreter::{builtins::builtin_builtin_function_interpreters, interpret::TypedValue},
+    processing::imdi::{HmdTransformError, MdInterpretError},
 };
 
 #[repr(C)]

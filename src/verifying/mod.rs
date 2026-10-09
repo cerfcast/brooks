@@ -15,14 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! All Metadata Information except for what is defined in Processing Stages.
+//! Processing Stages Metadata
 
-use std::fmt::Debug;
-
-/// Concrete instances of MI generated during interpretation that may be used to specify post-interpretation behavior.
-pub trait MetadataInformationResultElement: Debug {}
-
-#[derive(Debug, Default)]
-pub struct MetadataInformationResultElements {
-    pub elements: Vec<Box<dyn MetadataInformationResultElement>>,
-}
+pub mod gmd;
+pub mod imdv;
+pub mod original;
+pub mod ps;
+pub mod verify;

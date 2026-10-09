@@ -15,20 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-/// Generic Metadata
 pub mod gmd;
-
-/// CDNI Metadata
-pub mod md;
-
-/// Processing Stages Metadata
+pub mod imd;
+pub mod original;
 pub mod ps;
-
-pub mod mi;
-
-/// Processing of Generic Metadata
-pub mod gmdp;
-pub mod processors;
 
 #[cfg(test)]
 pub mod tests;

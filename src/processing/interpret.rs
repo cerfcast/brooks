@@ -15,17 +15,26 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Generic Metadata Processing
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
-use std::fmt::{Debug, Display};
-use std::str::FromStr;
+use crate::{
+    prr::{self, Prr, PrrType, ValueType},
+    utils::try_to_url,
+};
 
-use http::{HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode, uri};
+/// Concrete instances of MI generated during interpretation that may be used to specify post-interpretation behavior.
+pub trait MetadataInformationResultElement: Debug {}
 
-use crate::cdni::gmd::spec::TypedGenericMetadata;
-use crate::cdni::md::verify::CdniVerificationKey;
-use crate::tools::prr;
+/// TODO
+#[derive(Debug, Default)]
+pub struct MetadataInformationResultElements {
+    pub elements: Vec<Box<dyn MetadataInformationResultElement>>,
+}
 
+/// TODO
 #[derive(Debug, PartialEq)]
 pub enum Stages {
     Pre,
@@ -45,6 +54,7 @@ pub enum Stages {
     Post,
 }
 
+/// TODO
 #[derive(Debug)]
 pub enum Error {
     InvalidType(String /* expected */, String /* actual */),
@@ -79,14 +89,13 @@ impl Display for Error {
 /// TODO: Determine whether the runtime can be factored out (made generic).
 #[derive(Debug)]
 pub struct InterpreterContext<C> {
-    pub request: Option<Request<Vec<u8>>>,
+    pub request: Option<http::Request<Vec<u8>>>,
     pub response: Option<reqwest::Response>,
     pub runtime: tokio::runtime::Runtime,
     pub cookie: C,
 }
 
-pub type AnalysisResult<Ck, Error> = Result<(Ck, CdniVerificationKey), Box<Error>>;
-
+/// TODO
 pub type InterpretationResult<Ck, Res, Error> = Result<(Ck, Res), Box<Error>>;
 
 /// Interpret a validated representation of a given piece of Metadata Information.
@@ -98,35 +107,21 @@ pub trait Interpreter<Ck, Res, Error>: Debug {
     fn stage(&self, stage: Stages) -> bool;
 }
 
-/// Generate a validated representation of a given piece of Metadata Information, if possible.
-pub trait Verifier<Ck, Error>: Debug {
-    fn analyze(&self, v: &TypedGenericMetadata<()>, input: Ck) -> AnalysisResult<Ck, Error>;
-
-    fn type_name(&self, candidate: &str) -> bool;
-}
-
-pub fn try_to_url<A: ToString>(from: A) -> Result<url::Url, url::ParseError> {
-    url::Url::from_str(&from.to_string())
-}
-
-pub fn try_to_uri<A: ToString>(from: A) -> Result<http::Uri, uri::InvalidUri> {
-    http::Uri::from_str(&from.to_string())
-}
-
+/// TODO
 #[derive(Debug)]
 pub struct ProcessedRequestResponse {
-    pub oheaders: HeaderMap<HeaderValue>,
+    pub oheaders: http::HeaderMap<http::HeaderValue>,
     pub obody: Vec<u8>,
     pub ourl: url::Url,
-    pub ostatus: Option<StatusCode>,
-    pub omethod: Method,
+    pub ostatus: Option<http::StatusCode>,
+    pub omethod: http::Method,
     pub tpe: prr::PrrType,
 }
 
 impl ProcessedRequestResponse {
-    pub fn new_request(url: &url::Url, method: &Method) -> Self {
+    pub fn new_request(url: &url::Url, method: &http::Method) -> Self {
         ProcessedRequestResponse {
-            oheaders: HeaderMap::<HeaderValue>::default(),
+            oheaders: http::HeaderMap::<http::HeaderValue>::default(),
             obody: vec![],
             ourl: url.clone(),
             ostatus: None,
@@ -135,9 +130,9 @@ impl ProcessedRequestResponse {
         }
     }
 
-    pub fn new_response(url: &url::Url, method: &Method) -> Self {
+    pub fn new_response(url: &url::Url, method: &http::Method) -> Self {
         ProcessedRequestResponse {
-            oheaders: HeaderMap::<HeaderValue>::default(),
+            oheaders: http::HeaderMap::<http::HeaderValue>::default(),
             obody: vec![],
             ourl: url.clone(),
             ostatus: None,
@@ -154,7 +149,7 @@ impl TryFrom<&http::Request<Vec<u8>>> for ProcessedRequestResponse {
         let mut result =
             ProcessedRequestResponse::new_request(&try_to_url(value.uri())?, value.method());
 
-        let mut headers = HeaderMap::<HeaderValue>::default();
+        let mut headers = http::HeaderMap::<http::HeaderValue>::default();
         for (k, v) in value.headers() {
             headers.insert(k, v.clone());
         }
@@ -168,7 +163,7 @@ impl TryFrom<&http::Request<Vec<u8>>> for ProcessedRequestResponse {
 }
 
 impl prr::Prr<Vec<u8>> for ProcessedRequestResponse {
-    fn headers(&self) -> Vec<(String, HeaderValue)> {
+    fn headers(&self) -> Vec<(String, http::HeaderValue)> {
         self.oheaders
             .iter()
             .map(|(k, v)| (k.to_string(), v.clone()))
@@ -176,13 +171,13 @@ impl prr::Prr<Vec<u8>> for ProcessedRequestResponse {
     }
 
     fn set_header_value(&mut self, header: &str, value: &str) -> prr::Result<()> {
-        let header_to_set = HeaderName::from_str(header).map_err(|_| {
+        let header_to_set = http::HeaderName::from_str(header).map_err(|_| {
             prr::Error::BadValue(prr::Value {
                 tpe: prr::ValueType::HeaderName,
                 value: Some(header.to_string()),
             })
         })?;
-        let header_to_set_value = HeaderValue::from_str(value).map_err(|_| {
+        let header_to_set_value = http::HeaderValue::from_str(value).map_err(|_| {
             prr::Error::BadValue(prr::Value {
                 tpe: prr::ValueType::HeaderValue,
                 value: Some(value.to_string()),
@@ -194,7 +189,7 @@ impl prr::Prr<Vec<u8>> for ProcessedRequestResponse {
     }
 
     fn remove_header(&mut self, header: &str) -> prr::Result<()> {
-        let header_to_remove = HeaderName::from_str(header).map_err(|_| {
+        let header_to_remove = http::HeaderName::from_str(header).map_err(|_| {
             prr::Error::BadValue(prr::Value {
                 tpe: prr::ValueType::HeaderName,
                 value: Some(header.to_string()),
@@ -218,7 +213,7 @@ impl prr::Prr<Vec<u8>> for ProcessedRequestResponse {
     }
 
     fn set_status(&mut self, response: &u16) -> prr::Result<()> {
-        self.ostatus = Some(StatusCode::from_u16(*response).map_err(|_| {
+        self.ostatus = Some(http::StatusCode::from_u16(*response).map_err(|_| {
             prr::Error::BadValue(prr::Value {
                 tpe: prr::ValueType::Status,
                 value: Some(response.to_string()),
@@ -241,7 +236,7 @@ impl prr::Prr<Vec<u8>> for ProcessedRequestResponse {
         Ok(&self.obody)
     }
 
-    fn get_status(&self) -> prr::Result<StatusCode> {
+    fn get_status(&self) -> prr::Result<http::StatusCode> {
         self.ostatus
             .ok_or(prr::Error::MissingValue(prr::ValueType::Status))
     }
@@ -257,5 +252,45 @@ impl prr::Prr<Vec<u8>> for ProcessedRequestResponse {
 
     fn get_method(&self) -> http::Method {
         self.omethod.clone()
+    }
+}
+
+impl TryFrom<&dyn Prr<Vec<u8>>> for reqwest::Request {
+    type Error = prr::Error;
+
+    fn try_from(value: &dyn Prr<Vec<u8>>) -> std::result::Result<Self, Self::Error> {
+        if value.tpe() != PrrType::Request {
+            return Err(prr::Error::InvalidMode);
+        }
+
+        let url = value
+            .url()
+            .map_err(|_| prr::Error::MissingValue(ValueType::Url))?;
+
+        let mut request = reqwest::Request::new(reqwest::Method::GET, url);
+
+        // Put in the headers.
+        for (header_key, header_value) in value.headers() {
+            request.headers_mut().insert(
+                http::HeaderName::from_str(&header_key).map_err(|_| {
+                    prr::Error::BadValue(prr::Value {
+                        tpe: ValueType::HeaderName,
+                        value: Some(header_key.clone()),
+                    })
+                })?,
+                header_value,
+            );
+        }
+
+        // Configure the body.
+        request.body_mut().replace(
+            value
+                .get_body()
+                .map_err(|_| prr::Error::MissingValue(ValueType::Body))?
+                .clone()
+                .into(),
+        );
+
+        Ok(request)
     }
 }

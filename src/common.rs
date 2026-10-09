@@ -15,9 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt::Debug;
 use std::fmt::Display;
 
-use crate::logging::Location;
+pub trait Location: Display + Debug {}
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct GrammarLocation {
@@ -30,16 +31,5 @@ impl Location for GrammarLocation {}
 impl Display for GrammarLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} to {}", self.start, self.start + self.extent)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::mel::ast::Mel;
-    use crate::mel::grammar::GrammarNode;
-
-    #[test]
-    fn test_grammar_node() {
-        assert_eq!(Mel::<()>::name()[0], "mel")
     }
 }

@@ -29,7 +29,7 @@ use crate::{
             req_type, uri_type,
         },
     },
-    tools::prr,
+    prr,
 };
 
 /// Create a scope that contains the types of the MEL core variables.

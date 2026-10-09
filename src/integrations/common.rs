@@ -20,17 +20,7 @@ use http::Request;
 use tokio::runtime::Handle;
 
 use crate::{
-    cdni::{
-        gmdp::ProcessedRequestResponse,
-        md::{
-            interpret::{
-                HmdInterpretResultError, HmdInterpretValue, HmdTransformError, MdInterpretError,
-                interpret_metadata,
-            },
-            spec::TypedHostMetadata,
-            verify::verify_metadata,
-        },
-    },
+    cdni::imd::spec::TypedHostMetadata,
     environment::scope::{Scope, Scopes},
     integrations::hmds::{HmdsConfiguration, query_hmds},
     logging::{LogLevel, LogMsg, LogMsgs},
@@ -39,7 +29,15 @@ use crate::{
         scope::{builtin_function_types, minimal_core_variable_types},
         types::Type,
     },
-    tools::prr,
+    processing::{
+        imdi::{
+            HmdInterpretResultError, HmdInterpretValue, HmdTransformError, MdInterpretError,
+            interpret_interconnection_metadata,
+        },
+        interpret::ProcessedRequestResponse,
+    },
+    prr,
+    verifying::imdv::verify_interconnection_metadata,
 };
 
 pub fn safe_brooks_integration_handle(
@@ -108,7 +106,7 @@ pub fn safe_brooks_integration_handle(
                 scopes: vec![&minimal_core_variable_types() + &builtin_function_types()],
             };
 
-            let found = match verify_metadata(&metadata.value, types_scope) {
+            let found = match verify_interconnection_metadata(&metadata.value, types_scope) {
                 Ok(o) => o,
                 Err(e) => {
                     return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
@@ -143,5 +141,5 @@ pub fn safe_brooks_integration_handle(
         &*processed_http_req as &dyn prr::Prr<Vec<u8>>,
     ));
 
-    interpret_metadata(&found, mel_scopes, processed_http_req, runtime, log)
+    interpret_interconnection_metadata(&found, mel_scopes, processed_http_req, runtime, log)
 }
