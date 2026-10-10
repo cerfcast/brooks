@@ -14,12 +14,25 @@ the [CDNI Processing Stages Metadata](https://datatracker.ietf.org/doc/draft-iet
 
 ### Try It Out
 
-There are a few different ways to try out the library! They are all documented in the peer repository that hosts
-the source code for a CLI tool that uses this library. You can find it at
+There are a few different ways to try out the library!
 
+#### MEL Explorer
 
-[https://github.com/cerfcast/brooks-cli](https://github.com/cerfcast/brooks-cli)
+At the heart of Brooks is a compiler, analyzer and interpreter for MEL. In order to increase awareness about the power
+and utility of MEL, there is an online "compiler explorer"[^godbolt] which can be used to explore how MEL expressions are parsed
+and analyzed:
 
+[melex.brooks.cerfca.st](https://melex.brooks.cerfca.st)
+
+[^godbolt]: Yes, we are _huge_ fans of [Matt Godbolt](https://xania.org/) and the eponymous ~~godbolt.org~~ [Compiler Explorer](https://www.compiler-explorer.org). Yes, of course we named the tool in his honor!
+
+#### Other Live Demos
+
+There are several other demo deployments of the Brooks library running live and they are all documented in the peer
+repository that hosts the source code for tool that provides an interface between peer CDNs who want to exchange
+interconnection metadata. You can find it at
+
+[https://github.com/cerfcast/brooks-ics](https://github.com/cerfcast/brooks-ics)
 
 ### Goals
 
