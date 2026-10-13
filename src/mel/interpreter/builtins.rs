@@ -344,16 +344,6 @@ impl Keep_Query_MultiBuiltin {
     }
 }
 
-#[builtin_function_interpreter(Type::Boolean, Type::Integer)]
-impl BooleanBuiltin {
-    fn interp(&self, c: &i64) -> BuiltinInterpResult {
-        Ok(TypedValue {
-            value: Value::Boolean(*c != 0),
-            tpe: Type::Boolean,
-        })
-    }
-}
-
 #[builtin_function_interpreter(Type::String, Type::String)]
 impl UpperBuiltin {
     fn interp(&self, s: &str) -> BuiltinInterpResult {
@@ -371,6 +361,63 @@ impl LowerBuiltin {
             value: Value::String(s.to_lowercase()),
             tpe: Type::String,
         })
+    }
+}
+
+impl BuiltinFunctionInterpreter for BooleanBuiltin {
+    fn interpw(&self, args: Value) -> BuiltinInterpResult {
+        let args = match args {
+            Value::ArgumentList(args) => args,
+            _ => return Err(BuiltinInterpError::ArgumentsInvalid.into()),
+        };
+
+        if args.len() != 1 {
+            return Err(BuiltinInterpError::ArgumentMiscount(1, args.len()).into());
+        }
+
+        let arg = &args[0];
+
+        let result = match arg {
+            TypedValue {
+                value: Value::Nil,
+                tpe: Type::Nil,
+            } => TypedValue {
+                value: Value::Boolean(false),
+                tpe: Type::Boolean,
+            },
+            TypedValue {
+                value: Value::String(s),
+                tpe: Type::String,
+            } => TypedValue {
+                value: Value::Boolean(!s.is_empty()),
+                tpe: Type::Boolean,
+            },
+            TypedValue {
+                value: Value::Integer(i),
+                tpe: Type::Integer,
+            } => TypedValue {
+                value: Value::Boolean(*i != 0),
+                tpe: Type::Boolean,
+            },
+            TypedValue {
+                value: Value::Real(r),
+                tpe: Type::Real,
+            } => TypedValue {
+                value: Value::Boolean(*r != 0.0),
+                tpe: Type::Boolean,
+            },
+            b @ TypedValue {
+                value: Value::Boolean(_),
+                tpe: Type::Boolean,
+            } => b.clone(),
+            TypedValue { value: _, tpe: t } => {
+                return Err(BuiltinInterpError::RuntimeError(format!(
+                    "Semantics of calling boolean on an argument with type {t} are undefined"
+                ))
+                .into());
+            }
+        };
+        Ok(result)
     }
 }
 

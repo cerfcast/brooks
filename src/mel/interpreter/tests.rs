@@ -2502,8 +2502,174 @@ mod builtin_function_interpreter_tests {
                 Value::{self, ArgumentList},
             },
         },
-        types::{Add_Query_MultiBuiltin, IntegerBuiltin, Type},
+        types::{Add_Query_MultiBuiltin, BooleanBuiltin, IntegerBuiltin, Type},
     };
+
+    #[test]
+    fn test_interpret_builtin_function_boolean_parameter_count_not_ok() {
+        let bb = BooleanBuiltin {};
+
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+        ]);
+
+        assert_matches!(
+            *bb.interpw(arg_values)
+                .expect_err("Could interpret call to builtin function with wrong argument count"),
+            BuiltinInterpError::ArgumentMiscount(1, 2)
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_boolean_string_empty_ok() {
+        let bb = BooleanBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::String("".to_string()),
+            tpe: Type::String,
+        }]);
+
+        assert_matches!(
+            bb.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Boolean(false),
+                tpe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_boolean_string_with_contents_ok() {
+        let bb = BooleanBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::String("has something".to_string()),
+            tpe: Type::String,
+        }]);
+
+        assert_matches!(
+            bb.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Boolean(true),
+                tpe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_boolean_integer_zero_ok() {
+        let bb = BooleanBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Integer(0),
+            tpe: Type::Integer,
+        }]);
+
+        assert_matches!(
+            bb.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Boolean(false),
+                tpe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_boolean_integer_non_zero_ok() {
+        let bb = BooleanBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Integer(5),
+            tpe: Type::Integer,
+        }]);
+
+        assert_matches!(
+            bb.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Boolean(true),
+                tpe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_boolean_real_zero_ok() {
+        let bb = BooleanBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Real(0.0),
+            tpe: Type::Real,
+        }]);
+
+        assert_matches!(
+            bb.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Boolean(false),
+                tpe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_boolean_real_non_zero_ok() {
+        let bb = BooleanBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Real(5.5),
+            tpe: Type::Real,
+        }]);
+
+        assert_matches!(
+            bb.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Boolean(true),
+                tpe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_boolean_boolean_false_ok() {
+        let bb = BooleanBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Boolean(false),
+            tpe: Type::Boolean,
+        }]);
+
+        assert_matches!(
+            bb.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Boolean(false),
+                tpe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_boolean_true_ok() {
+        let bb = BooleanBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Boolean(true),
+            tpe: Type::Boolean,
+        }]);
+
+        assert_matches!(
+            bb.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Boolean(true),
+                tpe: Type::Boolean
+            })
+        );
+    }
 
     #[test]
     fn test_interpret_builtin_function_integer_parameter_count_not_ok() {

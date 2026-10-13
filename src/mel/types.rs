@@ -252,10 +252,6 @@ pub struct Path_ElementBuiltin {}
 #[builtin_function(Type::String, Type::String, Type::Integer, Type::Integer)]
 pub struct Path_ElementsBuiltin {}
 
-#[derive(Debug, Clone)]
-#[builtin_function(Type::Boolean, Type::Integer)]
-pub struct BooleanBuiltin {}
-
 #[allow(non_camel_case_types)]
 #[derive(Clone, Default, Debug)]
 #[builtin_function(Type::String, Type::String, Type::String)]
@@ -302,6 +298,23 @@ pub struct LowerBuiltin {}
 pub struct UpperBuiltin {}
 
 #[derive(Clone, Default, Debug)]
+pub struct BooleanBuiltin {}
+impl BuiltinFunction for BooleanBuiltin {}
+impl BuiltinFunctionType for BooleanBuiltin {
+    fn name(&self) -> String {
+        "boolean".to_string()
+    }
+
+    fn params_type_checker(&self) -> ParamsTypeCheckerGenerator {
+        || Box::new(TypelessParamTypeChecker { count: 1 })
+    }
+
+    fn return_type_calculator(&self) -> ReturnTypeCalculator {
+        || Type::Boolean
+    }
+}
+
+#[derive(Clone, Default, Debug)]
 pub struct IntegerBuiltin {}
 impl BuiltinFunction for IntegerBuiltin {}
 impl BuiltinFunctionType for IntegerBuiltin {
@@ -331,7 +344,7 @@ impl BuiltinFunctionType for RealBuiltin {
     }
 
     fn return_type_calculator(&self) -> ReturnTypeCalculator {
-        || Type::Integer
+        || Type::Real
     }
 }
 
