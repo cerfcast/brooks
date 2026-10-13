@@ -2506,17 +2506,151 @@ mod builtin_function_interpreter_tests {
     };
 
     #[test]
-    #[ignore = "TODO"]
-    fn test_interpret_builtin_function_integer_parameter_count_ok() {
-        let _b = IntegerBuiltin {};
+    fn test_interpret_builtin_function_integer_parameter_count_not_ok() {
+        let ib = IntegerBuiltin {};
 
-        let _arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Integer(5),
-            tpe: Type::Integer,
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+        ]);
+
+        assert_matches!(
+            *ib.interpw(arg_values)
+                .expect_err("Could interpret call to builtin function with wrong argument count"),
+            BuiltinInterpError::ArgumentMiscount(1, 2)
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_integer_string_ok() {
+        let ib = IntegerBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::String("5".to_string()),
+            tpe: Type::String,
         }]);
 
-        // Update when implemented.
-        todo!()
+        assert_matches!(
+            ib.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Integer(5),
+                tpe: Type::Integer
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_integer_string_negative_ok() {
+        let ib = IntegerBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::String("-505".to_string()),
+            tpe: Type::String,
+        }]);
+
+        assert_matches!(
+            ib.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Integer(-505),
+                tpe: Type::Integer
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_integer_string_invalid_nil() {
+        let ib = IntegerBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::String("abc".to_string()),
+            tpe: Type::String,
+        }]);
+
+        assert_matches!(
+            ib.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Nil,
+                tpe: Type::Nil
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_integer_real_ok() {
+        let ib = IntegerBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Real(5.5),
+            tpe: Type::Real,
+        }]);
+
+        assert_matches!(
+            ib.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Integer(5),
+                tpe: Type::Integer
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_integer_negative_real_ok() {
+        let ib = IntegerBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Real(-5.5),
+            tpe: Type::Real,
+        }]);
+
+        assert_matches!(
+            ib.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Integer(-5),
+                tpe: Type::Integer
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_integer_boolean_true_ok() {
+        let ib = IntegerBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Boolean(true),
+            tpe: Type::Boolean,
+        }]);
+
+        assert_matches!(
+            ib.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Integer(1),
+                tpe: Type::Integer
+            })
+        );
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_integer_boolean_false_ok() {
+        let ib = IntegerBuiltin {};
+
+        let arg_values = ArgumentList(vec![TypedValue {
+            value: Value::Boolean(false),
+            tpe: Type::Boolean,
+        }]);
+
+        assert_matches!(
+            ib.interpw(arg_values),
+            Ok(TypedValue {
+                value: Value::Integer(0),
+                tpe: Type::Integer
+            })
+        );
     }
 
     #[test]

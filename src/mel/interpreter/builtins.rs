@@ -387,7 +387,55 @@ impl BuiltinFunctionInterpreter for IntegerBuiltin {
 
         // Now, interpret!
 
-        todo!()
+        let arg = &args[0];
+
+        let result = match arg {
+            TypedValue {
+                value: Value::Nil,
+                tpe: Type::Nil,
+            } => TypedValue {
+                value: Value::Integer(0),
+                tpe: Type::Integer,
+            },
+            TypedValue {
+                value: Value::String(s),
+                tpe: Type::String,
+            } => s.parse().map_or(
+                TypedValue {
+                    value: Value::Nil,
+                    tpe: Type::Nil,
+                },
+                |v| TypedValue {
+                    value: Value::Integer(v),
+                    tpe: Type::Integer,
+                },
+            ),
+            v @ TypedValue {
+                value: Value::Integer(_),
+                tpe: Type::Integer,
+            } => v.clone(),
+            TypedValue {
+                value: Value::Real(r),
+                tpe: Type::Real,
+            } => TypedValue {
+                value: Value::Integer(*r as i64),
+                tpe: Type::Integer,
+            },
+            TypedValue {
+                value: Value::Boolean(b),
+                tpe: Type::Boolean,
+            } => TypedValue {
+                value: Value::Integer(if *b { 1 } else { 0 }),
+                tpe: Type::Integer,
+            },
+            TypedValue { value: _, tpe: t } => {
+                return Err(BuiltinInterpError::RuntimeError(format!(
+                    "Semantics of calling integer on an argument with type {t} are undefined"
+                ))
+                .into());
+            }
+        };
+        Ok(result)
     }
 }
 
