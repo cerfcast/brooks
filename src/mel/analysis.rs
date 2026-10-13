@@ -399,7 +399,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 arguments: arg_types,
                 location: ast.location.clone(),
                 aug: Analyzed {
-                    tipe: Type::None,
+                    tipe: Type::Nil,
                     constant: None,
                 },
             }))),
@@ -707,7 +707,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                 member: Identifier {
                     identifier: ast.member.identifier.clone(),
                     aug: Analyzed {
-                        tipe: types::Type::None,
+                        tipe: types::Type::Nil,
                         constant: None,
                     },
                     location: ast.location.clone(),

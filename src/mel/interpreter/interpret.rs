@@ -118,6 +118,7 @@ pub enum Value {
     Function(Arc<dyn BuiltinFunction>),
     Struct(StructValue),
     ArgumentList(Vec<TypedValue>),
+    Nil,
     #[default]
     Uninitialized,
 }
@@ -131,6 +132,7 @@ pub struct TypedValue {
 impl Display for TypedValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
+            Value::Nil => write!(f, "nil"),
             Value::Integer(i) => write!(f, "{i}"),
             Value::Real(i) => write!(f, "{i}"),
             Value::String(s) => write!(f, "\"{s}\""),

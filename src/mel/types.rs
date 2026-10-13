@@ -117,7 +117,7 @@ pub enum Type {
     Function(String, ReturnTypeCalculator, ParamsTypeCheckerGenerator),
     Struct(Struct),
     #[default]
-    None,
+    Nil,
 }
 
 impl PartialEq for Type {
@@ -167,7 +167,7 @@ impl Display for Type {
                 write!(f, "Name: {name} Return Type: {rt}, Parameter Types: {ptc}")
             }
             Type::Struct(s) => write!(f, "Struct: {s}"),
-            Type::None => write!(f, "None"),
+            Type::Nil => write!(f, "Nil"),
         }
     }
 }

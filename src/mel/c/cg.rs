@@ -146,7 +146,7 @@ pub(crate) fn mel_type_to_c_type(tipe: &Type) -> String {
         Type::IPAddress => todo!(),
         Type::Params(_) => todo!(),
         Type::Function(_, _, _) => todo!(),
-        Type::None => todo!(),
+        Type::Nil => todo!(),
     }
 }
 
