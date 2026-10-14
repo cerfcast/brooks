@@ -511,16 +511,31 @@ impl BuiltinFunctionInterpreter for UnsignedBuiltin {
             TypedValue {
                 value: Value::String(s),
                 tpe: Type::String,
-            } => s.parse().map_or(
-                TypedValue {
-                    value: Value::Nil,
-                    tpe: Type::Nil,
-                },
-                |v| TypedValue {
-                    value: Value::Integer(v),
-                    tpe: Type::Integer,
-                },
-            ),
+            } => {
+                if s.starts_with("0x") {
+                    u64::from_str_radix(s.trim_start_matches("0x"), 16).map_or(
+                        TypedValue {
+                            value: Value::Nil,
+                            tpe: Type::Nil,
+                        },
+                        |v| TypedValue {
+                            value: Value::Unsigned(v),
+                            tpe: Type::Unsigned,
+                        },
+                    )
+                } else {
+                    s.parse().map_or(
+                        TypedValue {
+                            value: Value::Nil,
+                            tpe: Type::Nil,
+                        },
+                        |v| TypedValue {
+                            value: Value::Unsigned(v),
+                            tpe: Type::Unsigned,
+                        },
+                    )
+                }
+            }
             TypedValue {
                 value: Value::Integer(value),
                 tpe: Type::Integer,

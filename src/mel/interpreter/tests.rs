@@ -2731,16 +2731,40 @@ mod builtin_conversion_function_interpreter_tests {
             UnsignedBuiltin {},
             String,
             "5".to_string(),
-            Integer,
+            Unsigned,
             5
         );
 
         builtin_conversion_function_simple_test!(
             UnsignedBuiltin {},
             String,
-            "-505".to_string(),
-            Integer,
-            -505
+            "0xff".to_string(),
+            Unsigned,
+            255
+        );
+
+        builtin_conversion_function_extended_test!(
+            UnsignedBuiltin {},
+            TypedValue {
+                value: Value::String("x05".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
+                value: Value::Nil,
+                tpe: Type::Nil,
+            }
+        );
+
+        builtin_conversion_function_extended_test!(
+            UnsignedBuiltin {},
+            TypedValue {
+                value: Value::String("-505".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
+                value: Value::Nil,
+                tpe: Type::Nil,
+            }
         );
 
         builtin_conversion_function_extended_test!(
