@@ -334,6 +334,23 @@ impl BuiltinFunctionType for IntegerBuiltin {
 }
 
 #[derive(Clone, Default, Debug)]
+pub struct UnsignedBuiltin {}
+impl BuiltinFunction for UnsignedBuiltin {}
+impl BuiltinFunctionType for UnsignedBuiltin {
+    fn name(&self) -> String {
+        "unsigned".to_string()
+    }
+
+    fn params_type_checker(&self) -> ParamsTypeCheckerGenerator {
+        || Box::new(TypelessParamTypeChecker { count: 1 })
+    }
+
+    fn return_type_calculator(&self) -> ReturnTypeCalculator {
+        || Type::Unsigned
+    }
+}
+
+#[derive(Clone, Default, Debug)]
 pub struct RealBuiltin {}
 impl BuiltinFunction for RealBuiltin {}
 impl BuiltinFunctionType for RealBuiltin {

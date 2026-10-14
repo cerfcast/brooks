@@ -22,11 +22,11 @@ use crate::{
         types::{
             Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
             IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,
-            MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, Remove_Query_MultiBuiltin,
-            Remove_QueryBuiltin,
+            MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, RealBuiltin,
+            Remove_Query_MultiBuiltin, Remove_QueryBuiltin, StringBuiltin,
             Type::{self, Function},
-            UpperBuiltin, header_type, header_type_from_processable_rr, header_type_from_req,
-            req_type, uri_type,
+            UnsignedBuiltin, UpperBuiltin, header_type, header_type_from_processable_rr,
+            header_type_from_req, req_type, uri_type,
         },
     },
     prr,
@@ -66,8 +66,13 @@ pub fn builtin_function_types() -> Scope<Type> {
     let keep_query_multi = Keep_Query_MultiBuiltin {};
     let lower = LowerBuiltin {};
     let upper = UpperBuiltin {};
+
+    // Builtin conversion functions.
     let boolean = BooleanBuiltin {};
     let integer = IntegerBuiltin {};
+    let unsigned = UnsignedBuiltin {};
+    let string = StringBuiltin {};
+    let real = RealBuiltin {};
 
     let mut scopes = Scope::<Type>::default();
     scopes = add_builtin_function_type_to_scope!(scopes, path_element);
@@ -81,8 +86,12 @@ pub fn builtin_function_types() -> Scope<Type> {
     scopes = add_builtin_function_type_to_scope!(scopes, keep_query_multi);
     scopes = add_builtin_function_type_to_scope!(scopes, lower);
     scopes = add_builtin_function_type_to_scope!(scopes, upper);
+
     scopes = add_builtin_function_type_to_scope!(scopes, boolean);
     scopes = add_builtin_function_type_to_scope!(scopes, integer);
+    scopes = add_builtin_function_type_to_scope!(scopes, real);
+    scopes = add_builtin_function_type_to_scope!(scopes, string);
+    scopes = add_builtin_function_type_to_scope!(scopes, unsigned);
     scopes
 }
 

@@ -31,7 +31,8 @@ use crate::{
             Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
             IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,
             MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, RealBuiltin,
-            Remove_Query_MultiBuiltin, Remove_QueryBuiltin, StringBuiltin, Type, UpperBuiltin,
+            Remove_Query_MultiBuiltin, Remove_QueryBuiltin, StringBuiltin, Type, UnsignedBuiltin,
+            UpperBuiltin,
         },
     },
 };
@@ -486,6 +487,90 @@ impl BuiltinFunctionInterpreter for IntegerBuiltin {
     }
 }
 
+impl BuiltinFunctionInterpreter for UnsignedBuiltin {
+    fn interpw(&self, args: Value) -> BuiltinInterpResult {
+        let args = match args {
+            Value::ArgumentList(args) => args,
+            _ => return Err(BuiltinInterpError::ArgumentsInvalid.into()),
+        };
+
+        if args.len() != 1 {
+            return Err(BuiltinInterpError::ArgumentMiscount(1, args.len()).into());
+        }
+
+        let arg = &args[0];
+
+        let result = match arg {
+            TypedValue {
+                value: Value::Nil,
+                tpe: Type::Nil,
+            } => TypedValue {
+                value: Value::Unsigned(0),
+                tpe: Type::Unsigned,
+            },
+            TypedValue {
+                value: Value::String(s),
+                tpe: Type::String,
+            } => s.parse().map_or(
+                TypedValue {
+                    value: Value::Nil,
+                    tpe: Type::Nil,
+                },
+                |v| TypedValue {
+                    value: Value::Integer(v),
+                    tpe: Type::Integer,
+                },
+            ),
+            TypedValue {
+                value: Value::Integer(value),
+                tpe: Type::Integer,
+            } => {
+                if *value >= 0 {
+                    TypedValue {
+                        value: Value::Unsigned(*value as u64),
+                        tpe: Type::Unsigned,
+                    }
+                } else {
+                    TypedValue {
+                        value: Value::Unsigned(0),
+                        tpe: Type::Unsigned,
+                    }
+                }
+            }
+            TypedValue {
+                value: Value::Real(r),
+                tpe: Type::Real,
+            } => {
+                if *r >= 0.0 {
+                    TypedValue {
+                        value: Value::Unsigned(*r as u64),
+                        tpe: Type::Unsigned,
+                    }
+                } else {
+                    TypedValue {
+                        value: Value::Unsigned(0),
+                        tpe: Type::Unsigned,
+                    }
+                }
+            }
+            TypedValue {
+                value: Value::Boolean(b),
+                tpe: Type::Boolean,
+            } => TypedValue {
+                value: Value::Unsigned(if *b { 1 } else { 0 }),
+                tpe: Type::Unsigned,
+            },
+            TypedValue { value: _, tpe: t } => {
+                return Err(BuiltinInterpError::RuntimeError(format!(
+                    "Semantics of calling integer on an argument with type {t} are undefined"
+                ))
+                .into());
+            }
+        };
+        Ok(result)
+    }
+}
+
 impl BuiltinFunctionInterpreter for RealBuiltin {
     fn interpw(&self, args: Value) -> BuiltinInterpResult {
         let args = match args {
@@ -513,8 +598,10 @@ impl BuiltinFunctionInterpreter for StringBuiltin {
             return Err(BuiltinInterpError::ArgumentMiscount(1, args.len()).into());
         }
 
-        // Now, interpret!
-        todo!()
+        Ok(TypedValue {
+            value: Value::String(args[0].to_string()),
+            tpe: Type::String,
+        })
     }
 }
 
@@ -546,7 +633,13 @@ pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
     let keep_query_multi = Keep_Query_MultiBuiltin {};
     let lower = LowerBuiltin {};
     let upper = UpperBuiltin {};
+
+    // Conversion functions.
     let boolean = BooleanBuiltin {};
+    let integer = IntegerBuiltin {};
+    let unsigned = UnsignedBuiltin {};
+    let string = StringBuiltin {};
+    let real = RealBuiltin {};
 
     let mut scopes = Scope::<TypedValue>::default();
 
@@ -561,6 +654,11 @@ pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
     scopes = add_builtin_function_interpreter_to_scope!(scopes, keep_query_multi);
     scopes = add_builtin_function_interpreter_to_scope!(scopes, lower);
     scopes = add_builtin_function_interpreter_to_scope!(scopes, upper);
+
     scopes = add_builtin_function_interpreter_to_scope!(scopes, boolean);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, integer);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, unsigned);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, string);
+    scopes = add_builtin_function_interpreter_to_scope!(scopes, real);
     scopes
 }

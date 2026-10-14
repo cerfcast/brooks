@@ -2487,11 +2487,11 @@ mod interpreter_value_tests {
     }
 }
 
-/// Test semantics and "checking" implementation of builtin functions directly.
+/// Test semantics and "checking" implementation of builtin conversion functions directly.
 ///
-/// See `type_check_tests` for similar tests in the context of analyzing a MEL expression.
+/// See the `type_check_tests` and `interpreter_tests` modules for similar tests in the context of analyzing a MEL expression.
 #[cfg(test)]
-mod builtin_function_interpreter_tests {
+mod builtin_conversion_function_interpreter_tests {
     use std::assert_matches;
 
     use crate::mel::{
@@ -2502,11 +2502,37 @@ mod builtin_function_interpreter_tests {
                 Value::{self, ArgumentList},
             },
         },
-        types::{Add_Query_MultiBuiltin, BooleanBuiltin, IntegerBuiltin, Type},
+        types::{BooleanBuiltin, IntegerBuiltin, StringBuiltin, Type, UnsignedBuiltin},
     };
 
+    macro_rules! builtin_conversion_function_extended_test {
+        ($interp:expr, $input:expr, $output:pat) => {
+            let interpreter = $interp;
+            let arg_values = ArgumentList(vec![$input]);
+            assert_matches!(interpreter.interpw(arg_values), Ok($output));
+        };
+    }
+
+    macro_rules! builtin_conversion_function_simple_test {
+        ($interp:expr, $input_type:tt, $input:expr, $output_type:tt, $output:pat $(, $condition:expr)?) => {
+            let interpreter = $interp;
+            let arg_values = ArgumentList(vec![TypedValue {
+                value: Value::$input_type($input),
+                tpe: Type::$input_type,
+            }]);
+
+            assert_matches!(
+                interpreter.interpw(arg_values),
+                Ok(TypedValue {
+                    value: Value::$output_type($output),
+                    tpe: Type::$output_type,
+                }) $(if $condition)?
+            );
+        };
+    }
+
     #[test]
-    fn test_interpret_builtin_function_boolean_parameter_count_not_ok() {
+    fn test_interpret_builtin_function_boolean() {
         let bb = BooleanBuiltin {};
 
         let arg_values = ArgumentList(vec![
@@ -2525,154 +2551,33 @@ mod builtin_function_interpreter_tests {
                 .expect_err("Could interpret call to builtin function with wrong argument count"),
             BuiltinInterpError::ArgumentMiscount(1, 2)
         );
-    }
 
-    #[test]
-    fn test_interpret_builtin_function_boolean_string_empty_ok() {
-        let bb = BooleanBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::String("".to_string()),
-            tpe: Type::String,
-        }]);
-
-        assert_matches!(
-            bb.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Boolean(false),
-                tpe: Type::Boolean
-            })
+        builtin_conversion_function_simple_test!(
+            BooleanBuiltin {},
+            String,
+            "".to_string(),
+            Boolean,
+            false
         );
-    }
 
-    #[test]
-    fn test_interpret_builtin_function_boolean_string_with_contents_ok() {
-        let bb = BooleanBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::String("has something".to_string()),
-            tpe: Type::String,
-        }]);
-
-        assert_matches!(
-            bb.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Boolean(true),
-                tpe: Type::Boolean
-            })
+        builtin_conversion_function_simple_test!(
+            BooleanBuiltin {},
+            String,
+            "has something".to_string(),
+            Boolean,
+            true
         );
+
+        builtin_conversion_function_simple_test!(BooleanBuiltin {}, Integer, 0, Boolean, false);
+        builtin_conversion_function_simple_test!(BooleanBuiltin {}, Integer, 5, Boolean, true);
+        builtin_conversion_function_simple_test!(BooleanBuiltin {}, Real, 0.0, Boolean, false);
+        builtin_conversion_function_simple_test!(BooleanBuiltin {}, Real, 5.5, Boolean, true);
+        builtin_conversion_function_simple_test!(BooleanBuiltin {}, Boolean, false, Boolean, false);
+        builtin_conversion_function_simple_test!(BooleanBuiltin {}, Boolean, true, Boolean, true);
     }
 
     #[test]
-    fn test_interpret_builtin_function_boolean_integer_zero_ok() {
-        let bb = BooleanBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Integer(0),
-            tpe: Type::Integer,
-        }]);
-
-        assert_matches!(
-            bb.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Boolean(false),
-                tpe: Type::Boolean
-            })
-        );
-    }
-
-    #[test]
-    fn test_interpret_builtin_function_boolean_integer_non_zero_ok() {
-        let bb = BooleanBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Integer(5),
-            tpe: Type::Integer,
-        }]);
-
-        assert_matches!(
-            bb.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Boolean(true),
-                tpe: Type::Boolean
-            })
-        );
-    }
-
-    #[test]
-    fn test_interpret_builtin_function_boolean_real_zero_ok() {
-        let bb = BooleanBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Real(0.0),
-            tpe: Type::Real,
-        }]);
-
-        assert_matches!(
-            bb.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Boolean(false),
-                tpe: Type::Boolean
-            })
-        );
-    }
-
-    #[test]
-    fn test_interpret_builtin_function_boolean_real_non_zero_ok() {
-        let bb = BooleanBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Real(5.5),
-            tpe: Type::Real,
-        }]);
-
-        assert_matches!(
-            bb.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Boolean(true),
-                tpe: Type::Boolean
-            })
-        );
-    }
-
-    #[test]
-    fn test_interpret_builtin_function_boolean_boolean_false_ok() {
-        let bb = BooleanBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Boolean(false),
-            tpe: Type::Boolean,
-        }]);
-
-        assert_matches!(
-            bb.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Boolean(false),
-                tpe: Type::Boolean
-            })
-        );
-    }
-
-    #[test]
-    fn test_interpret_builtin_function_boolean_true_ok() {
-        let bb = BooleanBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Boolean(true),
-            tpe: Type::Boolean,
-        }]);
-
-        assert_matches!(
-            bb.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Boolean(true),
-                tpe: Type::Boolean
-            })
-        );
-    }
-
-    #[test]
-    fn test_interpret_builtin_function_integer_parameter_count_not_ok() {
+    fn test_interpret_builtin_function_integer() {
         let ib = IntegerBuiltin {};
 
         let arg_values = ArgumentList(vec![
@@ -2691,133 +2596,190 @@ mod builtin_function_interpreter_tests {
                 .expect_err("Could interpret call to builtin function with wrong argument count"),
             BuiltinInterpError::ArgumentMiscount(1, 2)
         );
-    }
 
-    #[test]
-    fn test_interpret_builtin_function_integer_string_ok() {
-        let ib = IntegerBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::String("5".to_string()),
-            tpe: Type::String,
-        }]);
-
-        assert_matches!(
-            ib.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Integer(5),
-                tpe: Type::Integer
-            })
+        builtin_conversion_function_simple_test!(
+            IntegerBuiltin {},
+            String,
+            "5".to_string(),
+            Integer,
+            5
         );
-    }
 
-    #[test]
-    fn test_interpret_builtin_function_integer_string_negative_ok() {
-        let ib = IntegerBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::String("-505".to_string()),
-            tpe: Type::String,
-        }]);
-
-        assert_matches!(
-            ib.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Integer(-505),
-                tpe: Type::Integer
-            })
+        builtin_conversion_function_simple_test!(
+            IntegerBuiltin {},
+            String,
+            "-505".to_string(),
+            Integer,
+            -505
         );
-    }
 
-    #[test]
-    fn test_interpret_builtin_function_integer_string_invalid_nil() {
-        let ib = IntegerBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::String("abc".to_string()),
-            tpe: Type::String,
-        }]);
-
-        assert_matches!(
-            ib.interpw(arg_values),
-            Ok(TypedValue {
+        builtin_conversion_function_extended_test!(
+            IntegerBuiltin {},
+            TypedValue {
+                value: Value::String("abc".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
                 value: Value::Nil,
-                tpe: Type::Nil
-            })
+                tpe: Type::Nil,
+            }
+        );
+
+        builtin_conversion_function_simple_test!(IntegerBuiltin {}, Real, 5.5, Integer, 5);
+        builtin_conversion_function_simple_test!(IntegerBuiltin {}, Real, -5.5, Integer, -5);
+        builtin_conversion_function_simple_test!(IntegerBuiltin {}, Integer, 1, Integer, 1);
+        builtin_conversion_function_simple_test!(IntegerBuiltin {}, Boolean, false, Integer, 0);
+        builtin_conversion_function_simple_test!(IntegerBuiltin {}, Boolean, true, Integer, 1);
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_string() {
+        let ib = StringBuiltin {};
+
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+        ]);
+
+        assert_matches!(
+            *ib.interpw(arg_values)
+                .expect_err("Could interpret call to builtin function with wrong argument count"),
+            BuiltinInterpError::ArgumentMiscount(1, 2)
+        );
+
+        builtin_conversion_function_simple_test!(
+            StringBuiltin {},
+            String,
+            "5".to_string(),
+            String,
+            s,
+            s == "5"
+        );
+
+        builtin_conversion_function_simple_test!(
+            StringBuiltin {},
+            String,
+            "asdf".to_string(),
+            String,
+            s,
+            s == "asdf"
+        );
+
+        builtin_conversion_function_simple_test!(
+            StringBuiltin {},
+            Real,
+            5.5,
+            String,
+            s,
+            s == "5.5"
+        );
+        builtin_conversion_function_simple_test!(
+            StringBuiltin {},
+            Real,
+            -5.5,
+            String,
+            s,
+            s == "-5.5"
+        );
+        builtin_conversion_function_simple_test!(StringBuiltin {}, Integer, 1, String, s, s == "1");
+        builtin_conversion_function_simple_test!(
+            StringBuiltin {},
+            Boolean,
+            false,
+            String,
+            s,
+            s == "false"
+        );
+        builtin_conversion_function_simple_test!(
+            StringBuiltin {},
+            Boolean,
+            true,
+            String,
+            s,
+            s == "true"
         );
     }
 
     #[test]
-    fn test_interpret_builtin_function_integer_real_ok() {
-        let ib = IntegerBuiltin {};
+    fn test_interpret_builtin_function_unsigned() {
+        let ib = UnsignedBuiltin {};
 
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Real(5.5),
-            tpe: Type::Real,
-        }]);
-
-        assert_matches!(
-            ib.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Integer(5),
-                tpe: Type::Integer
-            })
-        );
-    }
-
-    #[test]
-    fn test_interpret_builtin_function_integer_negative_real_ok() {
-        let ib = IntegerBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Real(-5.5),
-            tpe: Type::Real,
-        }]);
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+        ]);
 
         assert_matches!(
-            ib.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Integer(-5),
-                tpe: Type::Integer
-            })
+            *ib.interpw(arg_values)
+                .expect_err("Could interpret call to builtin function with wrong argument count"),
+            BuiltinInterpError::ArgumentMiscount(1, 2)
         );
-    }
 
-    #[test]
-    fn test_interpret_builtin_function_integer_boolean_true_ok() {
-        let ib = IntegerBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Boolean(true),
-            tpe: Type::Boolean,
-        }]);
-
-        assert_matches!(
-            ib.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Integer(1),
-                tpe: Type::Integer
-            })
+        builtin_conversion_function_simple_test!(
+            UnsignedBuiltin {},
+            String,
+            "5".to_string(),
+            Integer,
+            5
         );
-    }
 
-    #[test]
-    fn test_interpret_builtin_function_integer_boolean_false_ok() {
-        let ib = IntegerBuiltin {};
-
-        let arg_values = ArgumentList(vec![TypedValue {
-            value: Value::Boolean(false),
-            tpe: Type::Boolean,
-        }]);
-
-        assert_matches!(
-            ib.interpw(arg_values),
-            Ok(TypedValue {
-                value: Value::Integer(0),
-                tpe: Type::Integer
-            })
+        builtin_conversion_function_simple_test!(
+            UnsignedBuiltin {},
+            String,
+            "-505".to_string(),
+            Integer,
+            -505
         );
+
+        builtin_conversion_function_extended_test!(
+            UnsignedBuiltin {},
+            TypedValue {
+                value: Value::String("abc".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
+                value: Value::Nil,
+                tpe: Type::Nil,
+            }
+        );
+
+        builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Real, 5.5, Unsigned, 5);
+        builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Real, -5.5, Unsigned, 0);
+        builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Integer, 1, Unsigned, 1);
+        builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Boolean, false, Unsigned, 0);
+        builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Boolean, true, Unsigned, 1);
     }
+}
+
+/// Test semantics and "checking" implementation of builtin functions directly.
+///
+/// See `type_check_tests` for similar tests in the context of analyzing a MEL expression.
+#[cfg(test)]
+mod builtin_function_interpreter_tests {
+    use std::assert_matches;
+
+    use crate::mel::{
+        interpreter::{
+            builtins::{BuiltinFunctionInterpreter, BuiltinInterpError},
+            interpret::{
+                TypedValue,
+                Value::{self, ArgumentList},
+            },
+        },
+        types::{Add_Query_MultiBuiltin, Type},
+    };
 
     #[test]
     fn test_interpret_builtin_function_query_path() {
