@@ -110,6 +110,7 @@ pub trait BuiltinFunction: BuiltinFunctionType + BuiltinFunctionInterpreter {}
 #[derive(Default, Debug, Clone)]
 pub enum Value {
     Integer(i64),
+    Unsigned(u64),
     Real(f64),
     String(String),
     Boolean(bool),
@@ -134,6 +135,7 @@ impl Display for TypedValue {
         match &self.value {
             Value::Nil => write!(f, "nil"),
             Value::Integer(i) => write!(f, "{i}"),
+            Value::Unsigned(u) => write!(f, "{u}"),
             Value::Real(i) => write!(f, "{i}"),
             Value::String(s) => write!(f, "\"{s}\""),
             Value::Boolean(b) => write!(f, "{b}"),

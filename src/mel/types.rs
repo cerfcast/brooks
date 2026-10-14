@@ -109,6 +109,7 @@ pub type ParamsTypeCheckerGenerator = fn() -> Box<dyn ParamsTypeChecker>;
 pub enum Type {
     Boolean,
     Integer,
+    Unsigned,
     Real,
     String,
     Regex,
@@ -145,6 +146,7 @@ impl Display for Struct {
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Type::Unsigned => write!(f, "Unsigned"),
             Type::Boolean => write!(f, "Bool"),
             Type::Integer => write!(f, "Integer"),
             Type::Real => write!(f, "Real"),
