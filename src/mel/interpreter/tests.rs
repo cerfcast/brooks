@@ -2502,7 +2502,9 @@ mod builtin_conversion_function_interpreter_tests {
                 Value::{self, ArgumentList},
             },
         },
-        types::{BooleanBuiltin, IntegerBuiltin, StringBuiltin, Type, UnsignedBuiltin},
+        types::{
+            BooleanBuiltin, IntegerBuiltin, RealBuiltin, StringBuiltin, Type, UnsignedBuiltin,
+        },
     };
 
     macro_rules! builtin_conversion_function_extended_test {
@@ -2782,8 +2784,66 @@ mod builtin_conversion_function_interpreter_tests {
         builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Real, 5.5, Unsigned, 5);
         builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Real, -5.5, Unsigned, 0);
         builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Integer, 1, Unsigned, 1);
+        builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Integer, -1, Unsigned, 0);
         builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Boolean, false, Unsigned, 0);
         builtin_conversion_function_simple_test!(UnsignedBuiltin {}, Boolean, true, Unsigned, 1);
+    }
+
+    #[test]
+    fn test_interpret_builtin_function_real() {
+        let ib = RealBuiltin {};
+
+        let arg_values = ArgumentList(vec![
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
+                value: Value::String("5".to_string()),
+                tpe: Type::String,
+            },
+        ]);
+
+        assert_matches!(
+            *ib.interpw(arg_values)
+                .expect_err("Could interpret call to builtin function with wrong argument count"),
+            BuiltinInterpError::ArgumentMiscount(1, 2)
+        );
+
+        builtin_conversion_function_simple_test!(
+            RealBuiltin {},
+            String,
+            "5.5".to_string(),
+            Real,
+            5.5
+        );
+
+        builtin_conversion_function_simple_test!(
+            RealBuiltin {},
+            String,
+            "-505.5".to_string(),
+            Real,
+            -505.5
+        );
+
+        builtin_conversion_function_extended_test!(
+            RealBuiltin {},
+            TypedValue {
+                value: Value::String("abc".to_string()),
+                tpe: Type::String,
+            },
+            TypedValue {
+                value: Value::Nil,
+                tpe: Type::Nil,
+            }
+        );
+
+        builtin_conversion_function_simple_test!(RealBuiltin {}, Real, 5.5, Real, 5.5);
+        builtin_conversion_function_simple_test!(RealBuiltin {}, Real, -5.5, Real, -5.5);
+        builtin_conversion_function_simple_test!(RealBuiltin {}, Integer, 1, Real, 1.0);
+        builtin_conversion_function_simple_test!(RealBuiltin {}, Integer, -21, Real, -21.0);
+        builtin_conversion_function_simple_test!(RealBuiltin {}, Boolean, false, Real, 0.0);
+        builtin_conversion_function_simple_test!(RealBuiltin {}, Boolean, true, Real, 1.0);
     }
 }
 

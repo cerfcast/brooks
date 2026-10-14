@@ -597,8 +597,55 @@ impl BuiltinFunctionInterpreter for RealBuiltin {
             return Err(BuiltinInterpError::ArgumentMiscount(1, args.len()).into());
         }
 
-        // Now, interpret!
-        todo!()
+        let arg = &args[0];
+
+        let result = match arg {
+            TypedValue {
+                value: Value::Nil,
+                tpe: Type::Nil,
+            } => TypedValue {
+                value: Value::Real(0.0),
+                tpe: Type::Real,
+            },
+            TypedValue {
+                value: Value::String(s),
+                tpe: Type::String,
+            } => s.parse().map_or(
+                TypedValue {
+                    value: Value::Nil,
+                    tpe: Type::Nil,
+                },
+                |v| TypedValue {
+                    value: Value::Real(v),
+                    tpe: Type::Real,
+                },
+            ),
+            TypedValue {
+                value: Value::Integer(value),
+                tpe: Type::Integer,
+            } => TypedValue {
+                value: Value::Real(*value as f64),
+                tpe: Type::Real,
+            },
+            r @ TypedValue {
+                value: Value::Real(_),
+                tpe: Type::Real,
+            } => r.clone(),
+            TypedValue {
+                value: Value::Boolean(b),
+                tpe: Type::Boolean,
+            } => TypedValue {
+                value: Value::Real(if *b { 1.0 } else { 0.0 }),
+                tpe: Type::Real,
+            },
+            TypedValue { value: _, tpe: t } => {
+                return Err(BuiltinInterpError::RuntimeError(format!(
+                    "Semantics of calling integer on an argument with type {t} are undefined"
+                ))
+                .into());
+            }
+        };
+        Ok(result)
     }
 }
 
