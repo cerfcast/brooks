@@ -137,7 +137,7 @@ impl Display for TypedValue {
             Value::Integer(i) => write!(f, "{i}"),
             Value::Unsigned(u) => write!(f, "{u}"),
             Value::Real(i) => write!(f, "{i}"),
-            Value::String(s) => write!(f, "\"{s}\""),
+            Value::String(s) => write!(f, "{s}"),
             Value::Boolean(b) => write!(f, "{b}"),
             Value::Regex(regex) => write!(f, "{regex}"),
             Value::IPAddress(ip_addr) => write!(f, "{ip_addr}"),
