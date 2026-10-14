@@ -22,6 +22,11 @@ pub fn strip_quotes(str: &str) -> String {
     result.strip_suffix("\"").unwrap_or(result).into()
 }
 
+pub fn strip_slashes(str: &str) -> String {
+    let result = str.strip_prefix("/").unwrap_or(str);
+    result.strip_suffix("/").unwrap_or(result).into()
+}
+
 pub fn sanitize_error_message(str: &str) -> String {
     str.replace("\n", "")
 }

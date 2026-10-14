@@ -843,7 +843,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                     location: syntax.into(),
                 })?;
 
-        let regex = match RegexBuilder::new(&utils::strip_quotes(literal)).build() {
+        let regex = match RegexBuilder::new(&utils::strip_slashes(literal)).build() {
             Ok(regex) => regex,
             Err(e) => {
                 return Err(MelCompilerLocatableError {

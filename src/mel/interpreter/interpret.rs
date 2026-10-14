@@ -436,7 +436,7 @@ impl MelInterp {
                 };
                 Ok(TypedValue {
                     value: Value::Boolean(right.is_match(left)),
-                    tpe: Type::String,
+                    tpe: Type::Boolean,
                 })
             }
             ast::BinaryInfixOperator::Comparison(cop) => match left.tpe {

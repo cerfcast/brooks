@@ -83,6 +83,82 @@ mod interpreter_tests {
     }
 
     #[test]
+    fn test_interp_binary_regex_expr() {
+        let expr = "\"testing\" ~= /tes.*ng/";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let context = MelInterpContext::default();
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::Boolean(true),
+                tpe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
+    fn test_interp_binary_regex_expr_not_found() {
+        let expr = "\"testing\" ~= /ts.*ng/";
+
+        let compile_result = compile(expr);
+        let ast = compile_result.expect("Compilation error");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelTypeChecker {};
+        let context = MelAnalysisContext::default();
+        let result = driver
+            .visit(&ast, &visitor, context)
+            .expect("Could not analyze");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelOptimizer {};
+        let result = driver
+            .visit(&ast, &visitor, result)
+            .expect("Could not analyze");
+
+        let expr = result.expr.expect("Could not get analysed expression");
+
+        let driver = AstVisitorDriver {};
+        let visitor = MelInterp {};
+        let context = MelInterpContext::default();
+        let result = driver
+            .visit(&expr, &visitor, context)
+            .expect("Could not interpret");
+
+        assert_matches!(
+            result.val,
+            Some(TypedValue {
+                value: Value::Boolean(false),
+                tpe: Type::Boolean
+            })
+        );
+    }
+
+    #[test]
     fn test_interp_function_call_boolean() {
         let expr = "boolean(1)";
 
