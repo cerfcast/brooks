@@ -33,3 +33,17 @@ impl Display for GrammarLocation {
         write!(f, "{} to {}", self.start, self.start + self.extent)
     }
 }
+
+pub trait Formatter<T> {
+    fn format(&self, value: &T) -> String;
+}
+
+pub trait Pretty {
+    fn pretty(&self, formatter: &dyn Formatter<Self>) -> String;
+}
+
+impl<I> Pretty for I {
+    fn pretty(&self, formatter: &dyn Formatter<I>) -> String {
+        formatter.format(self)
+    }
+}

@@ -17,11 +17,7 @@
 
 use std::fmt::{Debug, Display};
 
-use crate::common::Location;
-
-pub trait Formatter<T> {
-    fn format(&self, value: &T) -> String;
-}
+use crate::common::{Formatter, Location, Pretty};
 
 #[derive(Default, Debug, Clone)]
 pub struct LogMsgFormatter {
@@ -98,10 +94,6 @@ impl LogMsg {
             level,
             location,
         }
-    }
-
-    pub fn pretty(&self, _formatter: &impl Formatter<LogMsg>) -> String {
-        _formatter.format(self)
     }
 
     pub fn level(&self) -> LogLevel {
