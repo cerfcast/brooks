@@ -228,9 +228,9 @@ impl MELCompiler {
             format!("Unexpected token {error_tok}")
         } else if repr.starts_with("MISSING") {
             let msg = repr.trim_start_matches("MISSING ");
-            format!("Missing {msg}")
+            format!("Missing: {msg}")
         } else {
-            format!("Bad token {error_tok}")
+            format!("Bad token: {error_tok}")
         };
 
         MelCompilerLocatableError {

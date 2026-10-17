@@ -212,6 +212,6 @@ mod tests {
                 error: MelCompilerError::SyntaxError(msg),
                 location: _
             }
-            if msg == "Bad token /");
+            if msg == "Bad token: /");
     }
 }
