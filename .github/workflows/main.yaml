@@ -141,11 +141,11 @@ jobs:
         shell: sh
         run: ls -latr target/doc
       - name: Upload
-        if: env.GITHUB_ACTIONS == 'true'
+        if: env.FORGEJO_ACTIONS != 'true'
         uses: actions/upload-pages-artifact@v5
         with:
           path: target/doc
       - name: Deploy Docs
-        if: env.GITHUB_ACTIONS == 'true'
+        if: env.FORGEJO_ACTIONS != 'true'
         uses: actions/deploy-pages@v5
 
