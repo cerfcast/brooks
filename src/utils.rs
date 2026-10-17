@@ -22,6 +22,10 @@ pub fn strip_quotes(str: &str) -> String {
     result.strip_suffix("\"").unwrap_or(result).into()
 }
 
+/// Strip any /s that surround `str`.
+///
+/// Useful for removing the /s that are required in a MEL regular expression
+/// that are not required in a Rust regular expression.
 pub fn strip_slashes(str: &str) -> String {
     let result = str.strip_prefix("/").unwrap_or(str);
     result.strip_suffix("/").unwrap_or(result).into()
