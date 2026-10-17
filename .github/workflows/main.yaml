@@ -108,7 +108,7 @@ jobs:
       - uses: actions/checkout@v7
       - run: cargo fmt
   generate-docs:
-    if: ${{ env.FORGEJO_ACTIONS != 'true' }}
+    if: env.FORGEJO_ACTIONS != 'true'
     name: Generate Docs
     runs-on: ubuntu-latest
     permissions:
