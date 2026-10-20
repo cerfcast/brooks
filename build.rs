@@ -89,6 +89,8 @@ fn main() {
         .allowlist_item("ngx_pcalloc")
         .allowlist_item("ngx_list_push")
         .allowlist_item("ngx_log.*")
+        .allowlist_item("ngx_buf.*")
+        .allowlist_item("ngx_pool.*")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
