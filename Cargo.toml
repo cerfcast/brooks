@@ -5,8 +5,8 @@ edition = "2024"
 
 [build-dependencies]
 tree-sitter-mel = { path = "parser" }
-bindgen = "0.71.0"
 git2 = { version = "0.21.0", features = ["https"] }
+bindgen = "0.73.2"
 
 [dependencies]
 tree-sitter = "0.26.13"
