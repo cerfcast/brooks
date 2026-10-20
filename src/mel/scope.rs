@@ -25,11 +25,12 @@ use crate::{
             MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, RealBuiltin,
             Remove_Query_MultiBuiltin, Remove_QueryBuiltin, StringBuiltin,
             Type::{self, Function},
-            UnsignedBuiltin, UpperBuiltin, mel_empty_header_type, mel_header_type_from_req,
-            mel_req_type, mel_uri_type,
+            UnsignedBuiltin, UpperBuiltin, mel_empty_header_type,
+            mel_header_type_from_processable_rr, mel_header_type_from_req, mel_req_type,
+            mel_uri_type,
         },
     },
-    prr::{self, mel_header_type_from_processable_rr},
+    prr,
 };
 
 /// Create a scope that contains the types of the MEL core variables.

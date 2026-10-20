@@ -25,7 +25,7 @@ use std::{
 use brooks_macros::builtin_function;
 use regex::Regex;
 
-use crate::mel::interpreter::interpret::BuiltinFunction;
+use crate::{mel::interpreter::interpret::BuiltinFunction, prr::Prr};
 
 /// Types
 
@@ -432,6 +432,18 @@ pub fn mel_req_type(header_type: Struct, uri_type: Struct) -> Struct {
 
 pub fn mel_empty_var_type() -> Struct {
     Struct::new("var")
+}
+
+pub(crate) fn mel_header_type_from_processable_rr<A>(value: &dyn Prr<A>) -> Struct {
+    // Make the header type.
+    let mut ht = Struct::new("h");
+    value.headers().iter().for_each(|header| {
+        ht.insert_field(
+            &header.0.to_string().replace("-", "_").to_lowercase(),
+            Type::String,
+        );
+    });
+    ht
 }
 
 #[cfg(test)]

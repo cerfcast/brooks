@@ -20,7 +20,6 @@ use std::fmt::{Debug, Display};
 
 use http::{HeaderValue, Method, StatusCode};
 
-use crate::mel::types::{Struct, Type};
 use crate::utils::try_to_uri;
 
 #[derive(Debug, Clone)]
@@ -203,16 +202,4 @@ impl TryFrom<&dyn Prr<Vec<u8>>> for http::Response<Vec<u8>> {
                 })
             })
     }
-}
-
-pub(crate) fn mel_header_type_from_processable_rr<A>(value: &dyn Prr<A>) -> Struct {
-    // Make the header type.
-    let mut ht = Struct::new("h");
-    value.headers().iter().for_each(|header| {
-        ht.insert_field(
-            &header.0.to_string().replace("-", "_").to_lowercase(),
-            Type::String,
-        );
-    });
-    ht
 }
