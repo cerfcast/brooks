@@ -86,6 +86,9 @@ jobs:
       - run: tree-sitter generate
         working-directory: ./parser
       - run: cargo build -F nginx
+      - run: find . -name 'bindings.rs' -exec cat {} \;
+      - run: ./auto/conf
+        working-directory: integrations/nginx/nginx/
   library-integration-express-build:
     name: Library Integration - Express Build
     runs-on: ubuntu-latest
