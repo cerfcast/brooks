@@ -26,7 +26,6 @@ use crate::{
         analysis::{self, Analyzed, MelAnalysisLocatableError},
         ast::Expr,
         compiler::{self, compile::MelCompilerLocatableError},
-        interpreter::values::TypedValue,
     },
     verifying::verify::{
         AnalysisResult, CdniVerificationKey, MetadataAnalysisContext, MetadataVerificationError,
@@ -37,7 +36,7 @@ use std::fmt::{Debug, Display};
 
 #[derive(Debug, Clone, Default)]
 pub struct SetVariableVerificationKey {
-    pub value: Option<TypedValue>,
+    pub value: Option<()>,
     pub expression: Option<Expr<Analyzed>>,
 }
 
