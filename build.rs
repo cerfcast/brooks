@@ -83,14 +83,7 @@ fn main() {
         // The input header we would like to generate
         // bindings for.
         .header("src/integrations/nginx/nginx.h")
-        .allowlist_item("ngx_http_request_s")
-        .allowlist_item("ngx_http_headers_in_t")
-        .allowlist_item("ngx_http_headers_out_t")
-        .allowlist_item("ngx_pcalloc")
-        .allowlist_item("ngx_list_push")
-        .allowlist_item("ngx_log.*")
-        .allowlist_item("ngx_buf.*")
-        .allowlist_item("ngx_pool.*")
+        .allowlist_item("ngx_.*")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
