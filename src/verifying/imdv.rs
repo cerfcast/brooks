@@ -17,6 +17,7 @@
 
 //! All Metadata Information except for what is defined in Processing Stages.
 
+use crate::verifying::mel::verify::SetVariableMetadataAnalyzer;
 use crate::verifying::verify::{
     CdniVerificationKey, MetadataAnalysisContext, MetadataVerificationError, Verifier,
 };
@@ -48,6 +49,10 @@ pub fn verify_interconnection_metadata(
 
     #[allow(clippy::vec_init_then_push)]
     processors.push(&SourceMetadataAnalyzer {}
+        as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>);
+
+    #[allow(clippy::vec_init_then_push)]
+    processors.push(&SetVariableMetadataAnalyzer {}
         as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>);
 
     for md in &metadata.metadata {

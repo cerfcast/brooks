@@ -21,6 +21,7 @@ pub mod test_helpers {
 
     use crate::cdni::{
         gmd::spec::TypedGenericMetadata,
+        mel::spec::{SetVariable, TypedSetVariable},
         original::spec::{Source, TypedSource},
         ps::spec::{
             ClientRequestStage, ExpressionMatch, Header, HeaderTransform, MatchGroup,
@@ -221,6 +222,22 @@ pub mod test_helpers {
             tpe: TypedClientRequestStage::<()>::typed_cdni_metadata_name(),
             value: ClientRequestStage {
                 match_groups: mgs,
+                aug: (),
+            },
+        }
+    }
+
+    pub fn set_variable(
+        variable_name: String,
+        variable_value: String,
+        value_is_expression: Option<bool>,
+    ) -> TypedSetVariable<()> {
+        TypedSetVariable {
+            tpe: TypedSetVariable::<()>::typed_cdni_metadata_name(),
+            value: SetVariable {
+                variable_name,
+                variable_value,
+                value_is_expression,
                 aug: (),
             },
         }

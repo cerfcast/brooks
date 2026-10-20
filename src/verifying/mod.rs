@@ -19,6 +19,7 @@
 
 pub mod gmd;
 pub mod imdv;
+pub mod mel;
 pub mod original;
 pub mod ps;
 pub mod verify;

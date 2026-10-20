@@ -22,9 +22,9 @@ use crate::{
     processing::processors::ps::PsInterpretMode, prr,
 };
 
-pub mod source;
-
+pub mod mel;
 pub mod ps;
+pub mod source;
 
 #[derive(Debug)]
 pub struct SimpleProcessorsInterpreterContext<'a> {
@@ -45,6 +45,15 @@ impl<'a> SimpleProcessorsInterpreterContext<'a> {
             },
             runtime: self.runtime,
             rr: new_rr,
+        }
+    }
+
+    pub fn with_new_value_in_scope(self, name: &str, new_value: TypedValue) -> Self {
+        Self {
+            scopes: self.scopes.insert(name, new_value),
+            mode: self.mode,
+            runtime: self.runtime,
+            rr: self.rr,
         }
     }
 }

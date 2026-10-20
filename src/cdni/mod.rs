@@ -17,6 +17,7 @@
 
 pub mod gmd;
 pub mod imd;
+pub mod mel;
 pub mod original;
 pub mod ps;
 

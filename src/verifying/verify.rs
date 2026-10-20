@@ -19,7 +19,9 @@
 
 use std::fmt::Debug;
 
+use crate::cdni::mel::spec::TypedSetVariable;
 use crate::cdni::original::spec::TypedSource;
+use crate::verifying::mel::verify::{MelVerificationError, SetVariableVerificationKey};
 use crate::{environment::scope::Scopes, mel::types::Type};
 
 use std::error::Error;
@@ -27,13 +29,13 @@ use std::fmt::Display;
 
 use serde::Serialize;
 
-use crate::verifying::original::verify::{SourceMetadataAnalyzer, SourceVerificationKey};
+use crate::verifying::original::verify::SourceVerificationKey;
+use crate::verifying::ps::verify::PsVerificationError;
 use crate::verifying::ps::verify::PsVerificationKey;
-use crate::verifying::ps::verify::{PsMetadataAnalyzer, PsVerificationError};
 
 use crate::cdni::ps::spec::TypedStage;
 
-use crate::cdni::{gmd::spec::TypedGenericMetadata, imd::spec::HostMetadata};
+use crate::cdni::gmd::spec::TypedGenericMetadata;
 
 #[derive(Debug, Clone, Default)]
 pub struct MetadataAnalysisContext {
@@ -48,12 +50,14 @@ pub enum MetadataVerificationError {
     NoProcessor(String),
     JsonError(String),
     PsVerificationError(Box<PsVerificationError>),
+    MelVerificationError(Box<MelVerificationError>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CdniVerifiedMetadataTypes {
     ProcessingStages,
     Source,
+    SetVariable,
     None,
 }
 
@@ -61,6 +65,7 @@ pub enum CdniVerifiedMetadataTypes {
 pub enum CdniVerificationKey {
     Stage(Box<TypedStage<PsVerificationKey>>),
     Source(Box<TypedSource<SourceVerificationKey>>),
+    SetVariable(Box<TypedSetVariable<SetVariableVerificationKey>>),
     #[default]
     None,
 }
@@ -70,6 +75,7 @@ impl From<&CdniVerificationKey> for CdniVerifiedMetadataTypes {
         match value {
             CdniVerificationKey::Stage(_) => CdniVerifiedMetadataTypes::ProcessingStages,
             CdniVerificationKey::Source(_) => CdniVerifiedMetadataTypes::Source,
+            CdniVerificationKey::SetVariable(_) => CdniVerifiedMetadataTypes::SetVariable,
             CdniVerificationKey::None => CdniVerifiedMetadataTypes::None,
         }
     }
@@ -98,6 +104,9 @@ impl Display for MetadataVerificationError {
             }
             MetadataVerificationError::PsVerificationError(pse) => write!(f, "{pse}"),
             MetadataVerificationError::JsonError(je) => write!(f, "JSON error: {je}"),
+            MetadataVerificationError::MelVerificationError(mel_verification_error) => {
+                write!(f, "{mel_verification_error}")
+            }
         }
     }
 }
@@ -109,61 +118,4 @@ pub trait Verifier<Ck, Error>: Debug {
     fn analyze(&self, v: &TypedGenericMetadata<()>, input: Ck) -> AnalysisResult<Ck, Error>;
 
     fn type_name(&self, candidate: &str) -> bool;
-}
-
-/// Verify given Interconnection Metadata for the given request.
-///
-/// TODO: Make clear in the documentation that this function is a _major_ entry point for library clients.
-pub fn verify_interconnection_metadata(
-    metadata: &HostMetadata<()>,
-    scopes: Scopes<Type>,
-) -> Result<HostMetadata<CdniVerificationKey>, Box<MetadataVerificationError>> {
-    let mut stages: Vec<TypedGenericMetadata<CdniVerificationKey>> = vec![];
-
-    #[allow(clippy::vec_init_then_push)]
-    #[allow(unused_mut)]
-    let mut processors: Vec<&dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>> =
-        vec![];
-
-    #[allow(clippy::vec_init_then_push)]
-    processors
-        .push(&PsMetadataAnalyzer {}
-            as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>);
-
-    #[allow(clippy::vec_init_then_push)]
-    processors.push(&SourceMetadataAnalyzer {}
-        as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>);
-
-    for md in &metadata.metadata {
-        let mut no_processor = true;
-        for processor in &processors {
-            if !processor.type_name(&md.tpe) {
-                continue;
-            }
-
-            no_processor = false;
-
-            let (_, analyzed) = processor.analyze(
-                md,
-                MetadataAnalysisContext {
-                    scopes: scopes.clone(),
-                },
-            )?;
-
-            stages.push(TypedGenericMetadata {
-                tpe: md.tpe.clone(),
-                value: md.value.clone(),
-                aug: analyzed,
-            });
-        }
-
-        if no_processor {
-            return Err(MetadataVerificationError::NoProcessor(md.tpe.clone()).into());
-        }
-    }
-
-    Ok(HostMetadata {
-        metadata: stages,
-        aug: Default::default(),
-    })
 }

@@ -133,6 +133,8 @@ impl Display for MelInterpLocatableError {
     }
 }
 
+impl std::error::Error for MelInterpLocatableError {}
+
 pub type MelInterpResult = Result<MelInterpContext, Box<MelInterpLocatableError>>;
 
 #[derive(Debug, Default)]
