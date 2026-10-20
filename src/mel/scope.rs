@@ -18,25 +18,25 @@
 use crate::{
     environment::scope::Scope,
     mel::{
-        interpreter::interpret::{StructValue, TypedValue, Value},
+        interpreter::values::{StructValue, TypedValue, Value},
         types::{
             Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
             IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,
             MatchBuiltin, Path_ElementBuiltin, Path_ElementsBuiltin, RealBuiltin,
             Remove_Query_MultiBuiltin, Remove_QueryBuiltin, StringBuiltin,
             Type::{self, Function},
-            UnsignedBuiltin, UpperBuiltin, header_type, header_type_from_processable_rr,
-            header_type_from_req, req_type, uri_type,
+            UnsignedBuiltin, UpperBuiltin, mel_empty_header_type, mel_header_type_from_req,
+            mel_req_type, mel_uri_type,
         },
     },
-    prr,
+    prr::{self, mel_header_type_from_processable_rr},
 };
 
 /// Create a scope that contains the types of the MEL core variables.
 pub fn minimal_core_variable_types() -> Scope<Type> {
     let mut scope = Scope::<Type>::default();
-    let ht = header_type(true);
-    scope = scope.insert("req", Type::Struct(req_type(ht, uri_type())));
+    let ht = mel_empty_header_type(true);
+    scope = scope.insert("req", Type::Struct(mel_req_type(ht, mel_uri_type())));
     scope
 }
 
@@ -101,9 +101,9 @@ impl<A> From<http::Request<A>> for Scope<Type> {
         // Set up the built-in variables for type checking.
         let mut scope = Scope::<Type>::default();
 
-        let ht = header_type_from_req(&value);
-        let urit = uri_type();
-        let reqs = req_type(ht, urit);
+        let ht = mel_header_type_from_req(&value);
+        let urit = mel_uri_type();
+        let reqs = mel_req_type(ht, urit);
 
         // Add those types to the scope.
         scope = scope.insert("req", Type::Struct(reqs));
@@ -115,9 +115,9 @@ impl<A> From<http::Request<A>> for Scope<Type> {
 /// Create a scope that contains the values of the MEL core variables present in an HTTP request.
 impl<A> From<&dyn prr::Prr<A>> for Scope<TypedValue> {
     fn from(value: &dyn prr::Prr<A>) -> Self {
-        let ht = header_type_from_processable_rr(value);
-        let urit = uri_type();
-        let reqt = req_type(ht.clone(), urit.clone());
+        let ht = mel_header_type_from_processable_rr(value);
+        let urit = mel_uri_type();
+        let reqt = mel_req_type(ht.clone(), urit.clone());
 
         // Set up the built-in variables for interpreting.
         let mut value_scope = Scope::<TypedValue>::default();

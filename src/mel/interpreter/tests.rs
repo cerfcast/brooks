@@ -27,10 +27,12 @@ mod interpreter_tests {
             compiler::compile,
             interpreter::{
                 builtins::BuiltinInterpError,
-                interpret::{
-                    MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError, StructValue,
-                    TypedValue,
-                    Value::{self, Struct},
+                {
+                    interpret::{MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError},
+                    values::{
+                        StructValue, TypedValue,
+                        Value::{self, Struct},
+                    },
                 },
             },
             types::{
@@ -2378,9 +2380,12 @@ mod interpreter_logger_tests {
             analysis::{MelAnalysisContext, MelOptimizer, MelTypeChecker},
             ast::AstVisitorDriver,
             compiler::compile,
-            interpreter::interpret::{
-                MelInterp, MelInterpContext, StructValue, TypedValue,
-                Value::{self, Struct},
+            interpreter::{
+                interpret::{MelInterp, MelInterpContext},
+                values::{
+                    StructValue, TypedValue,
+                    Value::{self, Struct},
+                },
             },
             types::{self, Type},
         },
@@ -2514,7 +2519,10 @@ mod interpreter_value_tests {
     use std::assert_matches;
 
     use crate::mel::{
-        interpreter::interpret::{MelInterpError, StructValue, TypedValue, Value},
+        interpreter::{
+            interpret::MelInterpError,
+            values::{StructValue, TypedValue, Value},
+        },
         types::{Struct, Type},
     };
 
@@ -2573,7 +2581,7 @@ mod builtin_conversion_function_interpreter_tests {
     use crate::mel::{
         interpreter::{
             builtins::{BuiltinFunctionInterpreter, BuiltinInterpError},
-            interpret::{
+            values::{
                 TypedValue,
                 Value::{self, ArgumentList},
             },
@@ -2933,7 +2941,7 @@ mod builtin_function_interpreter_tests {
     use crate::mel::{
         interpreter::{
             builtins::{BuiltinFunctionInterpreter, BuiltinInterpError},
-            interpret::{
+            values::{
                 TypedValue,
                 Value::{self, ArgumentList},
             },

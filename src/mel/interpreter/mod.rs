@@ -17,6 +17,7 @@
 
 pub mod builtins;
 pub mod interpret;
+pub mod values;
 
 #[cfg(test)]
 pub mod tests;

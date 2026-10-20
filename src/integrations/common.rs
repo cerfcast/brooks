@@ -25,7 +25,7 @@ use crate::{
     integrations::hmds::{HmdsConfiguration, query_hmds},
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
-        interpreter::interpret::TypedValue,
+        interpreter::values::TypedValue,
         scope::{builtin_function_types, minimal_core_variable_types},
         types::Type,
     },

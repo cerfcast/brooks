@@ -33,9 +33,9 @@ use crate::logging::LogMsgs;
 use crate::mel::analysis::Analyzed;
 use crate::mel::ast::Expr;
 use crate::mel::interpreter::interpret::{
-    MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError, TypedValue,
-    Value,
+    MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError,
 };
+use crate::mel::interpreter::values::{TypedValue, Value};
 use crate::mel::types::Type;
 use crate::processing::interpret;
 use crate::processing::processors::SimpleProcessorsInterpreterContext;

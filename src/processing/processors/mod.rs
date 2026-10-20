@@ -18,7 +18,7 @@
 //! Processors for Metadata Information.
 
 use crate::{
-    environment::scope::Scopes, mel::interpreter::interpret::TypedValue,
+    environment::scope::Scopes, mel::interpreter::values::TypedValue,
     processing::processors::ps::PsInterpretMode, prr,
 };
 

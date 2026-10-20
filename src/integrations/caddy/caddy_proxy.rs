@@ -36,7 +36,7 @@ use crate::{
         support::to_null_terminated_str,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
-    mel::interpreter::{builtins::builtin_builtin_function_interpreters, interpret::TypedValue},
+    mel::interpreter::{builtins::builtin_builtin_function_interpreters, values::TypedValue},
     processing::imdi::{HmdTransformError, MdInterpretError},
 };
 

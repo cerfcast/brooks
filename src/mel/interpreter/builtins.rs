@@ -26,7 +26,10 @@ use brooks_macros::builtin_function_interpreter;
 use crate::{
     environment::scope::Scope,
     mel::{
-        interpreter::interpret::{BuiltinFunction, TypedValue, Value},
+        interpreter::{
+            interpret::BuiltinFunction,
+            values::{TypedValue, Value},
+        },
         types::{
             Add_Query_MultiBuiltin, Add_QueryBuiltin, BooleanBuiltin, BuiltinFunctionType,
             IntegerBuiltin, Keep_Query_MultiBuiltin, LowerBuiltin, Match_ReplaceBuiltin,

@@ -33,7 +33,7 @@ use crate::processing::interpret::MetadataInformationResultElements;
 use crate::processing::processors::SimpleProcessorsInterpreterContext;
 use crate::processing::processors::ps::{PsInterpretMode, PsInterpretValue};
 use crate::prr;
-use crate::{cdni::imd::spec::HostMetadata, mel::interpreter::interpret::TypedValue};
+use crate::{cdni::imd::spec::HostMetadata, mel::interpreter::values::TypedValue};
 
 pub type HmdInterpretValue = (StatusCode, http::Response<Vec<u8>>, LogMsgs);
 pub type HmdInterpretResultError = (Box<MdInterpretError>, LogMsgs);

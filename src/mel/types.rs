@@ -25,7 +25,7 @@ use std::{
 use brooks_macros::builtin_function;
 use regex::Regex;
 
-use crate::{mel::interpreter::interpret::BuiltinFunction, prr};
+use crate::mel::interpreter::interpret::BuiltinFunction;
 
 /// Types
 
@@ -384,7 +384,7 @@ impl BuiltinFunctionType for StringBuiltin {
     }
 }
 
-pub(crate) fn header_type(wild: bool) -> Struct {
+pub fn mel_empty_header_type(wild: bool) -> Struct {
     let mut ht = Struct::new("h");
     if wild {
         ht.insert_wild_field(
@@ -396,7 +396,7 @@ pub(crate) fn header_type(wild: bool) -> Struct {
     ht
 }
 
-pub(crate) fn header_type_from_req<A>(value: &http::Request<A>) -> Struct {
+pub fn mel_header_type_from_req<A>(value: &http::Request<A>) -> Struct {
     // Make the header type.
     let mut ht = Struct::new("h");
     value.headers().iter().for_each(|header| {
@@ -408,19 +408,7 @@ pub(crate) fn header_type_from_req<A>(value: &http::Request<A>) -> Struct {
     ht
 }
 
-pub(crate) fn header_type_from_processable_rr<A>(value: &dyn prr::Prr<A>) -> Struct {
-    // Make the header type.
-    let mut ht = Struct::new("h");
-    value.headers().iter().for_each(|header| {
-        ht.insert_field(
-            &header.0.to_string().replace("-", "_").to_lowercase(),
-            Type::String,
-        );
-    });
-    ht
-}
-
-pub(crate) fn uri_type() -> Struct {
+pub fn mel_uri_type() -> Struct {
     // Make the URI type.
     let mut urit = Struct::new("uri");
     urit.insert_field("path", Type::String);
@@ -429,7 +417,7 @@ pub(crate) fn uri_type() -> Struct {
     urit
 }
 
-pub(crate) fn req_type(header_type: Struct, uri_type: Struct) -> Struct {
+pub fn mel_req_type(header_type: Struct, uri_type: Struct) -> Struct {
     // Make the req type.
     let mut reqs = Struct::new("req");
     reqs.insert_field("h", Type::Struct(header_type));
@@ -440,6 +428,10 @@ pub(crate) fn req_type(header_type: Struct, uri_type: Struct) -> Struct {
     reqs.insert_field("clientport", Type::Integer);
 
     reqs
+}
+
+pub fn mel_empty_var_type() -> Struct {
+    Struct::new("var")
 }
 
 #[cfg(test)]
