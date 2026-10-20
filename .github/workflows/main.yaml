@@ -73,7 +73,7 @@ jobs:
       - run: cargo build -F caddy
   library-integration-nginx-build:
     name: Library Integration - Nginx Build
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: tree-sitter/setup-action@v2
