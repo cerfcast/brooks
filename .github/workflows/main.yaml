@@ -81,6 +81,8 @@ jobs:
       # are forced to specify calls to the CI ourselves.
       # See https://github.com/orgs/community/discussions/25742
       - run: git clone https://github.com/nginx/nginx.git integrations/nginx/nginx/
+      - run: which clang
+      - run: whereis clang
       - run: ./auto/configure
         working-directory: integrations/nginx/nginx/
   library-integration-express-build:
