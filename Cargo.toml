@@ -9,7 +9,7 @@ git2 = { version = "0.21.0", features = ["https"] }
 bindgen = "0.73.2"
 
 [dependencies]
-tree-sitter = "0.26.13"
+tree-sitter = "0.27.1"
 tree-sitter-mel = { path = "parser" }
 brooks-macros = { path = "macros" }
 pretty_assertions = "1.4.1"
@@ -26,7 +26,7 @@ url = "2.5.8"
 log = { version = "0.4.34" }
 
 [features]
-default = ["processing"]
+default = ["nginx", "processing"]
 
 domain = []
 hmds = []
