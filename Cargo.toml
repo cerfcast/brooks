@@ -26,7 +26,7 @@ url = "2.5.8"
 log = { version = "0.4.34" }
 
 [features]
-default = ["nginx", "processing"]
+default = ["processing"]
 
 domain = []
 hmds = []
