@@ -161,8 +161,6 @@ pub fn interpret_interconnection_metadata(
         }
     }
 
-    println!("Scopes: {:?}", request_context.scopes);
-
     // For any of the host metadata entries that are client requests,
     // do them now.
     for stage in &hmd.metadata {
