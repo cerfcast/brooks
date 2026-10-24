@@ -99,8 +99,7 @@ mod test {
         environment::scope::Scopes,
         mel::{
             interpreter::values::{TypedValue, Value},
-            scope::builtin_function_types,
-            types::Type,
+            types::{Type, builtin_function_types},
         },
         processing::{
             interpret::{Interpreter, ProcessedRequestResponse},

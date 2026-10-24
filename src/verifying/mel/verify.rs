@@ -122,7 +122,7 @@ mod test {
             mel::spec::TypedSetVariable,
             tests::test_helpers::{generic_metadata, set_variable},
         },
-        mel::scope::builtin_function_types,
+        mel::types::builtin_function_types,
         verifying::{
             mel::verify::SetVariableMetadataAnalyzer,
             verify::{CdniVerificationKey, MetadataAnalysisContext, Verifier},

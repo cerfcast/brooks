@@ -28,8 +28,6 @@ pub mod grammar;
 #[allow(dead_code)]
 pub mod interpreter;
 #[allow(dead_code)]
-pub mod scope;
-#[allow(dead_code)]
 pub mod serializer;
 #[allow(dead_code)]
 pub mod types;

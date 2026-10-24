@@ -25,7 +25,7 @@ use std::{
 use brooks_macros::builtin_function;
 use regex::Regex;
 
-use crate::{mel::interpreter::interpret::BuiltinFunction, prr::Prr};
+use crate::{environment::scope::Scope, mel::interpreter::interpret::BuiltinFunction, prr::Prr};
 
 /// Types
 
@@ -444,6 +444,86 @@ pub(crate) fn mel_header_type_from_processable_rr<A>(value: &dyn Prr<A>) -> Stru
         );
     });
     ht
+}
+
+/// Create a scope that contains the types of the MEL core variables.
+pub fn minimal_core_variable_types() -> Scope<Type> {
+    let mut scope = Scope::<Type>::default();
+    let ht = mel_empty_header_type(true);
+    scope = scope.insert("req", Type::Struct(mel_req_type(ht, mel_uri_type())));
+    scope
+}
+
+macro_rules! add_builtin_function_type_to_scope {
+    ($scope:ident, $builtin:ident) => {
+        $scope.insert(
+            &$builtin.name(),
+            Type::Function(
+                $builtin.name(),
+                $builtin.return_type_calculator(),
+                $builtin.params_type_checker(),
+            ),
+        )
+    };
+}
+
+/// Create a scope that contains the types of the MEL builtin functions.
+pub fn builtin_function_types() -> Scope<Type> {
+    let path_element = Path_ElementBuiltin {};
+    let path_elements = Path_ElementsBuiltin {};
+    let mtch = MatchBuiltin {};
+    let match_replace = Match_ReplaceBuiltin {};
+    let add_query = Add_QueryBuiltin {};
+    let add_query_multi = Add_Query_MultiBuiltin {};
+    let remove_query = Remove_QueryBuiltin {};
+    let remove_query_multi = Remove_Query_MultiBuiltin {};
+    let keep_query_multi = Keep_Query_MultiBuiltin {};
+    let lower = LowerBuiltin {};
+    let upper = UpperBuiltin {};
+
+    // Builtin conversion functions.
+    let boolean = BooleanBuiltin {};
+    let integer = IntegerBuiltin {};
+    let unsigned = UnsignedBuiltin {};
+    let string = StringBuiltin {};
+    let real = RealBuiltin {};
+
+    let mut scopes = Scope::<Type>::default();
+    scopes = add_builtin_function_type_to_scope!(scopes, path_element);
+    scopes = add_builtin_function_type_to_scope!(scopes, path_elements);
+    scopes = add_builtin_function_type_to_scope!(scopes, mtch);
+    scopes = add_builtin_function_type_to_scope!(scopes, match_replace);
+    scopes = add_builtin_function_type_to_scope!(scopes, add_query);
+    scopes = add_builtin_function_type_to_scope!(scopes, add_query_multi);
+    scopes = add_builtin_function_type_to_scope!(scopes, remove_query);
+    scopes = add_builtin_function_type_to_scope!(scopes, remove_query_multi);
+    scopes = add_builtin_function_type_to_scope!(scopes, keep_query_multi);
+    scopes = add_builtin_function_type_to_scope!(scopes, lower);
+    scopes = add_builtin_function_type_to_scope!(scopes, upper);
+
+    scopes = add_builtin_function_type_to_scope!(scopes, boolean);
+    scopes = add_builtin_function_type_to_scope!(scopes, integer);
+    scopes = add_builtin_function_type_to_scope!(scopes, real);
+    scopes = add_builtin_function_type_to_scope!(scopes, string);
+    scopes = add_builtin_function_type_to_scope!(scopes, unsigned);
+    scopes
+}
+
+/// Create a scope that contains the types of only the MEL core variables present in an HTTP request.
+impl<A> From<http::Request<A>> for Scope<Type> {
+    fn from(value: http::Request<A>) -> Self {
+        // Set up the built-in variables for type checking.
+        let mut scope = Scope::<Type>::default();
+
+        let ht = mel_header_type_from_req(&value);
+        let urit = mel_uri_type();
+        let reqs = mel_req_type(ht, urit);
+
+        // Add those types to the scope.
+        scope = scope.insert("req", Type::Struct(reqs));
+
+        scope
+    }
 }
 
 #[cfg(test)]

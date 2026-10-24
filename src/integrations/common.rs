@@ -26,8 +26,7 @@ use crate::{
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
         interpreter::values::TypedValue,
-        scope::{builtin_function_types, minimal_core_variable_types},
-        types::Type,
+        types::{Type, builtin_function_types, minimal_core_variable_types},
     },
     processing::{
         imdi::{
