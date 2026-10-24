@@ -148,6 +148,21 @@ pub fn interpret_interconnection_metadata(
         rr: request,
     };
 
+    // For any SetVariables, do them now.
+    for hmd in &hmd.metadata {
+        // TODO: Determine if/when/how processing will stop when there is a terminating metadata object.
+        #[allow(clippy::collapsible_if)]
+        if let CdniVerificationKey::SetVariable(sv) = &hmd.aug {
+            // TODO: Handle a stage that generates MI.
+            (request_context, _) = match sv.value.interpret(request_context) {
+                Ok((c, r)) => (c, r),
+                Err(e) => return Err((MdInterpretError::MetadataProcessingError(e).into(), log)),
+            };
+        }
+    }
+
+    println!("Scopes: {:?}", request_context.scopes);
+
     // For any of the host metadata entries that are client requests,
     // do them now.
     for stage in &hmd.metadata {

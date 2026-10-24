@@ -24,7 +24,7 @@ use crate::{
     processing::{
         interpret::{
             self, Error, InterpretationResult, MetadataInformationResultElements,
-            ProcessedRequestResponse, Stages,
+            ProcessedRequestResponse,
         },
         processors::{
             SimpleProcessorsInterpreterContext,
@@ -117,9 +117,5 @@ impl
                 MetadataInformationResultElements::default(),
             ),
         ))
-    }
-
-    fn stage(&self, stage: Stages) -> bool {
-        stage == Stages::Source
     }
 }

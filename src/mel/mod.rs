@@ -32,5 +32,7 @@ pub mod serializer;
 #[allow(dead_code)]
 pub mod types;
 
+pub static MEL_USER_SET_VARIABLE_STRUCT_NAME: &str = "var";
+
 #[cfg(test)]
 mod tests;

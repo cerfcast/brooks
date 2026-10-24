@@ -25,7 +25,11 @@ use std::{
 use brooks_macros::builtin_function;
 use regex::Regex;
 
-use crate::{environment::scope::Scope, mel::interpreter::interpret::BuiltinFunction, prr::Prr};
+use crate::{
+    environment::scope::Scope,
+    mel::{MEL_USER_SET_VARIABLE_STRUCT_NAME, interpreter::interpret::BuiltinFunction},
+    prr::Prr,
+};
 
 /// Types
 
@@ -431,7 +435,7 @@ pub fn mel_req_type(header_type: Struct, uri_type: Struct) -> Struct {
 }
 
 pub fn mel_empty_var_type() -> Struct {
-    Struct::new("var")
+    Struct::new(MEL_USER_SET_VARIABLE_STRUCT_NAME)
 }
 
 pub(crate) fn mel_header_type_from_processable_rr<A>(value: &dyn Prr<A>) -> Struct {
@@ -450,7 +454,9 @@ pub(crate) fn mel_header_type_from_processable_rr<A>(value: &dyn Prr<A>) -> Stru
 pub fn minimal_core_variable_types() -> Scope<Type> {
     let mut scope = Scope::<Type>::default();
     let ht = mel_empty_header_type(true);
+    let vart = mel_empty_var_type();
     scope = scope.insert("req", Type::Struct(mel_req_type(ht, mel_uri_type())));
+    scope = scope.insert(MEL_USER_SET_VARIABLE_STRUCT_NAME, Type::Struct(vart));
     scope
 }
 

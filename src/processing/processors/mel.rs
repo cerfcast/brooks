@@ -20,12 +20,19 @@
 use crate::{
     cdni::mel::spec::SetVariable,
     logging::{LogLevel::Debug, LogMsgs},
-    mel::{self, interpreter::interpret::MelInterpContext},
+    mel::{
+        self, MEL_USER_SET_VARIABLE_STRUCT_NAME,
+        interpreter::{
+            interpret::MelInterpContext,
+            values::{TypedValue, Value},
+        },
+        types::{Struct, Type},
+    },
     processing::{
         interpret::{
             self,
-            Error::{self, RuntimeError},
-            InterpretationResult, MetadataInformationResultElements, Stages,
+            Error::{self, InvalidType, RuntimeError},
+            InterpretationResult, MetadataInformationResultElements,
         },
         processors::{
             SimpleProcessorsInterpreterContext,
@@ -51,6 +58,27 @@ impl
         Error,
     > {
         let lmsgs = LogMsgs::new(Debug);
+
+        // First, try to get the var struct from the scope.
+        let var = input
+            .scopes
+            .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
+            .ok_or(RuntimeError("var not in scope".into()))?;
+
+        let (mut var, var_tpe) = match var {
+            TypedValue {
+                value: Value::Struct(value),
+                tpe: Type::Struct(tpe),
+            } => (value, tpe),
+            TypedValue { value: _, tpe } => {
+                return Err(InvalidType(
+                    Type::Struct(Struct::new(MEL_USER_SET_VARIABLE_STRUCT_NAME)).to_string(),
+                    tpe.to_string(),
+                )
+                .into());
+            }
+        };
+
         if let Some(expression) = &self.aug.expression {
             let result = mel::interpreter::interpret(
                 expression,
@@ -62,11 +90,20 @@ impl
             )
             .map_err(|e| RuntimeError(Box::new(e)))?;
 
-            let output = input.with_new_value_in_scope(
+            var.insert_field(
                 &self.variable_name,
                 result.val.ok_or(RuntimeError(
                     "Missing value after successful interpretation of Mel expression".into(),
                 ))?,
+            )
+            .map_err(|e| RuntimeError(e))?;
+
+            let output = input.with_new_value_in_scope(
+                MEL_USER_SET_VARIABLE_STRUCT_NAME,
+                TypedValue {
+                    value: Value::Struct(var),
+                    tpe: Type::Struct(var_tpe),
+                },
             );
 
             Ok((
@@ -78,10 +115,6 @@ impl
         } else {
             todo!()
         }
-    }
-
-    fn stage(&self, stage: Stages) -> bool {
-        stage != Stages::Source
     }
 }
 
@@ -98,8 +131,9 @@ mod test {
         },
         environment::scope::Scopes,
         mel::{
-            interpreter::values::{TypedValue, Value},
-            types::{Type, builtin_function_types},
+            MEL_USER_SET_VARIABLE_STRUCT_NAME,
+            interpreter::values::{TypedValue, Value, mel_var_value_from_type},
+            types::{Type, builtin_function_types, minimal_core_variable_types},
         },
         processing::{
             interpret::{Interpreter, ProcessedRequestResponse},
@@ -129,7 +163,7 @@ mod test {
             .analyze(
                 &json,
                 MetadataAnalysisContext {
-                    scopes: builtin_function_types().into(),
+                    scopes: (&builtin_function_types() + &minimal_core_variable_types()).into(),
                 },
             )
             .expect("Could not analyze correct MI.SetVariable");
@@ -139,13 +173,27 @@ mod test {
             _ => panic!("Result of verifying correct MI.SetVariable was of incorrect type"),
         };
 
+        let var = result
+            .0
+            .scopes
+            .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
+            .expect("Could not get the var struct from the types of the analyzed generic metadata");
+
+        let var = match var {
+            Type::Struct(s) => s,
+            _ => panic!("var had the wrong type in the analyzed generic metadata"),
+        };
+
         let rt = tokio::runtime::Builder::new_current_thread()
             .build()
             .expect("Could not get a runtime to use for testing interpret function");
         let result = svmi
             .value
             .interpret(SimpleProcessorsInterpreterContext {
-                scopes: Scopes::<TypedValue>::default(),
+                scopes: Scopes::<TypedValue>::default().insert(
+                    MEL_USER_SET_VARIABLE_STRUCT_NAME,
+                    mel_var_value_from_type(var),
+                ),
                 mode: PsInterpretMode::None,
                 runtime: rt.handle(),
                 rr: Box::new(ProcessedRequestResponse::new_request(
@@ -156,17 +204,33 @@ mod test {
             })
             .expect("Could not interpret correct MI.SetVariable");
 
-        let value = result
+        let value = match result
             .0
             .scopes
-            .lookup("is_bad")
-            .expect("Could not get interpreted value by name from resulting scope");
-        assert_matches!(
-            value,
+            .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
+            .unwrap_or_else(|| {
+                panic!(
+                    "Could not get {} from resulting scope",
+                    MEL_USER_SET_VARIABLE_STRUCT_NAME
+                )
+            }) {
             TypedValue {
-                value: Value::Boolean(true),
-                tpe: Type::Boolean
-            }
-        );
+                value: Value::Struct(s),
+                tpe: Type::Struct(_),
+            } => s.fields.get("is_bad").cloned(),
+            _ => panic!(
+                "{} is not a struct in resulting scope",
+                MEL_USER_SET_VARIABLE_STRUCT_NAME
+            ),
+        };
+
+        let value = match value {
+            Some(v) => v,
+            None => panic!(
+                "is_bad field of {} does not have a value in resulting scope",
+                MEL_USER_SET_VARIABLE_STRUCT_NAME
+            ),
+        };
+        assert_matches!(value, TypedValue{ value: Value::Boolean(v), tpe: _} if v)
     }
 }

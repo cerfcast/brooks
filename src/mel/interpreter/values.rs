@@ -30,8 +30,8 @@ use crate::{
     mel::{
         interpreter::interpret::{BuiltinFunction, MelInterpError},
         types::{
-            mel_header_type_from_processable_rr, mel_header_type_from_req, mel_req_type,
-            mel_uri_type,
+            mel_empty_var_type, mel_header_type_from_processable_rr, mel_header_type_from_req,
+            mel_req_type, mel_uri_type,
         },
     },
     prr,
@@ -380,5 +380,27 @@ impl<A> From<&dyn prr::Prr<A>> for Scope<TypedValue> {
         );
 
         value_scope
+    }
+}
+
+pub fn mel_empty_var_value() -> TypedValue {
+    let vart = mel_empty_var_type();
+
+    TypedValue {
+        value: Value::Struct(StructValue {
+            fields: Default::default(),
+            tpe: vart.clone(),
+        }),
+        tpe: Type::Struct(vart),
+    }
+}
+
+pub fn mel_var_value_from_type(tpe: Struct) -> TypedValue {
+    TypedValue {
+        value: Value::Struct(StructValue {
+            fields: Default::default(),
+            tpe: tpe.clone(),
+        }),
+        tpe: Type::Struct(tpe),
     }
 }

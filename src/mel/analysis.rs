@@ -725,9 +725,11 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 #[cfg(test)]
 mod type_check_tests {
     use crate::common::GrammarLocation;
+    use crate::mel::MEL_USER_SET_VARIABLE_STRUCT_NAME;
     use crate::mel::types::Type::IPAddress;
     use crate::mel::types::{
         BuiltinFunctionType, IntegerBuiltin, RealBuiltin, SimpleParamTypeChecker, StringBuiltin,
+        minimal_core_variable_types,
     };
     use crate::mel::{
         analysis::{Analyzed, MelAnalysisContext, MelAnalysisError, MelTypeChecker},
@@ -1988,6 +1990,47 @@ mod type_check_tests {
                 MelAnalysisError::InvalidType(i, Type::String)
             if i == vec![IPAddress]
         )
+    }
+
+    #[test]
+    fn test_basic_scope_of_types_for_var_struct() {
+        let sc = minimal_core_variable_types();
+        let var = sc
+            .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
+            .expect("Could not get type of var from scope that should contain it.");
+        assert_matches!(var, Type::Struct(s) if s.fields().count() == 0);
+    }
+
+    #[test]
+    fn test_basic_scope_of_types_for_var_struct_updated() {
+        let sc = minimal_core_variable_types();
+        let var = sc
+            .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
+            .expect("Could not get type of var from scope that should contain it.");
+
+        let new_var = match var {
+            Type::Struct(mut s) => {
+                s.insert_field("new_user_variable", Type::String);
+                s
+            }
+            _ => panic!(),
+        };
+
+        let sc = sc.insert(MEL_USER_SET_VARIABLE_STRUCT_NAME, Type::Struct(new_var));
+        let var = sc
+            .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
+            .expect("Could not get type of var from scope that should contain it.");
+
+        assert_matches!(var, Type::Struct(s) if s.fields().count() == 1);
+    }
+
+    #[test]
+    fn test_basic_scope_of_types_for_req_struct() {
+        let sc = minimal_core_variable_types();
+        let req = sc
+            .lookup("req")
+            .expect("Could not get type of req from scope that should contain it.");
+        assert_matches!(req, Type::Struct(_));
     }
 }
 

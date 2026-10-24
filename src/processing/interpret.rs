@@ -102,9 +102,6 @@ pub type InterpretationResult<Ck, Res, Error> = Result<(Ck, Res), Box<Error>>;
 pub trait Interpreter<Ck, Res, Error>: Debug {
     /// Perform the semantics of the MI.
     fn interpret(&self, input: Ck) -> InterpretationResult<Ck, Res, Error>;
-
-    /// Determine whether this MI should be interpreted at this stage in processing of stages.
-    fn stage(&self, stage: Stages) -> bool;
 }
 
 /// TODO

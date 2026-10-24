@@ -25,7 +25,8 @@ use crate::{
     integrations::hmds::{HmdsConfiguration, query_hmds},
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
-        interpreter::values::TypedValue,
+        MEL_USER_SET_VARIABLE_STRUCT_NAME,
+        interpreter::values::{TypedValue, mel_var_value_from_type},
         types::{Type, builtin_function_types, minimal_core_variable_types},
     },
     processing::{
@@ -33,7 +34,7 @@ use crate::{
             HmdInterpretResultError, HmdInterpretValue, HmdTransformError, MdInterpretError,
             interpret_interconnection_metadata,
         },
-        interpret::ProcessedRequestResponse,
+        interpret::{Error::AssertionFailure, ProcessedRequestResponse},
     },
     prr,
     verifying::imdv::verify_interconnection_metadata,
@@ -75,53 +76,54 @@ pub fn safe_brooks_integration_handle(
         None => None,
     };
 
-    let found = match found {
-        Some(found) => found,
-        None => {
-            let res = match runtime.block_on(query_hmds(hmds_key, &hmds_config.hmds_server)) {
-                Ok(o) => o,
-                Err(e) => {
-                    return Err((MdInterpretError::HmdsQueryError(e.to_string()).into(), log));
-                }
-            };
-            let (expiry, query_result) = match res {
-                Some((timeout, query_result)) => (timeout, query_result),
-                None => {
-                    return Err((
-                        MdInterpretError::MissingConfiguration(hmds_key.to_string()).into(),
-                        log,
-                    ));
-                }
-            };
+    let (verified_md, updated_types_scopes) = if let Some(found) = found {
+        found
+    } else {
+        let res = match runtime.block_on(query_hmds(hmds_key, &hmds_config.hmds_server)) {
+            Ok(o) => o,
+            Err(e) => {
+                return Err((MdInterpretError::HmdsQueryError(e.to_string()).into(), log));
+            }
+        };
+        let (expiry, query_result) = match res {
+            Some((timeout, query_result)) => (timeout, query_result),
+            None => {
+                return Err((
+                    MdInterpretError::MissingConfiguration(hmds_key.to_string()).into(),
+                    log,
+                ));
+            }
+        };
 
-            let metadata = match serde_json::from_value::<TypedHostMetadata<()>>(query_result) {
+        let metadata = match serde_json::from_value::<TypedHostMetadata<()>>(query_result) {
+            Ok(o) => o,
+            Err(e) => {
+                return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
+            }
+        };
+
+        let types_scope = Scopes::<Type> {
+            scopes: vec![&minimal_core_variable_types() + &builtin_function_types()],
+        };
+
+        let (verified_md, updated_types_scope) =
+            match verify_interconnection_metadata(&metadata.value, types_scope) {
                 Ok(o) => o,
                 Err(e) => {
                     return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
                 }
             };
 
-            let types_scope = Scopes::<Type> {
-                scopes: vec![&minimal_core_variable_types() + &builtin_function_types()],
-            };
+        log = debug!(
+            log,
+            &format!("Put {hmds_key} in the host metadata cache to expire at {expiry}.")
+        );
+        hmds_config.hmds_cache.insert(
+            hmds_key.to_string(),
+            (expiry, (verified_md.clone(), updated_types_scope.clone())),
+        );
 
-            let found = match verify_interconnection_metadata(&metadata.value, types_scope) {
-                Ok(o) => o,
-                Err(e) => {
-                    return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
-                }
-            };
-
-            log = debug!(
-                log,
-                &format!("Put {hmds_key} in the host metadata cache to expire at {expiry}.")
-            );
-            hmds_config
-                .hmds_cache
-                .insert(hmds_key.to_string(), (expiry, found.clone()));
-
-            found
-        }
+        (verified_md, updated_types_scope)
     };
 
     let processed_http_req = match TryInto::<ProcessedRequestResponse>::try_into(request) {
@@ -140,5 +142,53 @@ pub fn safe_brooks_integration_handle(
         &*processed_http_req as &dyn prr::Prr<Vec<u8>>,
     ));
 
-    interpret_interconnection_metadata(&found, mel_scopes, processed_http_req, runtime, log)
+    // Get the updated var struct (after processing any MI.SetVariables in the HMD), and
+    // build up a more complete type for its value during interpretation.
+    let var = match updated_types_scopes
+        .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
+        .ok_or(MdInterpretError::MetadataProcessingError(
+            AssertionFailure(
+                format!(
+                    "Missing {} struct type after analyzing HMD",
+                    MEL_USER_SET_VARIABLE_STRUCT_NAME
+                )
+                .into(),
+            )
+            .into(),
+        )) {
+        Ok(variable) => match variable {
+            Type::Struct(s) => s,
+            _ => {
+                return Err((
+                    MdInterpretError::MetadataProcessingError(
+                        AssertionFailure(
+                            format!(
+                                "{} has wrong type after analyzing HMD",
+                                MEL_USER_SET_VARIABLE_STRUCT_NAME
+                            )
+                            .into(),
+                        )
+                        .into(),
+                    )
+                    .into(),
+                    log,
+                ));
+            }
+        },
+        Err(e) => return Err((e.into(), log)),
+    };
+
+    log = debug!(
+        log,
+        &format!(
+            "Creating more-specific type for {} struct: {}",
+            MEL_USER_SET_VARIABLE_STRUCT_NAME, var
+        )
+    );
+    let mel_scopes = mel_scopes.insert(
+        MEL_USER_SET_VARIABLE_STRUCT_NAME,
+        mel_var_value_from_type(var),
+    );
+
+    interpret_interconnection_metadata(&verified_md, mel_scopes, processed_http_req, runtime, log)
 }

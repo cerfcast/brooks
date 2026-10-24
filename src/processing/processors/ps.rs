@@ -960,16 +960,6 @@ impl
         ))?;
         Ok((input, (result, md)))
     }
-
-    fn stage(&self, stage: interpret::Stages) -> bool {
-        stage
-            == match self {
-                TypedStage::ClientRequest(_) => interpret::Stages::ClientRequest,
-                TypedStage::ClientResponse(_) => interpret::Stages::ClientResponse,
-                TypedStage::OriginRequest(_) => interpret::Stages::OriginRequest,
-                TypedStage::OriginResponse(_) => interpret::Stages::OriginResponse,
-            }
-    }
 }
 
 #[cfg(test)]

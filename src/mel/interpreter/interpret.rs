@@ -15,7 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::fmt::{Debug, Display};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+};
 
 use crate::{
     common::GrammarLocation,
@@ -119,6 +122,8 @@ impl Display for MelInterpError {
         }
     }
 }
+
+impl Error for MelInterpError {}
 
 #[derive(Debug)]
 pub struct MelInterpLocatableError {

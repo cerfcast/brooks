@@ -34,27 +34,18 @@ use crate::cdni::{gmd::spec::TypedGenericMetadata, imd::spec::HostMetadata};
 pub fn verify_interconnection_metadata(
     metadata: &HostMetadata<()>,
     scopes: Scopes<Type>,
-) -> Result<HostMetadata<CdniVerificationKey>, Box<MetadataVerificationError>> {
-    let mut stages: Vec<TypedGenericMetadata<CdniVerificationKey>> = vec![];
+) -> Result<(HostMetadata<CdniVerificationKey>, Scopes<Type>), Box<MetadataVerificationError>> {
+    let mut analyzed_md_elements: Vec<TypedGenericMetadata<CdniVerificationKey>> = vec![];
 
-    #[allow(clippy::vec_init_then_push)]
-    #[allow(unused_mut)]
-    let mut processors: Vec<&dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>> =
-        vec![];
+    let processors: Vec<&dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>> = vec![
+        &PsMetadataAnalyzer {} as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>,
+        &SourceMetadataAnalyzer {}
+            as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>,
+        &SetVariableMetadataAnalyzer {}
+            as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>,
+    ];
 
-    #[allow(clippy::vec_init_then_push)]
-    processors
-        .push(&PsMetadataAnalyzer {}
-            as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>);
-
-    #[allow(clippy::vec_init_then_push)]
-    processors.push(&SourceMetadataAnalyzer {}
-        as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>);
-
-    #[allow(clippy::vec_init_then_push)]
-    processors.push(&SetVariableMetadataAnalyzer {}
-        as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>);
-
+    let mut analysis_context = MetadataAnalysisContext { scopes };
     for md in &metadata.metadata {
         let mut no_processor = true;
         for processor in &processors {
@@ -64,17 +55,14 @@ pub fn verify_interconnection_metadata(
 
             no_processor = false;
 
-            let (_, analyzed) = processor.analyze(
-                md,
-                MetadataAnalysisContext {
-                    scopes: scopes.clone(),
-                },
-            )?;
+            let (new_analysis_context, analyzed_md) = processor.analyze(md, analysis_context)?;
 
-            stages.push(TypedGenericMetadata {
+            analysis_context = new_analysis_context;
+
+            analyzed_md_elements.push(TypedGenericMetadata {
                 tpe: md.tpe.clone(),
                 value: md.value.clone(),
-                aug: analyzed,
+                aug: analyzed_md,
             });
         }
 
@@ -83,8 +71,11 @@ pub fn verify_interconnection_metadata(
         }
     }
 
-    Ok(HostMetadata {
-        metadata: stages,
-        aug: Default::default(),
-    })
+    Ok((
+        HostMetadata {
+            metadata: analyzed_md_elements,
+            aug: Default::default(),
+        },
+        analysis_context.scopes,
+    ))
 }
