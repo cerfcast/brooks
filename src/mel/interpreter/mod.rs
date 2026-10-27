@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! MEL interpreter
+
 pub mod builtins;
 pub mod error;
 pub mod interpret;
@@ -29,6 +31,7 @@ use crate::mel::{
     interpreter::interpret::{MelInterp, MelInterpContext, MelInterpResult},
 };
 
+/// Interpret analyzed MEL expression
 pub fn interpret(expr: &Expr<Analyzed>, context: MelInterpContext) -> MelInterpResult {
     let driver = AstVisitorDriver {};
     let visitor = MelInterp {};

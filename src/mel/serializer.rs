@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Serialize a MEL AST
+
 use std::fmt::Display;
 
 use crate::common::TextLocation;

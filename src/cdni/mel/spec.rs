@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! All Metadata Information except for what is defined in Processing Stages.
+//! MEL metadata definitions
 
 use crate::macros::IntoCdniMetadata;
 use brooks_macros::CdniMetadata;

@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! All Metadata Information except for what is defined in Processing Stages.
+//! Verification of [Interconnection Metadata](https://datatracker.ietf.org/doc/rfc8006/)
 
 use crate::verifying::mel::verify::SetVariableMetadataAnalyzer;
 use crate::verifying::verify::{
@@ -28,7 +28,7 @@ use crate::verifying::ps::verify::PsMetadataAnalyzer;
 
 use crate::cdni::{gmd::spec::TypedGenericMetadata, imd::spec::HostMetadata};
 
-/// Verify given Interconnection Metadata for the given request.
+/// Verify a piece of [Interconnection Metadata](https://datatracker.ietf.org/doc/rfc8006/).
 ///
 /// TODO: Make clear in the documentation that this function is a _major_ entry point for library clients.
 pub fn verify_interconnection_metadata(

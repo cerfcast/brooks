@@ -111,9 +111,12 @@ impl Serialize for CdniVerificationKey {
     }
 }
 
+//BEGIN: Verifier Trait
+
+/// The result of an analysis of [`TypedGenericMetadata`].
 pub type AnalysisResult<Ck, Error> = Result<(Ck, CdniVerificationKey), Box<Error>>;
 
-/// Generate a validated representation of a given piece of Metadata Information, if possible.
+/// Generate a validated representation of a given piece of [`TypedGenericMetadata`] information, if possible.
 pub trait Verifier<Ck, Error>: Debug {
     fn analyze(&self, v: &TypedGenericMetadata<()>, input: Ck) -> AnalysisResult<Ck, Error>;
 

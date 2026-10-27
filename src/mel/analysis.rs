@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Analyse a MEL expression
+
 use std::{
     fmt::{Debug, Display},
     net::IpAddr,
@@ -2899,6 +2901,8 @@ mod analysis_error_tests {
 }
 
 pub type MelAnalysisResult = Result<Expr<Analyzed>, Box<AnalysisLocatableError>>;
+
+/// Analyze the source code of a MEL expression.
 pub fn analyze(expr: &Expr<()>, scopes: &Scopes<Type>) -> MelAnalysisResult {
     let driver = AstVisitorDriver {};
     let visitor = MelTypeChecker {};

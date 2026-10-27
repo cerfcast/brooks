@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! MEL Types and Values
+//! MEL types
 
 use std::{
     collections::HashMap,
@@ -31,7 +31,7 @@ use crate::{
     prr::Prr,
 };
 
-/// Types
+//BEGIN: Types
 
 #[derive(Debug, Clone, Default)]
 pub struct Struct {
@@ -94,20 +94,6 @@ pub struct ArgumentTypeList {
 pub struct ParameterTypesList {
     pub params: Vec<Type>,
 }
-
-pub type ReturnTypeCalculator = fn() -> Type;
-
-#[derive(Debug, Clone)]
-pub enum ParamsTypeCheckerError {
-    Miscount(usize, usize),
-    Mismatch(Type, Type),
-}
-
-#[allow(clippy::result_large_err)]
-pub trait ParamsTypeChecker: Display {
-    fn check(&self, args: ArgumentTypeList) -> Result<(), ParamsTypeCheckerError>;
-}
-pub type ParamsTypeCheckerGenerator = fn() -> Box<dyn ParamsTypeChecker>;
 
 #[derive(Default, Debug, Clone)]
 pub enum Type {
@@ -184,6 +170,8 @@ impl Struct {
     }
 }
 
+//BEGIN: Simple MEL function parameter type checker.
+
 pub struct SimpleParamTypeChecker {
     pub p: ParameterTypesList,
 }
@@ -222,6 +210,8 @@ impl Display for SimpleParamTypeChecker {
     }
 }
 
+//BEGIN: Simple MEL function parameter type checker for polymorphic functions.
+
 pub struct TypelessParamTypeChecker {
     pub count: usize,
 }
@@ -242,6 +232,28 @@ impl Display for TypelessParamTypeChecker {
     }
 }
 
+//BEGIN: BuiltinFunctionType trait
+
+/// A function that, when called, will return the type of the return type of a MEL function.
+pub type ReturnTypeCalculator = fn() -> Type;
+
+//BEGIN: ParamsTypeChecker trait
+
+#[derive(Debug, Clone)]
+pub enum ParamsTypeCheckerError {
+    Miscount(usize, usize),
+    Mismatch(Type, Type),
+}
+
+#[allow(clippy::result_large_err)]
+pub trait ParamsTypeChecker: Display {
+    fn check(&self, args: ArgumentTypeList) -> Result<(), ParamsTypeCheckerError>;
+}
+
+/// A function that, when called, will return an object that can typecheck function parameters.
+pub type ParamsTypeCheckerGenerator = fn() -> Box<dyn ParamsTypeChecker>;
+
+/// What is required to calculate the type of a MEL function.
 pub trait BuiltinFunctionType: Debug {
     fn name(&self) -> String;
     fn params_type_checker(&self) -> ParamsTypeCheckerGenerator;
@@ -388,6 +400,8 @@ impl BuiltinFunctionType for StringBuiltin {
     }
 }
 
+//BEGIN: Convenience functions for populating [`Scope<Types>`] for [`mel::analysis::analyze`].
+
 pub fn mel_empty_header_type(wild: bool) -> Struct {
     let mut ht = Struct::new("h");
     if wild {
@@ -450,7 +464,7 @@ pub(crate) fn mel_header_type_from_processable_rr<A>(value: &dyn Prr<A>) -> Stru
     ht
 }
 
-/// Create a scope that contains the types of the MEL core variables.
+/// Create a [`Scope<Type>`] that contains the types of the MEL core variables.
 pub fn minimal_core_variable_types() -> Scope<Type> {
     let mut scope = Scope::<Type>::default();
     let ht = mel_empty_header_type(true);

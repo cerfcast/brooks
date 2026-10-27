@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Processing stages metadata definitions
+
 use crate::macros::IntoCdniMetadata;
 use brooks_macros::CdniMetadata;
 use serde::{Deserialize, Serialize};

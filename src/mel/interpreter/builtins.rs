@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+//! Interpreter implementation for MEL builtins
+
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -663,6 +665,7 @@ macro_rules! add_builtin_function_interpreter_to_scope {
     };
 }
 
+/// Create a [`Scope<TypedValue>`] containing all the MEL builtin interpreters.
 pub fn builtin_builtin_function_interpreters() -> Scope<TypedValue> {
     let path_element = Path_ElementBuiltin {};
     let path_elements = Path_ElementsBuiltin {};

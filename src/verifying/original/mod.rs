@@ -15,6 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Processing Stages Metadata
+//! Verification of Generic Metadata from the original CDNI Interconnection Metadata draft
 
 pub mod verify;
