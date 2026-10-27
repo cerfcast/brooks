@@ -102,9 +102,11 @@ documentation for the library is available online at
 
 ### Contributing
 
-We would _love_ your contributions! More information on how to contribute will be coming soon!
+We would _love_ your contributions!
 
-In the meantime, if you want to get started helping immediately, please file an
+We try to follow a consistent set of rules for writing our code. You can find more about that in the [devdocs](./devdocs/).
+
+If you want to contribute but are unsure where to start, please file an
 [issue](https://github.com/cerfcast/brooks/issues) or contact [Will Hawkins](mailto:whh8b@obs.cr).
 
 Open Source is all about community -- we can't wait to have you join the effort!!
