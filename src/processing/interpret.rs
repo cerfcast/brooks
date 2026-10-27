@@ -21,8 +21,10 @@ use std::{
 };
 
 use crate::{
+    processing::processors::{SimpleProcessorsInterpreterContext, ps::PsInterpretValue},
     prr::{self, Prr, PrrType, ValueType},
     utils::try_to_url,
+    verifying::verify::CdniVerificationKey,
 };
 
 /// Concrete instances of MI generated during interpretation that may be used to specify post-interpretation behavior.
@@ -102,6 +104,8 @@ pub type InterpretationResult<Ck, Res, Error> = Result<(Ck, Res), Box<Error>>;
 pub trait Interpreter<Ck, Res, Error>: Debug {
     /// Perform the semantics of the MI.
     fn interpret(&self, input: Ck) -> InterpretationResult<Ck, Res, Error>;
+
+    fn at(&self, stage: Stages) -> bool;
 }
 
 /// TODO
@@ -289,5 +293,42 @@ impl TryFrom<&dyn Prr<Vec<u8>>> for reqwest::Request {
         );
 
         Ok(request)
+    }
+}
+
+// Generic implementation of `interpret::Interpreter` for CdniVerificationKey
+// that simply redirects to the implementation of the underlying key.
+impl
+    Interpreter<
+        SimpleProcessorsInterpreterContext<'_>,
+        (PsInterpretValue, MetadataInformationResultElements),
+        Error,
+    > for CdniVerificationKey
+{
+    fn interpret<'a>(
+        &self,
+        input: SimpleProcessorsInterpreterContext<'a>,
+    ) -> InterpretationResult<
+        SimpleProcessorsInterpreterContext<'a>,
+        (PsInterpretValue, MetadataInformationResultElements),
+        Error,
+    > {
+        match &self {
+            CdniVerificationKey::Stage(typed_stage) => typed_stage.interpret(input),
+            CdniVerificationKey::Source(typed_source) => typed_source.interpret(input),
+            CdniVerificationKey::SetVariable(typed_set_variable) => {
+                typed_set_variable.interpret(input)
+            }
+            CdniVerificationKey::None => todo!(),
+        }
+    }
+
+    fn at(&self, stage: Stages) -> bool {
+        match &self {
+            CdniVerificationKey::Stage(typed_stage) => typed_stage.at(stage),
+            CdniVerificationKey::Source(typed_source) => typed_source.at(stage),
+            CdniVerificationKey::SetVariable(typed_set_variable) => typed_set_variable.at(stage),
+            CdniVerificationKey::None => todo!(),
+        }
     }
 }

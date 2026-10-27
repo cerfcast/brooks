@@ -18,7 +18,7 @@
 //! The Mel Generic Metadata Processing Implementation
 
 use crate::{
-    cdni::mel::spec::SetVariable,
+    cdni::mel::spec::TypedSetVariable,
     logging::{LogLevel::Debug, LogMsgs},
     mel::{
         self, MEL_USER_SET_VARIABLE_STRUCT_NAME,
@@ -47,7 +47,7 @@ impl
         SimpleProcessorsInterpreterContext<'_>,
         (ps::PsInterpretValue, MetadataInformationResultElements),
         Error,
-    > for SetVariable<SetVariableVerificationKey>
+    > for TypedSetVariable<SetVariableVerificationKey>
 {
     fn interpret<'a>(
         &self,
@@ -79,7 +79,7 @@ impl
             }
         };
 
-        if let Some(expression) = &self.aug.expression {
+        if let Some(expression) = &self.value.aug.expression {
             let result = mel::interpreter::interpret(
                 expression,
                 MelInterpContext {
@@ -91,7 +91,7 @@ impl
             .map_err(|e| RuntimeError(Box::new(e)))?;
 
             var.insert_field(
-                &self.variable_name,
+                &self.value.variable_name,
                 result.val.ok_or(RuntimeError(
                     "Missing value after successful interpretation of Mel expression".into(),
                 ))?,
@@ -110,11 +110,15 @@ impl
                 output,
                 (MatchYes, MetadataInformationResultElements::default()),
             ))
-        } else if let Some(_value) = &self.aug.value {
+        } else if let Some(_value) = &self.value.aug.value {
             todo!()
         } else {
             todo!()
         }
+    }
+
+    fn at(&self, stage: interpret::Stages) -> bool {
+        stage == interpret::Stages::Pre
     }
 }
 
@@ -188,7 +192,6 @@ mod test {
             .build()
             .expect("Could not get a runtime to use for testing interpret function");
         let result = svmi
-            .value
             .interpret(SimpleProcessorsInterpreterContext {
                 scopes: Scopes::<TypedValue>::default().insert(
                     MEL_USER_SET_VARIABLE_STRUCT_NAME,

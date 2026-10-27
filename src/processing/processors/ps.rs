@@ -38,6 +38,9 @@ use crate::mel::interpreter::interpret::{
 use crate::mel::interpreter::values::{TypedValue, Value};
 use crate::mel::types::Type;
 use crate::processing::interpret;
+use crate::processing::interpret::Stages::{
+    ClientRequest, ClientResponse, OriginRequest, OriginResponse,
+};
 use crate::processing::processors::SimpleProcessorsInterpreterContext;
 use crate::verifying::ps::verify::PsVerificationKey;
 use crate::visitors::{PsVisitor, PsVisitorResult};
@@ -959,6 +962,16 @@ impl
             PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult).into(),
         ))?;
         Ok((input, (result, md)))
+    }
+
+    fn at(&self, stage: interpret::Stages) -> bool {
+        match &self {
+            // The [Origin|Client]RequestStage metadata can contain request and response transforms.
+            TypedStage::ClientRequest(_) => stage == ClientRequest || stage == ClientResponse,
+            TypedStage::OriginRequest(_) => stage == OriginRequest || stage == OriginResponse,
+            TypedStage::ClientResponse(_) => stage == ClientResponse,
+            TypedStage::OriginResponse(_) => stage == OriginResponse,
+        }
     }
 }
 

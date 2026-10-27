@@ -237,6 +237,8 @@ impl Verifier<MetadataAnalysisContext, MetadataVerificationError> for PsMetadata
         )
         .map_err(|e| MetadataVerificationError::JsonError(e.to_string()))?;
 
+        // TODO: It may be possible to optimize how the analyzed metadata is interpreted
+        // if the if-rule in the MatchGroup is a constant.
         let res = verify_ps_request_stage(&generic_stage, &input.scopes)
             .map_err(MetadataVerificationError::PsVerificationError)?;
 
