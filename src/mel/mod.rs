@@ -24,6 +24,8 @@ pub mod c;
 #[allow(dead_code)]
 pub mod compiler;
 #[allow(dead_code)]
+pub mod error;
+#[allow(dead_code)]
 pub mod grammar;
 #[allow(dead_code)]
 pub mod interpreter;

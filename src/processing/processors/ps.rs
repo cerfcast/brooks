@@ -32,9 +32,11 @@ use crate::environment::scope::Scopes;
 use crate::logging::LogMsgs;
 use crate::mel::analysis::Analyzed;
 use crate::mel::ast::Expr;
-use crate::mel::interpreter::interpret::{
-    MelInterpAssertion, MelInterpContext, MelInterpError, MelInterpLocatableError,
+use crate::mel::interpreter::error::{
+    InterpAssertion as MelInterpAssertion, InterpError as MelInterpError,
+    InterpLocatableError as MelInterpLocatableError,
 };
+use crate::mel::interpreter::interpret::MelInterpContext;
 use crate::mel::interpreter::values::{TypedValue, Value};
 use crate::mel::types::Type;
 use crate::processing::interpret;

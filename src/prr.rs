@@ -59,6 +59,12 @@ impl Display for Value {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum PrrType {
+    Request,
+    Response,
+}
+
 #[derive(Debug, Clone)]
 pub enum Error {
     BadValue(Value),
@@ -81,12 +87,6 @@ impl Display for Error {
             ),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum PrrType {
-    Request,
-    Response,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

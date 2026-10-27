@@ -56,6 +56,21 @@ pub enum Stages {
     Post,
 }
 
+/// The context for the interpretation of a validated representation of a given piece of Metadata Information.
+///
+///
+/// The `cookie` (of user-specified type `C`) can be used to allow access to other data
+/// an interpretation of the MI may update.
+///
+/// TODO: Determine whether the runtime can be factored out (made generic).
+#[derive(Debug)]
+pub struct InterpreterContext<C> {
+    pub request: Option<http::Request<Vec<u8>>>,
+    pub response: Option<reqwest::Response>,
+    pub runtime: tokio::runtime::Runtime,
+    pub cookie: C,
+}
+
 /// TODO
 #[derive(Debug)]
 pub enum Error {
@@ -83,21 +98,6 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
-
-/// The context for the interpretation of a validated representation of a given piece of Metadata Information.
-///
-///
-/// The `cookie` (of user-specified type `C`) can be used to allow access to other data
-/// an interpretation of the MI may update.
-///
-/// TODO: Determine whether the runtime can be factored out (made generic).
-#[derive(Debug)]
-pub struct InterpreterContext<C> {
-    pub request: Option<http::Request<Vec<u8>>>,
-    pub response: Option<reqwest::Response>,
-    pub runtime: tokio::runtime::Runtime,
-    pub cookie: C,
-}
 
 /// TODO
 pub type InterpretationResult<Ck, Res, Error> = Result<(Ck, Res), Box<Error>>;

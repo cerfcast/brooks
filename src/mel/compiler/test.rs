@@ -17,9 +17,10 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::mel::compiler::compile;
-    use crate::mel::compiler::compile::MelCompilerError;
-    use crate::mel::compiler::compile::MelCompilerLocatableError;
+    use crate::mel::compiler::{
+        compile,
+        error::{CompilerError, CompilerLocatableError},
+    };
     use std::assert_matches;
 
     #[test]
@@ -161,8 +162,8 @@ mod tests {
         let compile_result = compile(code).expect_err("Could compile code with syntax error");
         assert_matches!(
             compile_result,
-            MelCompilerLocatableError {
-                error: MelCompilerError::BadLiteral(_),
+            CompilerLocatableError {
+                error: CompilerError::BadLiteral(_),
                 location: _
             }
         )
@@ -195,8 +196,8 @@ mod tests {
         let compile_result = compile(code).expect_err("Could compile code with syntax error");
 
         assert_matches!(compile_result,
-            MelCompilerLocatableError {
-                error: MelCompilerError::SyntaxError(msg),
+            CompilerLocatableError {
+                error: CompilerError::SyntaxError(msg),
                 location: _
             }
             if msg == "Unexpected token j");
@@ -208,8 +209,8 @@ mod tests {
         let compile_result = compile(code).expect_err("Could compile code with syntax error");
 
         assert_matches!(compile_result,
-            MelCompilerLocatableError {
-                error: MelCompilerError::SyntaxError(msg),
+            CompilerLocatableError {
+                error: CompilerError::SyntaxError(msg),
                 location: _
             }
             if msg == "Bad token: /");

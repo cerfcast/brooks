@@ -28,7 +28,7 @@ use regex::Regex;
 use crate::{
     environment::scope::Scope,
     mel::{
-        interpreter::interpret::{BuiltinFunction, MelInterpError},
+        interpreter::{error::InterpError, interpret::BuiltinFunction},
         types::{
             mel_empty_var_type, mel_header_type_from_processable_rr, mel_header_type_from_req,
             mel_req_type, mel_uri_type,
@@ -56,20 +56,14 @@ impl StructValue {
         }
     }
 
-    pub fn insert_field(
-        &mut self,
-        name: &str,
-        value: TypedValue,
-    ) -> Result<(), Box<MelInterpError>> {
+    pub fn insert_field(&mut self, name: &str, value: TypedValue) -> Result<(), Box<InterpError>> {
         let ft = self
             .tpe
             .get_field(name)
-            .ok_or(MelInterpError::UnknownField(name.to_string()))?;
+            .ok_or(InterpError::UnknownField(name.to_string()))?;
 
         if ft != value.tpe {
-            return Err(
-                MelInterpError::MistypedField(name.to_string(), ft.clone(), value.tpe).into(),
-            );
+            return Err(InterpError::MistypedField(name.to_string(), ft.clone(), value.tpe).into());
         }
 
         self.fields.insert(name.to_string(), value);
@@ -114,19 +108,6 @@ pub enum Value {
     Nil,
     #[default]
     Uninitialized,
-}
-
-#[derive(Debug, Clone)]
-pub enum TypedValueError {
-    ConversionError(String),
-}
-
-impl Display for TypedValueError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TypedValueError::ConversionError(ce) => write!(f, "Conversion error: {ce}"),
-        }
-    }
 }
 
 #[derive(Default, Debug, Clone)]

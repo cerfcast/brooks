@@ -25,19 +25,14 @@ use crate::{
     common::TextLocation,
     environment::scope::Scopes,
     mel::{
-        compiler::compile::MelCompilerLocatableError,
+        error::{AnalysisAssertions, AnalysisError, AnalysisLocatableError, AnalysisPreconditions},
         types::{ArgumentTypeList, ParamsTypeCheckerError, ParamsTypeCheckerGenerator},
     },
 };
 
 use crate::mel::{
-    analysis::{
-        MelAnalysisAssertions::{ContextMissingExpr, ContextMissingParams, ContextWrongExprType},
-        MelAnalysisError::{
-            AssertionFailure, Incalculable, InvalidRegex, InvalidType, Miscount, Mismatch,
-            OptimizationNotSupported, PreconditionFailure, RegexSame, UnknownField,
-            UnknownIdentifier,
-        },
+    analysis::AnalysisAssertions::{
+        ContextMissingExpr, ContextMissingParams, ContextWrongExprType,
     },
     ast::{
         self, Argument, ArgumentList, AstVisitor, AstVisitorDriver, AstVisitorResult, BinaryExpr,
@@ -46,6 +41,7 @@ use crate::mel::{
         Expr, FunctionCall, IPAddressLiteral, Identifier, MemberAccessExpression, NumberLiteral,
         StringLiteral, TernaryExpr,
     },
+    error::AnalysisError::{AssertionFailure, InvalidType, Mismatch, UnknownIdentifier},
     types::{
         self,
         Type::{self, Struct},
@@ -110,112 +106,6 @@ impl<A: Clone + Debug> Display for Expr<A> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum MelAnalysisAssertions {
-    ContextMissing,
-    ContextMissingExpr(String),
-    ContextWrongExprType(String, String, String),
-    ContextMissingParams,
-    InvalidOperator(String, String),
-}
-
-impl Display for MelAnalysisAssertions {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MelAnalysisAssertions::ContextMissing => write!(f, "Missing analysis context"),
-            ContextWrongExprType(expected, actual, whre) => write!(
-                f,
-                "Wrong expression type in analysis context; expected {} but found {} in {}",
-                expected, actual, whre
-            ),
-            MelAnalysisAssertions::ContextMissingParams => {
-                write!(f, "Missing parameters in analysis context")
-            }
-            MelAnalysisAssertions::ContextMissingExpr(s) => {
-                write!(f, "Missing expression in {}", s)
-            }
-            MelAnalysisAssertions::InvalidOperator(o, l) => {
-                write!(f, "Invalid operator {o} in {l}")
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum MelAnalysisPreconditions {
-    ContextMissingExpr(String),
-}
-
-impl Display for MelAnalysisPreconditions {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MelAnalysisPreconditions::ContextMissingExpr(s) => {
-                write!(f, "Missing expression in {}", s)
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum MelAnalysisError {
-    CompilerError(MelCompilerLocatableError),
-    Mismatch(Type, Type),
-    RegexSame,
-    InvalidType(Vec<Type>, Type),
-    Miscount(usize, usize),
-    InvalidRegex(String),
-    UnknownField(String, String),
-    UnknownIdentifier(String),
-    AssertionFailure(MelAnalysisAssertions),
-    PreconditionFailure(MelAnalysisPreconditions),
-    OptimizationNotSupported(String),
-    Incalculable,
-}
-
-impl Display for MelAnalysisError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::CompilerError(e) => write!(f, "Compiler error: {:?}", e),
-            Mismatch(expected, found) => write!(f, "Expected {:?}, found {:?}", expected, found),
-            Miscount(expected, found) => write!(f, "Expected {expected} arguments, found {found}"),
-            UnknownIdentifier(i) => write!(f, "Unknown identifier {:?}", i),
-            AssertionFailure(c) => write!(f, "Missing compiler context: {:?}", c),
-            PreconditionFailure(c) => {
-                write!(f, "Precondition not satisfied during analysis: {:?}", c)
-            }
-            UnknownField(strct, member) => write!(f, "No field named {member} in {strct}"),
-            Incalculable => write!(f, "Incalculable expression analysis"),
-            OptimizationNotSupported(o) => write!(f, "Optimization not supported: {o}"),
-            InvalidRegex(i) => write!(f, "Regular expression literal not valid: {i}"),
-            RegexSame => write!(
-                f,
-                "The operands to the regular expression match operator must be a string and a regular expression"
-            ),
-            InvalidType(valids, actual) => write!(
-                f,
-                "{actual} is not one of the expected types ({})",
-                valids
-                    .iter()
-                    .map(|v| v.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",")
-            ),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct MelAnalysisLocatableError {
-    pub error: Box<MelAnalysisError>,
-    pub location: TextLocation,
-}
-
-impl Display for MelAnalysisLocatableError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({})", self.error, self.location)
-    }
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct MelAnalysisContext {
     pub expr: Option<Expr<Analyzed>>,
@@ -257,20 +147,20 @@ impl From<Vec<Argument<Analyzed>>> for ArgumentTypeList {
 
 pub struct MelTypeChecker {}
 
-impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeChecker {
+impl AstVisitor<MelAnalysisContext, (), AnalysisLocatableError> for MelTypeChecker {
     fn visit_function_call(
         &self,
         ast: &FunctionCall<()>,
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         let callee = driver.visit(&ast.callee, self, context.clone())?;
 
         let callee = if let Some(callee) = callee.expr {
             callee
         } else {
-            return Err(MelAnalysisLocatableError {
-                error: AssertionFailure(MelAnalysisAssertions::ContextMissingExpr(
+            return Err(AnalysisLocatableError {
+                error: AssertionFailure(AnalysisAssertions::ContextMissingExpr(
                     "visit_function_call".to_string(),
                 ))
                 .into(),
@@ -297,7 +187,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             ))
             .into()),
         }
-        .map_err(|e| MelAnalysisLocatableError {
+        .map_err(|e| AnalysisLocatableError {
             error: e,
             location: ast.location.clone(),
         })?;
@@ -320,11 +210,11 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         ast: &Identifier<()>,
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         let found_id = context
             .scopes
             .lookup(&ast.identifier)
-            .ok_or(MelAnalysisLocatableError {
+            .ok_or(AnalysisLocatableError {
                 error: UnknownIdentifier(ast.identifier.clone()).into(),
                 location: ast.location.clone(),
             })?;
@@ -344,8 +234,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         ast: &ArgumentList<()>,
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
-        let ptcg = context.ptcg.ok_or(MelAnalysisLocatableError {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
+        let ptcg = context.ptcg.ok_or(AnalysisLocatableError {
             error: AssertionFailure(ContextMissingParams).into(),
             location: ast.location.clone(),
         })?;
@@ -357,8 +247,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             let arg = self
                 .visit_argument(arg, context.clone(), driver)?
                 .expr
-                .ok_or(MelAnalysisLocatableError {
-                    error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+                .ok_or(AnalysisLocatableError {
+                    error: AnalysisError::AssertionFailure(ContextMissingExpr(
                         "visit_argument_list".into(),
                     ))
                     .into(),
@@ -372,7 +262,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
                     "visit_argument_list".to_string(),
                 ))),
             }
-            .map_err(|e| MelAnalysisLocatableError {
+            .map_err(|e| AnalysisLocatableError {
                 error: e.into(),
                 location: ast.location.clone(),
             })?;
@@ -382,13 +272,13 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         ptc.check(arg_types.clone().into()).map_err(|e| {
             let error = match e {
                 ParamsTypeCheckerError::Miscount(expected, actual) => {
-                    MelAnalysisError::Miscount(expected, actual)
+                    AnalysisError::Miscount(expected, actual)
                 }
                 ParamsTypeCheckerError::Mismatch(expected, actual) => {
-                    MelAnalysisError::Mismatch(expected, actual)
+                    AnalysisError::Mismatch(expected, actual)
                 }
             };
-            MelAnalysisLocatableError {
+            AnalysisLocatableError {
                 error: error.into(),
                 location: ast.location.clone(),
             }
@@ -411,16 +301,18 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         ast: &Argument<()>,
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
-        let arg = driver.visit(&ast.expr, self, context.clone())?.expr.ok_or(
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
-                    "visit_argument".into(),
-                ))
-                .into(),
-                location: ast.location.clone(),
-            },
-        )?;
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
+        let arg =
+            driver
+                .visit(&ast.expr, self, context.clone())?
+                .expr
+                .ok_or(AnalysisLocatableError {
+                    error: AnalysisError::AssertionFailure(ContextMissingExpr(
+                        "visit_argument".into(),
+                    ))
+                    .into(),
+                    location: ast.location.clone(),
+                })?;
 
         let arg_type = arg.tipe();
         Ok(context.update_expr(Expr::Argument(Arc::new(Argument {
@@ -438,21 +330,23 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         ast: &BinaryExpr<()>,
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
-        let left = driver.visit(&ast.left, self, context.clone())?.expr.ok_or(
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
-                    "visit_binary_expr".into(),
-                ))
-                .into(),
-                location: ast.left.location(),
-            },
-        )?;
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
+        let left =
+            driver
+                .visit(&ast.left, self, context.clone())?
+                .expr
+                .ok_or(AnalysisLocatableError {
+                    error: AnalysisError::AssertionFailure(ContextMissingExpr(
+                        "visit_binary_expr".into(),
+                    ))
+                    .into(),
+                    location: ast.left.location(),
+                })?;
         let right = driver
             .visit(&ast.right, self, context.clone())?
             .expr
-            .ok_or(MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+            .ok_or(AnalysisLocatableError {
+                error: AnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_binary_expr".into(),
                 ))
                 .into(),
@@ -473,13 +367,11 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
             BinaryInfixOperator::Math(_) => (vec![Type::Integer], Type::Integer),
             BinaryInfixOperator::Concat(_) => (vec![Type::String], Type::String),
             BinaryInfixOperator::MemberAccess(e) => {
-                return Err(MelAnalysisLocatableError {
-                    error: MelAnalysisError::AssertionFailure(
-                        MelAnalysisAssertions::InvalidOperator(
-                            e.to_string(),
-                            "visit_binary_expr".to_string(),
-                        ),
-                    )
+                return Err(AnalysisLocatableError {
+                    error: AnalysisError::AssertionFailure(AnalysisAssertions::InvalidOperator(
+                        e.to_string(),
+                        "visit_binary_expr".to_string(),
+                    ))
                     .into(),
                     location: ast.right.location(),
                 });
@@ -487,13 +379,13 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         };
 
         if !valid_types.contains(&left_type) {
-            return Err(MelAnalysisLocatableError {
+            return Err(AnalysisLocatableError {
                 error: InvalidType(valid_types, left_type).into(),
                 location: left.location(),
             });
         }
         if !valid_types.contains(&right_type) {
-            return Err(MelAnalysisLocatableError {
+            return Err(AnalysisLocatableError {
                 error: InvalidType(valid_types, right_type).into(),
                 location: right.location(),
             });
@@ -502,13 +394,13 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         // If the operator is the regex operator, then there is special handling.
         if let BinaryInfixOperator::Comparison(Re) = ast.op {
             if left_type != Type::String {
-                return Err(MelAnalysisLocatableError {
+                return Err(AnalysisLocatableError {
                     error: Mismatch(Type::String, left_type).into(),
                     location: left.location(),
                 });
             }
             if right_type != Type::Regex {
-                return Err(MelAnalysisLocatableError {
+                return Err(AnalysisLocatableError {
                     error: Mismatch(Type::Regex, right_type).into(),
                     location: right.location(),
                 });
@@ -527,7 +419,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 
         // Otherwise, the types just need to be equal!
         if left_type != right_type {
-            return Err(MelAnalysisLocatableError {
+            return Err(AnalysisLocatableError {
                 error: Mismatch(left_type, right_type).into(),
                 location: right.location(),
             });
@@ -550,7 +442,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         ast: (&ast::Literal, &TextLocation, &()),
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         match ast {
             (b @ ast::Literal::Boolean(_), location, _) => Ok(context.update_expr(Expr::Literal(
                 b.clone(),
@@ -602,50 +494,54 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         ast: &TernaryExpr<()>,
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         let condition = driver
             .visit(&ast.condition, self, context.clone())?
             .expr
-            .ok_or(MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+            .ok_or(AnalysisLocatableError {
+                error: AnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
                 ))
                 .into(),
                 location: ast.condition.location(),
             })?;
-        let yes = driver.visit(&ast.yes, self, context.clone())?.expr.ok_or(
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
-                    "visit_ternary_expr".into(),
-                ))
-                .into(),
-                location: ast.yes.location(),
-            },
-        )?;
+        let yes =
+            driver
+                .visit(&ast.yes, self, context.clone())?
+                .expr
+                .ok_or(AnalysisLocatableError {
+                    error: AnalysisError::AssertionFailure(ContextMissingExpr(
+                        "visit_ternary_expr".into(),
+                    ))
+                    .into(),
+                    location: ast.yes.location(),
+                })?;
 
-        let no = driver.visit(&ast.no, self, context.clone())?.expr.ok_or(
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
-                    "visit_ternary_expr".into(),
-                ))
-                .into(),
-                location: ast.no.location(),
-            },
-        )?;
+        let no =
+            driver
+                .visit(&ast.no, self, context.clone())?
+                .expr
+                .ok_or(AnalysisLocatableError {
+                    error: AnalysisError::AssertionFailure(ContextMissingExpr(
+                        "visit_ternary_expr".into(),
+                    ))
+                    .into(),
+                    location: ast.no.location(),
+                })?;
 
         let condition_type = condition.tipe();
         let yes_type = yes.tipe();
         let no_type = no.tipe();
 
         if condition_type != Type::Boolean {
-            return Err(MelAnalysisLocatableError {
+            return Err(AnalysisLocatableError {
                 error: Mismatch(Type::Boolean, condition_type).into(),
                 location: ast.location.clone(),
             });
         }
 
         if yes_type != no_type {
-            return Err(MelAnalysisLocatableError {
+            return Err(AnalysisLocatableError {
                 error: Mismatch(yes_type, no_type).into(),
                 location: ast.location.clone(),
             });
@@ -668,37 +564,40 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
         ast: &ast::MemberAccessExpression<()>,
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
-        let base = driver.visit(&ast.base, self, context.clone())?.expr.ok_or(
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
-                    "visit_member_access_expr".into(),
-                ))
-                .into(),
-                location: ast.base.location(),
-            },
-        )?;
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
+        let base =
+            driver
+                .visit(&ast.base, self, context.clone())?
+                .expr
+                .ok_or(AnalysisLocatableError {
+                    error: AnalysisError::AssertionFailure(ContextMissingExpr(
+                        "visit_member_access_expr".into(),
+                    ))
+                    .into(),
+                    location: ast.base.location(),
+                })?;
 
         let struct_type = match base.tipe() {
             Type::Struct(struct_type) => struct_type,
             t => {
-                return Err(MelAnalysisLocatableError {
-                    error: MelAnalysisError::Mismatch(Struct(types::Struct::new("TODO")), t).into(),
+                return Err(AnalysisLocatableError {
+                    error: AnalysisError::Mismatch(Struct(types::Struct::new("TODO")), t).into(),
                     location: ast.base.location(),
                 });
             }
         };
 
-        let member_type = struct_type.type_for_field(&ast.member.identifier).ok_or(
-            MelAnalysisLocatableError {
-                error: MelAnalysisError::UnknownField(
-                    struct_type.name,
-                    ast.member.identifier.clone(),
-                )
-                .into(),
-                location: ast.base.location(),
-            },
-        )?;
+        let member_type =
+            struct_type
+                .type_for_field(&ast.member.identifier)
+                .ok_or(AnalysisLocatableError {
+                    error: AnalysisError::UnknownField(
+                        struct_type.name,
+                        ast.member.identifier.clone(),
+                    )
+                    .into(),
+                    location: ast.base.location(),
+                })?;
 
         Ok(
             context.update_expr(Expr::MemberAccess(Arc::new(MemberAccessExpression {
@@ -732,7 +631,7 @@ mod type_check_tests {
         minimal_core_variable_types,
     };
     use crate::mel::{
-        analysis::{Analyzed, MelAnalysisContext, MelAnalysisError, MelTypeChecker},
+        analysis::{AnalysisError, Analyzed, MelAnalysisContext, MelTypeChecker},
         ast::{AstVisitorDriver, BinaryExpr, Expr, FunctionCall, Identifier},
         compiler::compile,
         types::{
@@ -838,7 +737,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-            MelAnalysisError::InvalidType(i, Integer)
+            AnalysisError::InvalidType(i, Integer)
             if i == vec![Type::Regex, Type::String]
         )
     }
@@ -865,7 +764,7 @@ mod type_check_tests {
             }
         );
         assert_matches!(*result.error,
-            MelAnalysisError::InvalidType(i, Boolean)
+            AnalysisError::InvalidType(i, Boolean)
             if i == vec![Type::Regex, Type::String]
         )
     }
@@ -892,7 +791,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-            MelAnalysisError::Mismatch(Type::String, Type::Regex)
+            AnalysisError::Mismatch(Type::String, Type::Regex)
         )
     }
 
@@ -919,7 +818,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-            MelAnalysisError::Mismatch(Type::Regex, Type::String)
+            AnalysisError::Mismatch(Type::Regex, Type::String)
         )
     }
 
@@ -1016,7 +915,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-                MelAnalysisError::InvalidType(x, types::Type::String)
+                AnalysisError::InvalidType(x, types::Type::String)
             if x == vec![Integer]
         )
     }
@@ -1044,7 +943,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-            MelAnalysisError::UnknownIdentifier(a)
+            AnalysisError::UnknownIdentifier(a)
             if a == "a"
         )
     }
@@ -1113,7 +1012,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-            MelAnalysisError::InvalidType(a, Boolean)
+            AnalysisError::InvalidType(a, Boolean)
         if a == vec![Integer]
         )
     }
@@ -1144,7 +1043,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-            MelAnalysisError::InvalidType(a, Boolean)
+            AnalysisError::InvalidType(a, Boolean)
         if a == vec![Integer]
         )
     }
@@ -1218,7 +1117,7 @@ mod type_check_tests {
                 extent: 6
             }
         );
-        assert_matches!(*result.error, MelAnalysisError::Miscount(1, 2))
+        assert_matches!(*result.error, AnalysisError::Miscount(1, 2))
     }
 
     #[test]
@@ -1254,7 +1153,7 @@ mod type_check_tests {
                 extent: 6
             }
         );
-        assert_matches!(*result.error, MelAnalysisError::Miscount(1, 2))
+        assert_matches!(*result.error, AnalysisError::Miscount(1, 2))
     }
 
     #[test]
@@ -1290,7 +1189,7 @@ mod type_check_tests {
                 extent: 6
             }
         );
-        assert_matches!(*result.error, MelAnalysisError::Miscount(1, 2))
+        assert_matches!(*result.error, AnalysisError::Miscount(1, 2))
     }
 
     #[test]
@@ -1374,7 +1273,7 @@ mod type_check_tests {
             .expect_err("Could analyze expression with missing identifier");
 
         assert_matches!(
-            *result.error, MelAnalysisError::UnknownIdentifier(a)
+            *result.error, AnalysisError::UnknownIdentifier(a)
             if a == "use_me"
         )
     }
@@ -1409,7 +1308,7 @@ mod type_check_tests {
             .visit(&ast, &visitor, context)
             .expect_err("Could analyze expression with miscounted params/args");
 
-        assert_matches!(*result.error, MelAnalysisError::Miscount(2, 1))
+        assert_matches!(*result.error, AnalysisError::Miscount(2, 1))
     }
 
     #[test]
@@ -1551,7 +1450,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-            MelAnalysisError::Mismatch(Integer, Type::String),
+            AnalysisError::Mismatch(Integer, Type::String),
         )
     }
 
@@ -1645,7 +1544,7 @@ mod type_check_tests {
             }
         );
         assert_matches!(
-            *result.error, MelAnalysisError::InvalidType(i, Boolean)
+            *result.error, AnalysisError::InvalidType(i, Boolean)
             if i == vec![Integer]
         )
     }
@@ -1709,7 +1608,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-            MelAnalysisError::InvalidType(i, Boolean) if i == vec![Integer]
+            AnalysisError::InvalidType(i, Boolean) if i == vec![Integer]
         )
     }
 
@@ -1923,7 +1822,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-                MelAnalysisError::InvalidType(i, Integer)
+                AnalysisError::InvalidType(i, Integer)
             if i == vec![IPAddress]
         )
     }
@@ -1954,7 +1853,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-                MelAnalysisError::InvalidType(i, Type::String)
+                AnalysisError::InvalidType(i, Type::String)
             if i == vec![IPAddress]
         )
     }
@@ -1987,7 +1886,7 @@ mod type_check_tests {
         );
         assert_matches!(
             *result.error,
-                MelAnalysisError::InvalidType(i, Type::String)
+                AnalysisError::InvalidType(i, Type::String)
             if i == vec![IPAddress]
         )
     }
@@ -2034,27 +1933,6 @@ mod type_check_tests {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum MelOptimizerError {}
-
-impl Display for MelOptimizerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Optimizer error")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct MelOptimizerLocatableError {
-    pub error: MelOptimizerError,
-    pub location: TextLocation,
-}
-
-impl Display for MelOptimizerLocatableError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({})", self.error, self.location)
-    }
-}
-
 pub struct ConstEvaluator {}
 
 impl ConstEvaluator {
@@ -2069,34 +1947,34 @@ impl ConstEvaluator {
         right: &CompiledConstant,
         right_type: Type,
         op: ast::BinaryInfixOperator,
-    ) -> Result<CompiledConstant, Box<MelAnalysisError>> {
+    ) -> Result<CompiledConstant, Box<AnalysisError>> {
         match op {
             ast::BinaryInfixOperator::Comparison(IP) => {
                 let left = if let CompiledConstant::IPAddress(l) = left {
                     l
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::IPAddress, left_type).into());
+                    return Err(AnalysisError::Mismatch(Type::IPAddress, left_type).into());
                 };
                 let right = if let CompiledConstant::IPAddress(r) = right {
                     r
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::IPAddress, right_type).into());
+                    return Err(AnalysisError::Mismatch(Type::IPAddress, right_type).into());
                 };
                 Ok(CompiledConstant::Boolean(left == right))
             }
             ast::BinaryInfixOperator::Comparison(_) => {
-                Err(MelAnalysisError::OptimizationNotSupported("Comparison operator".into()).into())
+                Err(AnalysisError::OptimizationNotSupported("Comparison operator".into()).into())
             }
             ast::BinaryInfixOperator::Logic(logic_operator) => {
                 let left = if let CompiledConstant::Boolean(l) = left {
                     l
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::Boolean, left_type).into());
+                    return Err(AnalysisError::Mismatch(Type::Boolean, left_type).into());
                 };
                 let right = if let CompiledConstant::Boolean(r) = right {
                     r
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::Boolean, right_type).into());
+                    return Err(AnalysisError::Mismatch(Type::Boolean, right_type).into());
                 };
                 match logic_operator {
                     ast::LogicOperator::And => Ok(CompiledConstant::Boolean(*left && *right)),
@@ -2107,12 +1985,12 @@ impl ConstEvaluator {
                 let left = if let CompiledConstant::Integer(l) = left {
                     l
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::Integer, left_type).into());
+                    return Err(AnalysisError::Mismatch(Type::Integer, left_type).into());
                 };
                 let right = if let CompiledConstant::Integer(r) = right {
                     r
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::Integer, right_type).into());
+                    return Err(AnalysisError::Mismatch(Type::Integer, right_type).into());
                 };
                 match math_operator {
                     ast::MathOperator::Plus => Ok(CompiledConstant::Integer(left + right)),
@@ -2126,17 +2004,17 @@ impl ConstEvaluator {
                 let left = if let CompiledConstant::String(l) = left {
                     l
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::String, left_type).into());
+                    return Err(AnalysisError::Mismatch(Type::String, left_type).into());
                 };
                 let right = if let CompiledConstant::String(r) = right {
                     r
                 } else {
-                    return Err(MelAnalysisError::Mismatch(Type::String, right_type).into());
+                    return Err(AnalysisError::Mismatch(Type::String, right_type).into());
                 };
                 Ok(CompiledConstant::String(left.to_owned() + right))
             }
-            ast::BinaryInfixOperator::MemberAccess(c) => Err(MelAnalysisError::AssertionFailure(
-                MelAnalysisAssertions::InvalidOperator(
+            ast::BinaryInfixOperator::MemberAccess(c) => Err(AnalysisError::AssertionFailure(
+                AnalysisAssertions::InvalidOperator(
                     c.to_string(),
                     "evaluate_binary_expr".to_string(),
                 ),
@@ -2147,13 +2025,13 @@ impl ConstEvaluator {
 }
 pub struct MelOptimizer {}
 
-impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimizer {
+impl AstVisitor<MelAnalysisContext, (), AnalysisLocatableError> for MelOptimizer {
     fn visit_function_call(
         &self,
         _ast: &FunctionCall<()>,
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         Ok(context.clone())
     }
 
@@ -2162,7 +2040,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         _ast: &Identifier<()>,
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         Ok(context.clone())
     }
 
@@ -2171,7 +2049,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         _ast: &ArgumentList<()>,
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         Ok(context.clone())
     }
 
@@ -2180,7 +2058,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         _: &Argument<()>,
         context: MelAnalysisContext,
         _: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         Ok(context.clone())
     }
 
@@ -2189,11 +2067,11 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         ast: &BinaryExpr<()>,
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
-        let expr = context.expr.as_ref().ok_or(MelAnalysisLocatableError {
-            error: MelAnalysisError::PreconditionFailure(
-                MelAnalysisPreconditions::ContextMissingExpr("visit_binary_expr".into()),
-            )
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
+        let expr = context.expr.as_ref().ok_or(AnalysisLocatableError {
+            error: AnalysisError::PreconditionFailure(AnalysisPreconditions::ContextMissingExpr(
+                "visit_binary_expr".into(),
+            ))
             .into(),
             location: ast.location.clone(),
         })?;
@@ -2210,8 +2088,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                 context.update_expr(analyzed_binary_expr.left),
             )?
             .expr
-            .ok_or(MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+            .ok_or(AnalysisLocatableError {
+                error: AnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_binary_expr".into(),
                 ))
                 .into(),
@@ -2225,8 +2103,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                 context.update_expr(analyzed_binary_expr.right),
             )?
             .expr
-            .ok_or(MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+            .ok_or(AnalysisLocatableError {
+                error: AnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_binary_expr".into(),
                 ))
                 .into(),
@@ -2244,7 +2122,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                             right.tipe(),
                             ast.op.clone(),
                         )
-                        .map_err(|e| MelAnalysisLocatableError {
+                        .map_err(|e| AnalysisLocatableError {
                             error: e,
                             location: ast.location.clone(),
                         })?,
@@ -2275,7 +2153,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         _ast: (&ast::Literal, &TextLocation, &()),
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         match _ast {
             (b @ ast::Literal::Boolean(v), location, _) => Ok(context.update_expr(Expr::Literal(
                 b.clone(),
@@ -2329,11 +2207,11 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         ast: &ast::TernaryExpr<()>,
         context: MelAnalysisContext,
         driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
-        let expr = context.expr.as_ref().ok_or(MelAnalysisLocatableError {
-            error: MelAnalysisError::PreconditionFailure(
-                MelAnalysisPreconditions::ContextMissingExpr("visit_ternary_expr".into()),
-            )
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
+        let expr = context.expr.as_ref().ok_or(AnalysisLocatableError {
+            error: AnalysisError::PreconditionFailure(AnalysisPreconditions::ContextMissingExpr(
+                "visit_ternary_expr".into(),
+            ))
             .into(),
             location: ast.location.clone(),
         })?;
@@ -2350,8 +2228,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                 context.update_expr(analyzed_binary_expr.condition),
             )?
             .expr
-            .ok_or(MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+            .ok_or(AnalysisLocatableError {
+                error: AnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
                 ))
                 .into(),
@@ -2364,8 +2242,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
                 context.update_expr(analyzed_binary_expr.yes),
             )?
             .expr
-            .ok_or(MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+            .ok_or(AnalysisLocatableError {
+                error: AnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
                 ))
                 .into(),
@@ -2375,8 +2253,8 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         let no = driver
             .visit(&ast.no, self, context.update_expr(analyzed_binary_expr.no))?
             .expr
-            .ok_or(MelAnalysisLocatableError {
-                error: MelAnalysisError::AssertionFailure(ContextMissingExpr(
+            .ok_or(AnalysisLocatableError {
+                error: AnalysisError::AssertionFailure(ContextMissingExpr(
                     "visit_ternary_expr".into(),
                 ))
                 .into(),
@@ -2404,9 +2282,9 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         let condition_c = match condition_c {
             CompiledConstant::Boolean(b) => b,
             e => {
-                return Err(MelAnalysisLocatableError {
-                    error: MelAnalysisError::AssertionFailure(
-                        MelAnalysisAssertions::ContextWrongExprType(
+                return Err(AnalysisLocatableError {
+                    error: AnalysisError::AssertionFailure(
+                        AnalysisAssertions::ContextWrongExprType(
                             "Boolean".to_string(),
                             e.to_string(),
                             "visit_ternary_expr".to_string(),
@@ -2439,7 +2317,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
         _ast: &ast::MemberAccessExpression<()>,
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
-    ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
+    ) -> AstVisitorResult<MelAnalysisContext, AnalysisLocatableError> {
         Ok(context.clone())
     }
 }
@@ -2993,7 +2871,7 @@ mod optimizer_tests {
 #[cfg(test)]
 mod analysis_error_tests {
     use crate::mel::{
-        analysis::{MelAnalysisContext, MelAnalysisError, MelAnalysisPreconditions, MelOptimizer},
+        analysis::{AnalysisError, AnalysisPreconditions, MelAnalysisContext, MelOptimizer},
         ast::AstVisitorDriver,
         compiler::compile,
     };
@@ -3015,12 +2893,12 @@ mod analysis_error_tests {
             .expect_err("Could analyze expression with no context");
         assert_matches!(
             *result.error,
-            MelAnalysisError::PreconditionFailure(MelAnalysisPreconditions::ContextMissingExpr(_))
+            AnalysisError::PreconditionFailure(AnalysisPreconditions::ContextMissingExpr(_))
         );
     }
 }
 
-pub type MelAnalysisResult = Result<Expr<Analyzed>, Box<MelAnalysisLocatableError>>;
+pub type MelAnalysisResult = Result<Expr<Analyzed>, Box<AnalysisLocatableError>>;
 pub fn analyze(expr: &Expr<()>, scopes: &Scopes<Type>) -> MelAnalysisResult {
     let driver = AstVisitorDriver {};
     let visitor = MelTypeChecker {};
@@ -3033,8 +2911,8 @@ pub fn analyze(expr: &Expr<()>, scopes: &Scopes<Type>) -> MelAnalysisResult {
     let visitor = MelOptimizer {};
     let result = driver.visit(expr, &visitor, result)?;
 
-    let result = result.expr.ok_or(MelAnalysisLocatableError {
-        error: MelAnalysisError::Incalculable.into(),
+    let result = result.expr.ok_or(AnalysisLocatableError {
+        error: AnalysisError::Incalculable.into(),
         location: TextLocation {
             start: 0,
             extent: 0,

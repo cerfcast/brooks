@@ -22,6 +22,7 @@ use std::fmt::Debug;
 use crate::cdni::mel::spec::TypedSetVariable;
 use crate::cdni::original::spec::TypedSource;
 use crate::verifying::mel::verify::{MelVerificationError, SetVariableVerificationKey};
+use crate::verifying::ps::error::VerificationError;
 use crate::{environment::scope::Scopes, mel::types::Type};
 
 use std::error::Error;
@@ -30,7 +31,6 @@ use std::fmt::Display;
 use serde::Serialize;
 
 use crate::verifying::original::verify::SourceVerificationKey;
-use crate::verifying::ps::verify::PsVerificationError;
 use crate::verifying::ps::verify::PsVerificationKey;
 
 use crate::cdni::ps::spec::TypedStage;
@@ -49,8 +49,29 @@ pub enum MetadataVerificationError {
     NotProcessingStage,
     NoProcessor(String),
     JsonError(String),
-    PsVerificationError(Box<PsVerificationError>),
+    PsVerificationError(Box<VerificationError>),
     MelVerificationError(Box<MelVerificationError>),
+}
+
+impl Error for MetadataVerificationError {}
+
+impl Display for MetadataVerificationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MetadataVerificationError::NoError => write!(f, "No error!"),
+            MetadataVerificationError::NotProcessingStage => {
+                write!(f, "Value was not a processing stage!")
+            }
+            MetadataVerificationError::NoProcessor(tpe) => {
+                write!(f, "No processor registered for Metadata with type {tpe}")
+            }
+            MetadataVerificationError::PsVerificationError(pse) => write!(f, "{pse}"),
+            MetadataVerificationError::JsonError(je) => write!(f, "JSON error: {je}"),
+            MetadataVerificationError::MelVerificationError(mel_verification_error) => {
+                write!(f, "{mel_verification_error}")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -87,27 +108,6 @@ impl Serialize for CdniVerificationKey {
         S: serde::Serializer,
     {
         serializer.serialize_none()
-    }
-}
-
-impl Error for MetadataVerificationError {}
-
-impl Display for MetadataVerificationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MetadataVerificationError::NoError => write!(f, "No error!"),
-            MetadataVerificationError::NotProcessingStage => {
-                write!(f, "Value was not a processing stage!")
-            }
-            MetadataVerificationError::NoProcessor(tpe) => {
-                write!(f, "No processor registered for Metadata with type {tpe}")
-            }
-            MetadataVerificationError::PsVerificationError(pse) => write!(f, "{pse}"),
-            MetadataVerificationError::JsonError(je) => write!(f, "JSON error: {je}"),
-            MetadataVerificationError::MelVerificationError(mel_verification_error) => {
-                write!(f, "{mel_verification_error}")
-            }
-        }
     }
 }
 

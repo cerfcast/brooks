@@ -24,10 +24,10 @@ use crate::{
     },
     common::TextLocation,
     mel::{
-        MEL_USER_SET_VARIABLE_STRUCT_NAME,
-        analysis::{self, Analyzed, MelAnalysisError, MelAnalysisLocatableError},
+        self, MEL_USER_SET_VARIABLE_STRUCT_NAME,
+        analysis::{self, Analyzed},
         ast::Expr,
-        compiler::{self, compile::MelCompilerLocatableError},
+        compiler::{self, error::CompilerLocatableError},
         types::{
             self,
             Type::{self, Struct},
@@ -48,8 +48,8 @@ pub struct SetVariableVerificationKey {
 
 #[derive(Debug, Clone)]
 pub enum MelVerificationError {
-    CompilationError(Box<MelCompilerLocatableError>),
-    AnalysisError(Box<MelAnalysisLocatableError>),
+    CompilationError(Box<CompilerLocatableError>),
+    AnalysisError(Box<mel::error::AnalysisLocatableError>),
 }
 
 impl Display for MelVerificationError {
@@ -120,8 +120,8 @@ impl Verifier<MetadataAnalysisContext, MetadataVerificationError> for SetVariabl
             .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
             .ok_or(MetadataVerificationError::MelVerificationError(
                 MelVerificationError::AnalysisError(
-                    MelAnalysisLocatableError {
-                        error: MelAnalysisError::UnknownIdentifier(
+                    mel::error::AnalysisLocatableError {
+                        error: mel::error::AnalysisError::UnknownIdentifier(
                             MEL_USER_SET_VARIABLE_STRUCT_NAME.to_string(),
                         )
                         .into(),
@@ -140,8 +140,8 @@ impl Verifier<MetadataAnalysisContext, MetadataVerificationError> for SetVariabl
             it => {
                 return Err(MetadataVerificationError::MelVerificationError(
                     MelVerificationError::AnalysisError(
-                        MelAnalysisLocatableError {
-                            error: MelAnalysisError::InvalidType(
+                        mel::error::AnalysisLocatableError {
+                            error: mel::error::AnalysisError::InvalidType(
                                 vec![Struct(types::Struct::new(
                                     MEL_USER_SET_VARIABLE_STRUCT_NAME,
                                 ))],

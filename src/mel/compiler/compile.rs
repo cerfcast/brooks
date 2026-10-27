@@ -18,7 +18,6 @@
 use regex::RegexBuilder;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fmt::Display;
 use std::net::IpAddr;
 use std::sync::Arc;
 use tree_sitter::{self, Node};
@@ -31,13 +30,15 @@ use crate::mel::ast::Literal::{Boolean, Number};
 use crate::mel::ast::LogicOperator::{And, Or};
 use crate::mel::ast::MathOperator::{Divide, Minus, Modulo, Multiply, Plus};
 use crate::mel::ast::{Argument, BinaryInfixOperator, StringConcatOperator};
+use crate::mel::compiler::error::CompilerError;
+use crate::mel::compiler::error::CompilerLocatableError;
 use crate::mel::{
     ast::{self, ArgumentList, Expr, Identifier},
     grammar::GrammarNode,
 };
 use crate::utils;
 
-pub type SyntaxVisitorResult<T> = Result<T, MelCompilerLocatableError>;
+pub type SyntaxVisitorResult<T> = Result<T, CompilerLocatableError>;
 
 pub trait SyntaxVisitor<T>: Sized {
     fn visit_function_call(
@@ -51,15 +52,15 @@ pub trait SyntaxVisitor<T>: Sized {
         syntax: Node,
         context: T,
         driver: &SyntaxVisitorDriver,
-    ) -> MelCompilerLocatableError;
+    ) -> CompilerLocatableError;
     fn visit_expr(
         &self,
         syntax: Node,
         context: T,
         driver: &SyntaxVisitorDriver,
     ) -> SyntaxVisitorResult<T> {
-        let node = syntax.named_child(0).ok_or(MelCompilerLocatableError {
-            error: MelCompilerError::BadGrammarElement,
+        let node = syntax.named_child(0).ok_or(CompilerLocatableError {
+            error: CompilerError::BadGrammarElement,
             location: syntax.into(),
         })?;
         driver.visit(node, self, context)
@@ -212,7 +213,7 @@ impl MELCompiler {
         }
     }
 
-    pub fn extract_error(&self, en: &Node) -> MelCompilerLocatableError {
+    pub fn extract_error(&self, en: &Node) -> CompilerLocatableError {
         let error_tok = en
             .utf8_text(self.source.as_bytes())
             .or::<String>(Ok(""))
@@ -233,8 +234,8 @@ impl MELCompiler {
             format!("Bad token: {error_tok}")
         };
 
-        MelCompilerLocatableError {
-            error: MelCompilerError::SyntaxError(msg),
+        CompilerLocatableError {
+            error: CompilerError::SyntaxError(msg),
             location: (*en).into(),
         }
     }
@@ -252,10 +253,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         let callee = match _driver.visit(walker.node(), self, _context.clone())? {
             MELCompilerContext::Expr(callee) => {
-                Result::<Expr<()>, MelCompilerLocatableError>::Ok(callee)
+                Result::<Expr<()>, CompilerLocatableError>::Ok(callee)
             }
-            _ => Result::<Expr<()>, MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::EmptyContext,
+            _ => Result::<Expr<()>, CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::EmptyContext,
                 location: syntax.into(),
             }),
         }?;
@@ -264,11 +265,11 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         let argument_list = match _driver.visit(walker.node(), self, _context.clone())? {
             MELCompilerContext::Expr(ast::Expr::ArgumentList(args)) => {
-                Result::<Arc<ArgumentList<()>>, MelCompilerLocatableError>::Ok(args)
+                Result::<Arc<ArgumentList<()>>, CompilerLocatableError>::Ok(args)
             }
-            _ => Result::<Arc<ArgumentList<()>>, MelCompilerLocatableError>::Err(
-                MelCompilerLocatableError {
-                    error: MelCompilerError::EmptyContext,
+            _ => Result::<Arc<ArgumentList<()>>, CompilerLocatableError>::Err(
+                CompilerLocatableError {
+                    error: CompilerError::EmptyContext,
                     location: syntax.into(),
                 },
             ),
@@ -308,8 +309,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let identifier =
             syntax
                 .utf8_text(self.source.as_bytes())
-                .map_err(|_| MelCompilerLocatableError {
-                    error: MelCompilerError::InvalidRange,
+                .map_err(|_| CompilerLocatableError {
+                    error: CompilerError::InvalidRange,
                     location: syntax.into(),
                 })?;
         let id = Identifier {
@@ -338,8 +339,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                     aug: (),
                 }),
             ))),
-            _ => Err(MelCompilerLocatableError {
-                error: MelCompilerError::EmptyContext,
+            _ => Err(CompilerLocatableError {
+                error: CompilerError::EmptyContext,
                 location: syntax.into(),
             }),
         }
@@ -356,11 +357,11 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         for arg in syntax.named_children(&mut walker) {
             let argument = match driver.visit(arg, self, context.clone())? {
                 MELCompilerContext::Expr(Expr::Argument(arg)) => {
-                    Result::<Arc<Argument<()>>, MelCompilerLocatableError>::Ok(arg)
+                    Result::<Arc<Argument<()>>, CompilerLocatableError>::Ok(arg)
                 }
-                _ => Result::<Arc<Argument<()>>, MelCompilerLocatableError>::Err(
-                    MelCompilerLocatableError {
-                        error: MelCompilerError::EmptyContext,
+                _ => Result::<Arc<Argument<()>>, CompilerLocatableError>::Err(
+                    CompilerLocatableError {
+                        error: CompilerError::EmptyContext,
                         location: syntax.into(),
                     },
                 ),
@@ -391,8 +392,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 BinaryInfixOperator::Concat(StringConcatOperator {}),
             ));
         }
-        Err(MelCompilerLocatableError {
-            error: MelCompilerError::BadGrammarElement,
+        Err(CompilerLocatableError {
+            error: CompilerError::BadGrammarElement,
             location: syntax.into(),
         })
     }
@@ -415,8 +416,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 BinaryInfixOperator::Logic(Or),
             ));
         }
-        Err(MelCompilerLocatableError {
-            error: MelCompilerError::BadGrammarElement,
+        Err(CompilerLocatableError {
+            error: CompilerError::BadGrammarElement,
             location: syntax.into(),
         })
     }
@@ -451,8 +452,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 BinaryInfixOperator::Math(Modulo),
             ));
         }
-        Err(MelCompilerLocatableError {
-            error: MelCompilerError::BadGrammarElement,
+        Err(CompilerLocatableError {
+            error: CompilerError::BadGrammarElement,
             location: syntax.into(),
         })
     }
@@ -468,11 +469,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         let left = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext::Expr(left) => {
-                Result::<Expr<()>, MelCompilerLocatableError>::Ok(left)
-            }
-            _ => Result::<Expr<()>, MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::EmptyContext,
+            MELCompilerContext::Expr(left) => Result::<Expr<()>, CompilerLocatableError>::Ok(left),
+            _ => Result::<Expr<()>, CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::EmptyContext,
                 location: syntax.into(),
             }),
         }?;
@@ -481,24 +480,24 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         let operator = match driver.visit(walker.node(), self, context.clone())? {
             MELCompilerContext::BinaryOperator(oper) => {
-                Result::<BinaryInfixOperator, MelCompilerLocatableError>::Ok(oper)
+                Result::<BinaryInfixOperator, CompilerLocatableError>::Ok(oper)
             }
-            _ => Result::<BinaryInfixOperator, MelCompilerLocatableError>::Err(
-                MelCompilerLocatableError {
-                    error: MelCompilerError::EmptyContext,
+            _ => {
+                Result::<BinaryInfixOperator, CompilerLocatableError>::Err(CompilerLocatableError {
+                    error: CompilerError::EmptyContext,
                     location: syntax.into(),
-                },
-            ),
+                })
+            }
         }?;
 
         walker.goto_next_sibling();
 
         let right = match driver.visit(walker.node(), self, context.clone())? {
             MELCompilerContext::Expr(right) => {
-                Result::<Expr<()>, MelCompilerLocatableError>::Ok(right)
+                Result::<Expr<()>, CompilerLocatableError>::Ok(right)
             }
-            _ => Result::<Expr<()>, MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::EmptyContext,
+            _ => Result::<Expr<()>, CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::EmptyContext,
                 location: syntax.into(),
             }),
         }?;
@@ -531,8 +530,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 ast::TernaryOperator::Colon,
             ));
         }
-        Err(MelCompilerLocatableError {
-            error: MelCompilerError::BadGrammarElement,
+        Err(CompilerLocatableError {
+            error: CompilerError::BadGrammarElement,
             location: syntax.into(),
         })
     }
@@ -549,10 +548,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         let condition = match driver.visit(walker.node(), self, context.clone())? {
             MELCompilerContext::Expr(condition) => {
-                Result::<Expr<()>, MelCompilerLocatableError>::Ok(condition)
+                Result::<Expr<()>, CompilerLocatableError>::Ok(condition)
             }
-            _ => Result::<Expr<()>, MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::EmptyContext,
+            _ => Result::<Expr<()>, CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::EmptyContext,
                 location: syntax.into(),
             }),
         }?;
@@ -561,10 +560,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         match driver.visit(walker.node(), self, context.clone())? {
             MELCompilerContext::TernaryOperator(ast::TernaryOperator::Question) => {
-                Result::<(), MelCompilerLocatableError>::Ok(())
+                Result::<(), CompilerLocatableError>::Ok(())
             }
-            _ => Result::<(), MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::BadGrammarElement,
+            _ => Result::<(), CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::BadGrammarElement,
                 location: syntax.into(),
             }),
         }?;
@@ -572,9 +571,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_next_sibling();
 
         let yes = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext::Expr(yes) => Result::<Expr<()>, MelCompilerLocatableError>::Ok(yes),
-            _ => Result::<Expr<()>, MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::BadGrammarElement,
+            MELCompilerContext::Expr(yes) => Result::<Expr<()>, CompilerLocatableError>::Ok(yes),
+            _ => Result::<Expr<()>, CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::BadGrammarElement,
                 location: syntax.into(),
             }),
         }?;
@@ -583,10 +582,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         match driver.visit(walker.node(), self, context.clone())? {
             MELCompilerContext::TernaryOperator(ast::TernaryOperator::Colon) => {
-                Result::<(), MelCompilerLocatableError>::Ok(())
+                Result::<(), CompilerLocatableError>::Ok(())
             }
-            _ => Result::<(), MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::BadGrammarElement,
+            _ => Result::<(), CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::BadGrammarElement,
                 location: syntax.into(),
             }),
         }?;
@@ -594,9 +593,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_next_sibling();
 
         let no = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext::Expr(no) => Result::<Expr<()>, MelCompilerLocatableError>::Ok(no),
-            _ => Result::<Expr<()>, MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::BadGrammarElement,
+            MELCompilerContext::Expr(no) => Result::<Expr<()>, CompilerLocatableError>::Ok(no),
+            _ => Result::<Expr<()>, CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::BadGrammarElement,
                 location: syntax.into(),
             }),
         }?;
@@ -632,8 +631,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let literal =
             syntax
                 .utf8_text(self.source.as_bytes())
-                .map_err(|_| MelCompilerLocatableError {
-                    error: MelCompilerError::InvalidRange,
+                .map_err(|_| CompilerLocatableError {
+                    error: CompilerError::InvalidRange,
                     location: syntax.into(),
                 })?;
         if literal == "true" {
@@ -649,8 +648,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 (),
             )));
         }
-        Err(MelCompilerLocatableError {
-            error: MelCompilerError::BadGrammarElement,
+        Err(CompilerLocatableError {
+            error: CompilerError::BadGrammarElement,
             location: syntax.into(),
         })
     }
@@ -663,14 +662,14 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let literal =
             syntax
                 .utf8_text(self.source.as_bytes())
-                .map_err(|_| MelCompilerLocatableError {
-                    error: MelCompilerError::InvalidRange,
+                .map_err(|_| CompilerLocatableError {
+                    error: CompilerError::InvalidRange,
                     location: syntax.into(),
                 })?;
         let number: usize = literal
             .parse::<usize>()
-            .map_err(|e| MelCompilerLocatableError {
-                error: MelCompilerError::BadLiteral(e.to_string()),
+            .map_err(|e| CompilerLocatableError {
+                error: CompilerError::BadLiteral(e.to_string()),
                 location: syntax.into(),
             })?;
 
@@ -690,8 +689,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let literal =
             syntax
                 .utf8_text(self.source.as_bytes())
-                .map_err(|_| MelCompilerLocatableError {
-                    error: MelCompilerError::InvalidRange,
+                .map_err(|_| CompilerLocatableError {
+                    error: CompilerError::InvalidRange,
                     location: syntax.into(),
                 })?;
         Ok(MELCompilerContext::Expr(Expr::Literal(
@@ -746,8 +745,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
             ));
         }
 
-        Err(MelCompilerLocatableError {
-            error: MelCompilerError::BadGrammarElement,
+        Err(CompilerLocatableError {
+            error: CompilerError::BadGrammarElement,
             location: syntax.into(),
         })
     }
@@ -763,11 +762,9 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         walker.goto_first_child();
 
         let base = match driver.visit(walker.node(), self, context.clone())? {
-            MELCompilerContext::Expr(base) => {
-                Result::<Expr<()>, MelCompilerLocatableError>::Ok(base)
-            }
-            _ => Result::<Expr<()>, MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::EmptyContext,
+            MELCompilerContext::Expr(base) => Result::<Expr<()>, CompilerLocatableError>::Ok(base),
+            _ => Result::<Expr<()>, CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::EmptyContext,
                 location: syntax.into(),
             }),
         }?;
@@ -776,10 +773,10 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         match driver.visit(walker.node(), self, context.clone())? {
             MELCompilerContext::BinaryOperator(BinaryInfixOperator::MemberAccess(_)) => {
-                Result::<(), MelCompilerLocatableError>::Ok(())
+                Result::<(), CompilerLocatableError>::Ok(())
             }
-            _ => Result::<(), MelCompilerLocatableError>::Err(MelCompilerLocatableError {
-                error: MelCompilerError::BadGrammarElement,
+            _ => Result::<(), CompilerLocatableError>::Err(CompilerLocatableError {
+                error: CompilerError::BadGrammarElement,
                 location: syntax.into(),
             }),
         }?;
@@ -788,14 +785,14 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
 
         let member = match driver.visit(walker.node(), self, context.clone())? {
             MELCompilerContext::Expr(ast::Expr::Identifier(id)) => {
-                Result::<Arc<Identifier<()>>, MelCompilerLocatableError>::Ok(id)
+                Result::<Arc<Identifier<()>>, CompilerLocatableError>::Ok(id)
             }
-            _ => Result::<Arc<Identifier<()>>, MelCompilerLocatableError>::Err(
-                MelCompilerLocatableError {
-                    error: MelCompilerError::EmptyContext,
+            _ => {
+                Result::<Arc<Identifier<()>>, CompilerLocatableError>::Err(CompilerLocatableError {
+                    error: CompilerError::EmptyContext,
                     location: syntax.into(),
-                },
-            ),
+                })
+            }
         }?;
 
         Ok(MELCompilerContext::Expr(MemberAccess(Arc::new(
@@ -823,8 +820,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
                 BinaryInfixOperator::MemberAccess(ast::MemberAccessOperator::MemberAccess),
             ));
         }
-        Err(MelCompilerLocatableError {
-            error: MelCompilerError::BadGrammarElement,
+        Err(CompilerLocatableError {
+            error: CompilerError::BadGrammarElement,
             location: syntax.into(),
         })
     }
@@ -838,16 +835,16 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let literal =
             syntax
                 .utf8_text(self.source.as_bytes())
-                .map_err(|_| MelCompilerLocatableError {
-                    error: MelCompilerError::InvalidRange,
+                .map_err(|_| CompilerLocatableError {
+                    error: CompilerError::InvalidRange,
                     location: syntax.into(),
                 })?;
 
         let regex = match RegexBuilder::new(&utils::strip_slashes(literal)).build() {
             Ok(regex) => regex,
             Err(e) => {
-                return Err(MelCompilerLocatableError {
-                    error: MelCompilerError::BadLiteral(e.to_string()),
+                return Err(CompilerLocatableError {
+                    error: CompilerError::BadLiteral(e.to_string()),
                     location: syntax.into(),
                 });
             }
@@ -869,15 +866,15 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         let literal =
             syntax
                 .utf8_text(self.source.as_bytes())
-                .map_err(|_| MelCompilerLocatableError {
-                    error: MelCompilerError::InvalidRange,
+                .map_err(|_| CompilerLocatableError {
+                    error: CompilerError::InvalidRange,
                     location: syntax.into(),
                 })?;
 
         let ip_addr: IpAddr = literal
             .parse::<IpAddr>()
-            .map_err(|e| MelCompilerLocatableError {
-                error: MelCompilerError::BadLiteral(e.to_string()),
+            .map_err(|e| CompilerLocatableError {
+                error: CompilerError::BadLiteral(e.to_string()),
                 location: syntax.into(),
             })?;
 
@@ -893,7 +890,7 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         syntax: Node,
         _context: MELCompilerContext,
         _driver: &SyntaxVisitorDriver,
-    ) -> MelCompilerLocatableError {
+    ) -> CompilerLocatableError {
         // if the node is an error, then the error is really in the child.
 
         if syntax.is_error()
@@ -904,8 +901,8 @@ impl SyntaxVisitor<MELCompilerContext> for MELCompiler {
         } else if syntax.is_missing() {
             self.extract_error(&syntax)
         } else {
-            MelCompilerLocatableError {
-                error: MelCompilerError::SyntaxError(
+            CompilerLocatableError {
+                error: CompilerError::SyntaxError(
                     "Unknown syntax error (couldn't get token)".to_string(),
                 ),
                 location: syntax.into(),
@@ -1064,8 +1061,8 @@ impl SyntaxVisitorDriver {
         } else {
             match hm.get(node.grammar_name()) {
                 Some(callable) => (callable)(visitor, node, context, self),
-                None => Err(MelCompilerLocatableError {
-                    error: MelCompilerError::NoSuchVisitor(node.grammar_name().into()),
+                None => Err(CompilerLocatableError {
+                    error: CompilerError::NoSuchVisitor(node.grammar_name().into()),
                     location: node.into(),
                 }),
             }
@@ -1081,45 +1078,3 @@ impl From<Node<'_>> for TextLocation {
         }
     }
 }
-
-#[derive(Debug, Clone)]
-pub enum MelCompilerError {
-    NoSuchVisitor(String),
-    EmptyContext,
-    BadGrammarElement,
-    BadLiteral(String),
-    InvalidRange,
-    UnexpectedExprType(String, String),
-    SyntaxError(String),
-}
-
-#[derive(Debug, Clone)]
-pub struct MelCompilerLocatableError {
-    pub error: MelCompilerError,
-    pub location: TextLocation,
-}
-
-impl Display for MelCompilerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MelCompilerError::NoSuchVisitor(e) => write!(f, "No such visitor: {e}"),
-            MelCompilerError::EmptyContext => write!(f, "Empty context"),
-            MelCompilerError::BadGrammarElement => write!(f, "Bad grammar element"),
-            MelCompilerError::BadLiteral(e) => write!(f, "Bad literal: {e}"),
-            MelCompilerError::InvalidRange => write!(f, "Invalid range"),
-            MelCompilerError::UnexpectedExprType(expected, actual) => write!(
-                f,
-                "Unexpected expression type: expected {expected} but got {actual}"
-            ),
-            MelCompilerError::SyntaxError(e) => write!(f, "Syntax error: {e}"),
-        }
-    }
-}
-
-impl Display for MelCompilerLocatableError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({})", self.error, self.location)
-    }
-}
-
-pub type CompileResult<T> = Result<T, MelCompilerLocatableError>;

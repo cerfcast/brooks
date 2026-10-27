@@ -17,4 +17,5 @@
 
 //! Processing Stages Metadata
 
+pub mod error;
 pub mod verify;

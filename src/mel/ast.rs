@@ -217,9 +217,6 @@ pub struct IPAddressLiteral {
     pub literal: IpAddr,
 }
 
-#[derive(Debug, Clone)]
-pub enum AstVisitorError {}
-
 pub type AstVisitorResult<T, E> = Result<T, E>;
 
 pub trait AstVisitor<T, A: Debug + Clone, E> {

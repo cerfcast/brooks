@@ -27,6 +27,7 @@ use crate::{
     environment::scope::Scope,
     mel::{
         interpreter::{
+            error::BuiltinInterpError,
             interpret::BuiltinFunction,
             values::{TypedValue, Value},
         },
@@ -39,30 +40,6 @@ use crate::{
         },
     },
 };
-
-#[derive(Debug, Clone)]
-pub enum BuiltinInterpError {
-    ArgumentMiscount(usize, usize),
-    ArgumentMismatch(usize, Type, Type),
-    RuntimeError(String),
-    ArgumentsInvalid,
-}
-
-impl Display for BuiltinInterpError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BuiltinInterpError::ArgumentMiscount(expected, actual) => {
-                write!(f, "Expected {expected} arguments but got {actual}")
-            }
-            BuiltinInterpError::ArgumentMismatch(which, expected, actual) => write!(
-                f,
-                "Expected argument {which} to have type {expected} but it has {actual}",
-            ),
-            BuiltinInterpError::ArgumentsInvalid => write!(f, "Invalid arguments"),
-            BuiltinInterpError::RuntimeError(e) => write!(f, "Runtime error: {e}"),
-        }
-    }
-}
 
 type BuiltinInterpResult = Result<TypedValue, Box<BuiltinInterpError>>;
 

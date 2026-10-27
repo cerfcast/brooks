@@ -19,14 +19,15 @@ use tree_sitter;
 
 use crate::common::TextLocation;
 use crate::mel::ast::Expr;
-use crate::mel::compiler::compile::CompileResult;
 use crate::mel::compiler::compile::MELCompiler;
 use crate::mel::compiler::compile::MELCompilerContext;
-use crate::mel::compiler::compile::MelCompilerError;
-use crate::mel::compiler::compile::MelCompilerLocatableError;
 use crate::mel::compiler::compile::SyntaxVisitorDriver;
+use crate::mel::compiler::error::CompileResult;
+use crate::mel::compiler::error::CompilerError;
+use crate::mel::compiler::error::CompilerLocatableError;
 
 pub mod compile;
+pub mod error;
 
 #[cfg(test)]
 mod test;
@@ -36,22 +37,20 @@ pub fn compile(source: &str) -> CompileResult<Expr<()>> {
     let language = tree_sitter_mel::LANGUAGE;
     parser
         .set_language(&language.into())
-        .map_err(|e| MelCompilerLocatableError {
-            error: MelCompilerError::SyntaxError(format!("Could not parse: {e}")),
+        .map_err(|e| CompilerLocatableError {
+            error: CompilerError::SyntaxError(format!("Could not parse: {e}")),
             location: TextLocation {
                 start: 0,
                 extent: 0,
             },
         })?;
-    let result = parser
-        .parse(source, None)
-        .ok_or(MelCompilerLocatableError {
-            error: MelCompilerError::SyntaxError("Could not parse.".to_string()),
-            location: TextLocation {
-                start: 0,
-                extent: 0,
-            },
-        })?;
+    let result = parser.parse(source, None).ok_or(CompilerLocatableError {
+        error: CompilerError::SyntaxError("Could not parse.".to_string()),
+        location: TextLocation {
+            start: 0,
+            extent: 0,
+        },
+    })?;
 
     let vd = SyntaxVisitorDriver {};
     let sd = MELCompiler::new(source);
@@ -61,8 +60,8 @@ pub fn compile(source: &str) -> CompileResult<Expr<()>> {
 
     match result {
         MELCompilerContext::Expr(expr) => Ok(expr),
-        _ => Err(MelCompilerLocatableError {
-            error: MelCompilerError::EmptyContext,
+        _ => Err(CompilerLocatableError {
+            error: CompilerError::EmptyContext,
             location: TextLocation {
                 start: 0,
                 extent: 0,

@@ -19,6 +19,7 @@
 
 use serde::Serialize;
 
+use crate::verifying::ps::error::VerificationError;
 use crate::verifying::verify::{
     AnalysisResult, CdniVerificationKey, MetadataAnalysisContext, MetadataVerificationError,
     Verifier,
@@ -39,15 +40,15 @@ use crate::{
     },
     environment::scope::Scopes,
     mel::{
-        analysis::{Analyzed, MelAnalysisLocatableError, analyze},
+        analysis::{Analyzed, analyze},
         ast::Expr,
-        compiler::{self, compile::MelCompilerLocatableError},
+        compiler,
         types::Type,
     },
     visitors::PsVisitor,
 };
 
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 type PsVisitorResult<T, E> = Result<T, E>;
 
@@ -68,77 +69,34 @@ impl Serialize for PsVerificationKey {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub enum PsVerificationError {
-    #[default]
-    NoError,
-    WrongType,
-    WrongGenericMetadataTypeName(String, String),
-    NoVerifiedValue,
-    ExpressionCompile(Box<MelCompilerLocatableError>),
-    ExpressionAnalyze(Box<MelAnalysisLocatableError>),
-    ExpressionWrongType(Type, Type),
-    InvalidTypedResponseStage,
-    ParseError,
-}
-
-impl Display for PsVerificationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PsVerificationError::NoError => write!(f, "No error!"),
-            PsVerificationError::WrongType => write!(f, "Wrong type"),
-            PsVerificationError::WrongGenericMetadataTypeName(expected, actual) => write!(
-                f,
-                "Wrong generic metadata type; expected {expected} and got {actual}"
-            ),
-            PsVerificationError::NoVerifiedValue => write!(f, "Missing verified value"),
-            PsVerificationError::ExpressionCompile(compiler_error) => {
-                write!(f, "Expression compilation error: {compiler_error}")
-            }
-            PsVerificationError::ExpressionAnalyze(mel_analysis_locatable_error) => write!(
-                f,
-                "Expression analysis error: {mel_analysis_locatable_error}"
-            ),
-            PsVerificationError::ExpressionWrongType(expected, actual) => write!(
-                f,
-                "Wrong expression type; expected {expected} and got {actual}"
-            ),
-            PsVerificationError::InvalidTypedResponseStage => {
-                write!(f, "Invalid typed response stage")
-            }
-            PsVerificationError::ParseError => write!(f, "Parse error"),
-        }
-    }
-}
-
 impl TypedGenericStage {
-    pub fn typed(&self) -> Result<TypedStage<()>, Box<PsVerificationError>> {
+    pub fn typed(&self) -> Result<TypedStage<()>, Box<VerificationError>> {
         if self.tpe == TypedClientRequestStage::<()>::typed_cdni_metadata_name() {
             let stages = serde_json::from_str::<TypedClientRequestStage<()>>(
-                &(serde_json::to_string(self).map_err(|_| PsVerificationError::ParseError)?),
+                &(serde_json::to_string(self).map_err(|_| VerificationError::ParseError)?),
             )
-            .map_err(|_| PsVerificationError::ParseError)?;
+            .map_err(|_| VerificationError::ParseError)?;
             Ok(TypedStage::ClientRequest(stages))
         } else if self.tpe == TypedClientResponseStage::<()>::typed_cdni_metadata_name() {
             let stages = serde_json::from_str::<TypedClientResponseStage<()>>(
-                &(serde_json::to_string(self).map_err(|_| PsVerificationError::ParseError)?),
+                &(serde_json::to_string(self).map_err(|_| VerificationError::ParseError)?),
             )
-            .map_err(|_| PsVerificationError::ParseError)?;
+            .map_err(|_| VerificationError::ParseError)?;
             Ok(TypedStage::ClientResponse(stages))
         } else if self.tpe == TypedOriginRequestStage::<()>::typed_cdni_metadata_name() {
             let stages = serde_json::from_str::<TypedOriginRequestStage<()>>(
-                &(serde_json::to_string(self).map_err(|_| PsVerificationError::ParseError)?),
+                &(serde_json::to_string(self).map_err(|_| VerificationError::ParseError)?),
             )
-            .map_err(|_| PsVerificationError::ParseError)?;
+            .map_err(|_| VerificationError::ParseError)?;
             Ok(TypedStage::OriginRequest(stages))
         } else if self.tpe == TypedOriginResponseStage::<()>::typed_cdni_metadata_name() {
             let stages = serde_json::from_str::<TypedOriginResponseStage<()>>(
-                &(serde_json::to_string(self).map_err(|_| PsVerificationError::ParseError)?),
+                &(serde_json::to_string(self).map_err(|_| VerificationError::ParseError)?),
             )
-            .map_err(|_| PsVerificationError::ParseError)?;
+            .map_err(|_| VerificationError::ParseError)?;
             Ok(TypedStage::OriginResponse(stages))
         } else {
-            Err(PsVerificationError::InvalidTypedResponseStage.into())
+            Err(VerificationError::InvalidTypedResponseStage.into())
         }
     }
 }
@@ -150,10 +108,10 @@ impl PsVerifier {
     pub fn compile_and_analyze_expr(
         source: &str,
         scopes: &Scopes<Type>,
-    ) -> Result<Expr<Analyzed>, Box<PsVerificationError>> {
+    ) -> Result<Expr<Analyzed>, Box<VerificationError>> {
         let expr = compiler::compile(source)
-            .map_err(|e| Box::new(PsVerificationError::ExpressionCompile(Box::new(e))))?;
-        analyze(&expr, scopes).map_err(|e| Box::new(PsVerificationError::ExpressionAnalyze(e)))
+            .map_err(|e| Box::new(VerificationError::ExpressionCompile(Box::new(e))))?;
+        analyze(&expr, scopes).map_err(|e| Box::new(VerificationError::ExpressionAnalyze(e)))
     }
 }
 
@@ -190,7 +148,7 @@ macro_rules! expect_maybe_some_value {
         match &$name {
             Some($value(v)) => Some(v),
             None => None,
-            _ => return Err(Box::new(PsVerificationError::WrongType)),
+            _ => return Err(Box::new(VerificationError::WrongType)),
         }
     };
 }
@@ -199,8 +157,8 @@ macro_rules! expect_some_value {
     ($name:expr, $value:path) => {
         match &$name {
             Some($value(v)) => v,
-            None => return Err(Box::new(PsVerificationError::NoVerifiedValue)),
-            _ => return Err(Box::new(PsVerificationError::WrongType)),
+            None => return Err(Box::new(VerificationError::NoVerifiedValue)),
+            _ => return Err(Box::new(VerificationError::WrongType)),
         }
     };
 }
@@ -214,7 +172,7 @@ macro_rules! make_context_value {
 macro_rules! check_generic_md_typename {
     ($value:expr, $tn:ident) => {
         if $value.tpe != $tn::<()>::typed_cdni_metadata_name() {
-            return Err(Box::new(PsVerificationError::WrongGenericMetadataTypeName(
+            return Err(Box::new(VerificationError::WrongGenericMetadataTypeName(
                 $tn::<()>::typed_cdni_metadata_name(),
                 $value.tpe.clone(),
             )));
@@ -253,12 +211,12 @@ impl Verifier<MetadataAnalysisContext, MetadataVerificationError> for PsMetadata
     }
 }
 
-impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError>> for PsVerifier {
+impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<VerificationError>> for PsVerifier {
     fn visit_processing_stages(
         &mut self,
         v: &TypedProcessingStages<()>,
         c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedProcessingStages);
 
         let mut result = ProcessingStages::<PsVerificationKey>::default();
@@ -316,7 +274,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedStageRules<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         // Check whether the expression has the right type!
 
         check_generic_md_typename!(v, TypedStageRules);
@@ -361,7 +319,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedExpressionMatch<()>,
         c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedExpressionMatch);
 
         let v = &v.value;
@@ -369,7 +327,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         let expr = Self::compile_and_analyze_expr(&v.expression, &c.scopes)?;
 
         if expr.tipe() != Type::Boolean {
-            return Err(Box::new(PsVerificationError::ExpressionWrongType(
+            return Err(Box::new(VerificationError::ExpressionWrongType(
                 Type::Boolean,
                 expr.tipe(),
             )));
@@ -392,7 +350,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedStageMetadata<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedStageMetadata);
 
         let v = &v.value;
@@ -450,7 +408,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedRequestTransform<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedRequestTransform);
 
         let v = &v.value;
@@ -482,7 +440,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
                 let expr = Self::compile_and_analyze_expr(uri, &c.scopes)?;
 
                 if expr.tipe() != Type::String {
-                    return Err(Box::new(PsVerificationError::ExpressionWrongType(
+                    return Err(Box::new(VerificationError::ExpressionWrongType(
                         Type::String,
                         expr.tipe(),
                     )));
@@ -510,7 +468,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedResponseTransform<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedResponseTransform);
 
         let v = &v.value;
@@ -551,7 +509,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
                 let expr = Self::compile_and_analyze_expr(rs, &c.scopes)?;
 
                 if expr.tipe() != Type::Integer {
-                    return Err(Box::new(PsVerificationError::ExpressionWrongType(
+                    return Err(Box::new(VerificationError::ExpressionWrongType(
                         Type::Integer,
                         expr.tipe(),
                     )));
@@ -579,10 +537,10 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedGenericMetadata<()>,
         c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         // We only verify that the type starts with "MI.".
         if !v.tpe.starts_with("MI.") {
-            return Err(Box::new(PsVerificationError::WrongGenericMetadataTypeName(
+            return Err(Box::new(VerificationError::WrongGenericMetadataTypeName(
                 "MI. ...".to_string(),
                 v.tpe.clone(),
             )));
@@ -607,7 +565,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedHeaderTransform<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedHeaderTransform);
         let v = &v.value;
 
@@ -654,7 +612,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedHeader<()>,
         c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedHeader);
 
         let v = &v.value;
@@ -671,7 +629,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
             let expr = Self::compile_and_analyze_expr(&v.value, &c.scopes)?;
 
             if expr.tipe() != Type::String {
-                return Err(Box::new(PsVerificationError::ExpressionWrongType(
+                return Err(Box::new(VerificationError::ExpressionWrongType(
                     Type::String,
                     expr.tipe(),
                 )));
@@ -696,7 +654,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedSyntheticResponse<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedSyntheticResponse);
         let v = &v.value;
 
@@ -728,7 +686,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
                 let expr = Self::compile_and_analyze_expr(rs, &c.scopes)?;
 
                 if expr.tipe() != Type::Integer {
-                    return Err(Box::new(PsVerificationError::ExpressionWrongType(
+                    return Err(Box::new(VerificationError::ExpressionWrongType(
                         Type::Integer,
                         expr.tipe(),
                     )));
@@ -748,7 +706,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
                 let expr = Self::compile_and_analyze_expr(body, &c.scopes)?;
 
                 if expr.tipe() != Type::String {
-                    return Err(Box::new(PsVerificationError::ExpressionWrongType(
+                    return Err(Box::new(VerificationError::ExpressionWrongType(
                         Type::String,
                         expr.tipe(),
                     )));
@@ -778,7 +736,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedClientRequestStage<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedClientRequestStage);
         let v = &v.value;
 
@@ -810,7 +768,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedMatchGroup<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedMatchGroup);
         let v = &v.value;
 
@@ -853,7 +811,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedOriginRequestStage<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedOriginRequestStage);
         let v = &v.value;
 
@@ -885,7 +843,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedClientResponseStage<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedClientResponseStage);
         let v = &v.value;
 
@@ -917,7 +875,7 @@ impl PsVisitor<(), PsVerifierContext, PsVerifierContext, Box<PsVerificationError
         &mut self,
         v: &TypedOriginResponseStage<()>,
         mut c: PsVerifierContext,
-    ) -> PsVisitorResult<PsVerifierContext, Box<PsVerificationError>> {
+    ) -> PsVisitorResult<PsVerifierContext, Box<VerificationError>> {
         check_generic_md_typename!(v, TypedOriginResponseStage);
         let v = &v.value;
 
@@ -958,7 +916,7 @@ pub(crate) fn verifier() -> (PsVerifier, PsVerifierContext) {
 ///
 pub fn verify_ps(
     stages: &TypedProcessingStages<()>,
-) -> Result<TypedProcessingStages<PsVerificationKey>, Box<PsVerificationError>> {
+) -> Result<TypedProcessingStages<PsVerificationKey>, Box<VerificationError>> {
     let (mut verifier, context) = verifier();
     let value = &stages;
     let result = verifier.visit_processing_stages(value, context)?;
@@ -970,7 +928,7 @@ pub fn verify_ps(
 pub fn verify_ps_request_stage(
     stage: &TypedGenericStage,
     scopes: &Scopes<Type>,
-) -> Result<TypedStage<PsVerificationKey>, Box<PsVerificationError>> {
+) -> Result<TypedStage<PsVerificationKey>, Box<VerificationError>> {
     match stage.typed()? {
         TypedStage::ClientRequest(crq) => {
             let (mut verifier, mut context) = verifier();
@@ -1021,7 +979,7 @@ mod test_verify {
     };
     use crate::mel::types::Type;
     use crate::verifying::ps::verify::{
-        PsVerificationError, PsVerificationKey, PsVerifierContextValue, verifier, verify_ps,
+        PsVerificationKey, PsVerifierContextValue, VerificationError, verifier, verify_ps,
     };
     use crate::visitors::PsVisitor;
     use crate::{cdni::ps::spec::TypedResponseTransform, mel::ast::Expr::BinaryExpr};
@@ -1039,7 +997,7 @@ mod test_verify {
         let result = verify_ps(&stages)
             .expect_err("Could verify CDNI generic metadata with invalid metadata type name");
 
-        assert_matches!(*result, PsVerificationError::WrongGenericMetadataTypeName(expected, actual) if expected == "MI.ProcessingStages" && actual == "MI.ProcessigStages")
+        assert_matches!(*result, VerificationError::WrongGenericMetadataTypeName(expected, actual) if expected == "MI.ProcessingStages" && actual == "MI.ProcessigStages")
     }
 
     #[test]
@@ -1051,7 +1009,7 @@ mod test_verify {
             .visit_generic_metadata(&generic, context)
             .expect_err("Could verify CDNI generic metadata with invalid metadata type name");
 
-        assert_matches!(*result, PsVerificationError::WrongGenericMetadataTypeName(expected, actual) if expected == "MI. ..." && actual == "Mi.CachePolicy");
+        assert_matches!(*result, VerificationError::WrongGenericMetadataTypeName(expected, actual) if expected == "MI. ..." && actual == "Mi.CachePolicy");
     }
 
     #[test]
@@ -1064,7 +1022,7 @@ mod test_verify {
 
         assert_matches!(
             *result,
-            PsVerificationError::ExpressionWrongType(Type::Boolean, Type::Integer)
+            VerificationError::ExpressionWrongType(Type::Boolean, Type::Integer)
         )
     }
 
@@ -1078,7 +1036,7 @@ mod test_verify {
 
         assert_matches!(
             *result,
-            PsVerificationError::ExpressionWrongType(Type::String, Type::Integer)
+            VerificationError::ExpressionWrongType(Type::String, Type::Integer)
         );
     }
 
@@ -1141,7 +1099,7 @@ mod test_verify {
 
         assert_matches!(
             *result,
-            PsVerificationError::ExpressionWrongType(Type::Integer, Type::Boolean)
+            VerificationError::ExpressionWrongType(Type::Integer, Type::Boolean)
         );
     }
 
@@ -1228,7 +1186,7 @@ mod test_verify {
 
         assert_matches!(
             *result,
-            PsVerificationError::ExpressionWrongType(Type::String, Type::Integer)
+            VerificationError::ExpressionWrongType(Type::String, Type::Integer)
         );
     }
 
@@ -1250,7 +1208,7 @@ mod test_verify {
 
         assert_matches!(
             *result,
-            PsVerificationError::ExpressionWrongType(Type::String, Type::Boolean)
+            VerificationError::ExpressionWrongType(Type::String, Type::Boolean)
         );
     }
 
@@ -1405,7 +1363,7 @@ mod test_verify {
 
         assert_matches!(
             *result,
-            PsVerificationError::ExpressionWrongType(Type::Integer, Type::Boolean)
+            VerificationError::ExpressionWrongType(Type::Integer, Type::Boolean)
         );
     }
 
@@ -1424,7 +1382,7 @@ mod test_verify {
 
         assert_matches!(
             *result,
-            PsVerificationError::ExpressionWrongType(Type::String, Type::Boolean)
+            VerificationError::ExpressionWrongType(Type::String, Type::Boolean)
         );
     }
 }
@@ -1440,7 +1398,7 @@ mod test_verify_from_json {
     use crate::environment::scope::Scopes;
     use crate::mel::types::Type;
     use crate::tests::read_test_file;
-    use crate::verifying::ps::verify::PsVerificationError::{
+    use crate::verifying::ps::verify::VerificationError::{
         ExpressionWrongType, WrongGenericMetadataTypeName,
     };
     use crate::verifying::ps::verify::{PsVerificationKey, verify_ps, verify_ps_request_stage};

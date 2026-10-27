@@ -26,13 +26,11 @@ mod interpreter_tests {
             ast::AstVisitorDriver,
             compiler::compile,
             interpreter::{
-                builtins::BuiltinInterpError,
-                {
-                    interpret::{MelInterp, MelInterpAssertion, MelInterpContext, MelInterpError},
-                    values::{
-                        StructValue, TypedValue,
-                        Value::{self, Struct},
-                    },
+                error::{BuiltinInterpError, InterpAssertion, InterpError},
+                interpret::{MelInterp, MelInterpContext},
+                values::{
+                    StructValue, TypedValue,
+                    Value::{self, Struct},
                 },
             },
             types::{
@@ -417,7 +415,7 @@ mod interpreter_tests {
             .expect_err("Could interpret call to path_elements with invalid arguments");
 
         let runtime_error = match *result.error {
-            MelInterpError::BuiltinError(be) => *be,
+            InterpError::BuiltinError(be) => *be,
             _ => panic!("Expected BuiltinError, but didn't get one"),
         };
 
@@ -682,7 +680,7 @@ mod interpreter_tests {
             .expect_err("Could interpret call to path_elements with invalid arguments");
 
         let runtime_error = match *result.error {
-            MelInterpError::BuiltinError(be) => *be,
+            InterpError::BuiltinError(be) => *be,
             _ => panic!("Expected BuiltinError, but didn't get one"),
         };
 
@@ -881,7 +879,7 @@ mod interpreter_tests {
             .expect_err("Could interpret call to path_elements with invalid arguments");
 
         let runtime_error = match *result.error {
-            MelInterpError::BuiltinError(be) => *be,
+            InterpError::BuiltinError(be) => *be,
             _ => panic!("Expected BuiltinError, but didn't get one"),
         };
 
@@ -1080,7 +1078,7 @@ mod interpreter_tests {
             .expect_err("Could interpret call to path_elements with invalid arguments");
 
         let runtime_error = match *result.error {
-            MelInterpError::BuiltinError(be) => *be,
+            InterpError::BuiltinError(be) => *be,
             _ => panic!("Expected BuiltinError, but didn't get one"),
         };
 
@@ -2362,9 +2360,9 @@ mod interpreter_tests {
             .expect_err("Could interpret");
 
         match *result.error {
-            MelInterpError::Assertion(e) => assert_matches!(
+            InterpError::Assertion(e) => assert_matches!(
                 *e,
-                MelInterpAssertion::TypeMismatch(Type::Boolean, Type::String)
+                InterpAssertion::TypeMismatch(Type::Boolean, Type::String)
             ),
             _ => panic!("Expected to find an assertion error, but did not"),
         }
@@ -2520,7 +2518,7 @@ mod interpreter_value_tests {
 
     use crate::mel::{
         interpreter::{
-            interpret::MelInterpError,
+            error::InterpError,
             values::{StructValue, TypedValue, Value},
         },
         types::{Struct, Type},
@@ -2566,7 +2564,7 @@ mod interpreter_value_tests {
 
         assert_matches!(
             *result,
-            MelInterpError::MistypedField(_, Type::Integer, Type::Boolean)
+            InterpError::MistypedField(_, Type::Integer, Type::Boolean)
         )
     }
 }
@@ -2580,7 +2578,8 @@ mod builtin_conversion_function_interpreter_tests {
 
     use crate::mel::{
         interpreter::{
-            builtins::{BuiltinFunctionInterpreter, BuiltinInterpError},
+            builtins::BuiltinFunctionInterpreter,
+            error::BuiltinInterpError,
             values::{
                 TypedValue,
                 Value::{self, ArgumentList},
@@ -2940,7 +2939,8 @@ mod builtin_function_interpreter_tests {
 
     use crate::mel::{
         interpreter::{
-            builtins::{BuiltinFunctionInterpreter, BuiltinInterpError},
+            builtins::BuiltinFunctionInterpreter,
+            error::BuiltinInterpError,
             values::{
                 TypedValue,
                 Value::{self, ArgumentList},
