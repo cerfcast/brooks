@@ -144,19 +144,16 @@ pub fn safe_brooks_integration_handle(
     // build up a more complete type for its value during interpretation.
     let var = match updated_types_scopes
         .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
-        .ok_or(ProxyError::ImdiError(
-            ImdInterpretError::RuntimeError(
-                interpret::Error::AssertionFailure(
-                    format!(
-                        "Missing {} struct type after analyzing HMD",
-                        MEL_USER_SET_VARIABLE_STRUCT_NAME
-                    )
-                    .into(),
+        .ok_or(ProxyError::ImdiError(ImdInterpretError::RuntimeError(
+            interpret::Error::AssertionFailure(
+                format!(
+                    "Missing {} struct type after analyzing HMD",
+                    MEL_USER_SET_VARIABLE_STRUCT_NAME
                 )
                 .into(),
             )
             .into(),
-        )) {
+        ))) {
         Ok(variable) => match variable {
             Type::Struct(s) => s,
             _ => {
