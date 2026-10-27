@@ -17,12 +17,9 @@
 
 //! Interpret CDNI Interconnection Metadata
 
-use std::fmt::Display;
-
-use http::StatusCode;
-
 use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
+use crate::processing::error::{ImdInterpretError, ImdInterpretResult};
 use crate::processing::interpret::{Error, Interpreter, Stages};
 use crate::verifying::verify::CdniVerificationKey;
 
@@ -31,101 +28,6 @@ use crate::processing::processors::SimpleProcessorsInterpreterContext;
 use crate::processing::processors::ps::{PsInterpretMode, PsInterpretValue};
 use crate::prr;
 use crate::{cdni::imd::spec::HostMetadata, mel::interpreter::values::TypedValue};
-
-pub type HmdInterpretValue = (StatusCode, http::Response<Vec<u8>>, LogMsgs);
-pub type HmdInterpretResultError = (Box<MdInterpretError>, LogMsgs);
-pub type HmdInterpretResult = Result<HmdInterpretValue, (Box<MdInterpretError>, LogMsgs)>;
-
-#[derive(Debug, Clone)]
-pub enum HmdTransformError {
-    BadHeaderName(String),
-    BadHeaderValue(String),
-    BadMethodValue(String),
-    BadBody(String),
-    BadUri(String),
-    BadUrl(String),
-    CreationError(String),
-    BadMemory,
-}
-
-impl Display for HmdTransformError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            HmdTransformError::BadHeaderName(bhn) => {
-                write!(f, "Bad header name: {bhn}")
-            }
-            HmdTransformError::BadHeaderValue(bhv) => {
-                write!(f, "Bad header value: {bhv}")
-            }
-            HmdTransformError::BadMethodValue(bmv) => {
-                write!(f, "Bad method value: {bmv}")
-            }
-            HmdTransformError::BadBody(bb) => write!(f, "Bad body: {bb}"),
-            HmdTransformError::BadUri(bu) => write!(f, "Bad URI: {bu}"),
-            HmdTransformError::BadUrl(bu) => write!(f, "Bad URL: {bu}"),
-            HmdTransformError::CreationError(ce) => write!(f, "Creation error: {ce}"),
-            HmdTransformError::BadMemory => {
-                write!(f, "Pool memory allocation failed")
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum MdInterpretError {
-    TransformError(Box<HmdTransformError>),
-    ProcessableRequestResponseError(Box<prr::Error>),
-    UpstreamError(String),
-    MissingConfiguration(String),
-    ProxyError(String),
-    HmdsQueryError(String),
-    RuntimeError(String),
-    MetadataProcessingError(Box<Error>),
-    BadMemory,
-}
-
-impl Display for MdInterpretError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MdInterpretError::HmdsQueryError(query_error) => {
-                write!(
-                    f,
-                    "Brooks Proxy Error: Error querying the HMDS: {query_error}"
-                )
-            }
-            MdInterpretError::TransformError(nginx_transform_error) => {
-                write!(
-                    f,
-                    "Brooks Proxy Error: Transformation error: {nginx_transform_error}"
-                )
-            }
-            MdInterpretError::MetadataProcessingError(ps_interpret_error) => {
-                write!(f, "Brooks Proxy Error: {}", *ps_interpret_error)
-            }
-            MdInterpretError::UpstreamError(ue) => {
-                write!(f, "Brooks Proxy Error: Upstream error: {ue}")
-            }
-            MdInterpretError::ProxyError(pe) => write!(f, "Brooks Proxy Error: {pe}"),
-            MdInterpretError::RuntimeError(re) => {
-                write!(f, "Brooks Proxy Error: Runtime error: {re}")
-            }
-            MdInterpretError::MissingConfiguration(query) => {
-                write!(f, "Brooks Proxy Error: Missing configuration for {query}")
-            }
-            MdInterpretError::BadMemory => {
-                write!(f, "Brooks Proxy Error: Pool memory allocation failed")
-            }
-            MdInterpretError::ProcessableRequestResponseError(
-                processable_request_response_error,
-            ) => {
-                write!(
-                    f,
-                    "Brooks Proxy Error: Error converting from the processed request/response to the request/response: {processable_request_response_error}"
-                )
-            }
-        }
-    }
-}
 
 /// Interpret given Host Metadata for the given request.
 ///
@@ -136,7 +38,7 @@ pub fn interpret_interconnection_metadata(
     request: Box<dyn prr::Prr<Vec<u8>>>,
     runtime: &tokio::runtime::Handle,
     mut log: LogMsgs,
-) -> HmdInterpretResult {
+) -> ImdInterpretResult {
     let mut request_context = SimpleProcessorsInterpreterContext {
         scopes: mel_scopes,
         mode: PsInterpretMode::Request,
@@ -149,7 +51,7 @@ pub fn interpret_interconnection_metadata(
         if hmd.aug.at(Stages::Pre) {
             (request_context, _) = match hmd.aug.interpret(request_context) {
                 Ok((c, r)) => (c, r),
-                Err(e) => return Err((MdInterpretError::MetadataProcessingError(e).into(), log)),
+                Err(e) => return Err((ImdInterpretError::MetadataProcessingError(e).into(), log)),
             };
         }
     }
@@ -162,7 +64,7 @@ pub fn interpret_interconnection_metadata(
             // TODO: Handle a stage that generates MI.
             (request_context, _) = match stage.aug.interpret(request_context) {
                 Ok((c, r)) => (c, r),
-                Err(e) => return Err((MdInterpretError::MetadataProcessingError(e).into(), log)),
+                Err(e) => return Err((ImdInterpretError::MetadataProcessingError(e).into(), log)),
             };
 
             // There are no synthetic responses at this stage.
@@ -183,7 +85,7 @@ pub fn interpret_interconnection_metadata(
             // TODO: Handle a stage that generates MI.
             (request_context, _) = match stage.aug.interpret(request_context) {
                 Ok((c, r)) => (c, r),
-                Err(e) => return Err((MdInterpretError::MetadataProcessingError(e).into(), log)),
+                Err(e) => return Err((ImdInterpretError::MetadataProcessingError(e).into(), log)),
             };
         }
     }
@@ -208,7 +110,7 @@ pub fn interpret_interconnection_metadata(
             (source_context, _) = match hmd.aug.interpret(source_context) {
                 Ok((c, r)) => (c, r),
                 Err(e) => {
-                    return Err((MdInterpretError::MetadataProcessingError(e).into(), log));
+                    return Err((ImdInterpretError::MetadataProcessingError(e).into(), log));
                 }
             };
             // There is only one Source processor allowed.
@@ -257,7 +159,7 @@ pub fn interpret_interconnection_metadata(
                 match stage.aug.interpret(response_context) {
                     Ok((c, r)) => (c, r),
                     Err(e) => {
-                        return Err((MdInterpretError::MetadataProcessingError(e).into(), log));
+                        return Err((ImdInterpretError::MetadataProcessingError(e).into(), log));
                     }
                 };
 
@@ -299,7 +201,7 @@ pub fn interpret_interconnection_metadata(
                 .interpret(response_context)
             {
                 Ok((c, r)) => (c, r),
-                Err(e) => return Err((MdInterpretError::MetadataProcessingError(e).into(), log)),
+                Err(e) => return Err((ImdInterpretError::MetadataProcessingError(e).into(), log)),
             };
 
             if let PsInterpretValue::SyntheticResponse(sr) = updated_result.0 {
@@ -323,7 +225,7 @@ pub fn interpret_interconnection_metadata(
         Some(o) => o,
         None => {
             return Err((
-                MdInterpretError::MetadataProcessingError(
+                ImdInterpretError::MetadataProcessingError(
                     Error::NoProcessor(
                         hmd.metadata
                             .iter()
@@ -347,10 +249,7 @@ pub fn interpret_interconnection_metadata(
         match (&*response_context.rr as &dyn prr::Prr<Vec<u8>>).try_into() {
             Ok(o) => o,
             Err(e) => {
-                return Err((
-                    MdInterpretError::ProcessableRequestResponseError(e.into()).into(),
-                    log,
-                ));
+                return Err((ImdInterpretError::TransformError(e.into()).into(), log));
             }
         };
 

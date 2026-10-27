@@ -19,4 +19,6 @@ pub mod interpret;
 
 pub mod processors;
 
+pub mod error;
+
 pub mod imdi;

@@ -22,7 +22,10 @@ use tokio::runtime::Handle;
 use crate::{
     cdni::imd::spec::TypedHostMetadata,
     environment::scope::{Scope, Scopes},
-    integrations::hmds::{HmdsConfiguration, query_hmds},
+    integrations::{
+        error::{ProxyError, ProxyResult},
+        hmds::{HmdsConfiguration, query_hmds},
+    },
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
         MEL_USER_SET_VARIABLE_STRUCT_NAME,
@@ -30,11 +33,9 @@ use crate::{
         types::{Type, builtin_function_types, minimal_core_variable_types},
     },
     processing::{
-        imdi::{
-            HmdInterpretResultError, HmdInterpretValue, HmdTransformError, MdInterpretError,
-            interpret_interconnection_metadata,
-        },
-        interpret::{Error::AssertionFailure, ProcessedRequestResponse},
+        error::ImdInterpretError,
+        imdi::interpret_interconnection_metadata,
+        interpret::{self, Error::AssertionFailure, ProcessedRequestResponse},
     },
     prr,
     verifying::imdv::verify_interconnection_metadata,
@@ -47,7 +48,7 @@ pub fn safe_brooks_integration_handle(
     hmds_config: &mut HmdsConfiguration,
     runtime: &Handle,
     mut log: LogMsgs,
-) -> Result<HmdInterpretValue, HmdInterpretResultError> {
+) -> ProxyResult {
     // First, try to find the query in the cache.
     log = debug!(
         log,
@@ -81,15 +82,16 @@ pub fn safe_brooks_integration_handle(
     } else {
         let res = match runtime.block_on(query_hmds(hmds_key, &hmds_config.hmds_server)) {
             Ok(o) => o,
-            Err(e) => {
-                return Err((MdInterpretError::HmdsQueryError(e.to_string()).into(), log));
-            }
+            Err(e) => return Err((ProxyError::HmdsError(e.into()).into(), log)),
         };
         let (expiry, query_result) = match res {
             Some((timeout, query_result)) => (timeout, query_result),
             None => {
                 return Err((
-                    MdInterpretError::MissingConfiguration(hmds_key.to_string()).into(),
+                    ProxyError::HmdsError(
+                        format!("Missing HMD configuration for {hmds_key}").into(),
+                    )
+                    .into(),
                     log,
                 ));
             }
@@ -98,7 +100,7 @@ pub fn safe_brooks_integration_handle(
         let metadata = match serde_json::from_value::<TypedHostMetadata<()>>(query_result) {
             Ok(o) => o,
             Err(e) => {
-                return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
+                return Err((ProxyError::HmdsError(e.into()).into(), log));
             }
         };
 
@@ -110,7 +112,7 @@ pub fn safe_brooks_integration_handle(
             match verify_interconnection_metadata(&metadata.value, types_scope) {
                 Ok(o) => o,
                 Err(e) => {
-                    return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
+                    return Err((ProxyError::HmdsError(e).into(), log));
                 }
             };
 
@@ -129,11 +131,7 @@ pub fn safe_brooks_integration_handle(
     let processed_http_req = match TryInto::<ProcessedRequestResponse>::try_into(request) {
         Ok(o) => o,
         Err(e) => {
-            return Err((
-                MdInterpretError::TransformError(HmdTransformError::BadUrl(e.to_string()).into())
-                    .into(),
-                log,
-            ));
+            return Err((ProxyError::SetupError(e.into()).into(), log));
         }
     };
 
@@ -146,11 +144,14 @@ pub fn safe_brooks_integration_handle(
     // build up a more complete type for its value during interpretation.
     let var = match updated_types_scopes
         .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
-        .ok_or(MdInterpretError::MetadataProcessingError(
-            AssertionFailure(
-                format!(
-                    "Missing {} struct type after analyzing HMD",
-                    MEL_USER_SET_VARIABLE_STRUCT_NAME
+        .ok_or(ProxyError::ImdiError(
+            ImdInterpretError::RuntimeError(
+                interpret::Error::AssertionFailure(
+                    format!(
+                        "Missing {} struct type after analyzing HMD",
+                        MEL_USER_SET_VARIABLE_STRUCT_NAME
+                    )
+                    .into(),
                 )
                 .into(),
             )
@@ -160,7 +161,7 @@ pub fn safe_brooks_integration_handle(
             Type::Struct(s) => s,
             _ => {
                 return Err((
-                    MdInterpretError::MetadataProcessingError(
+                    ProxyError::ImdiError(ImdInterpretError::MetadataProcessingError(
                         AssertionFailure(
                             format!(
                                 "{} has wrong type after analyzing HMD",
@@ -169,7 +170,7 @@ pub fn safe_brooks_integration_handle(
                             .into(),
                         )
                         .into(),
-                    )
+                    ))
                     .into(),
                     log,
                 ));
@@ -191,4 +192,5 @@ pub fn safe_brooks_integration_handle(
     );
 
     interpret_interconnection_metadata(&verified_md, mel_scopes, processed_http_req, runtime, log)
+        .map_err(|(e, log)| (ProxyError::ImdiError(*e).into(), log))
 }

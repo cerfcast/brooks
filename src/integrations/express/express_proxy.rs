@@ -27,6 +27,7 @@ use crate::{
     environment::scope::Scopes,
     integrations::{
         common::safe_brooks_integration_handle,
+        error::{NativeRequestTransformError, ProxyError},
         express::expressi::{
             BrooksExpressConfiguration, BrooksExpressLoggerCallback, BrooksExpressRequest,
             BrooksExpressResponseConfig, drain_to_express_log,
@@ -36,22 +37,20 @@ use crate::{
     },
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::interpreter::{builtins::builtin_builtin_function_interpreters, values::TypedValue},
-    processing::imdi::{HmdTransformError, MdInterpretError},
 };
 
 fn try_from_response(
     response: &http::Response<Vec<u8>>,
     status: StatusCode,
     res: BrooksExpressResponseConfig,
-) -> Result<(), Box<MdInterpretError>> {
+) -> Result<(), Box<NativeRequestTransformError>> {
     unsafe {
         for header in response.headers().iter() {
             let header_name = header.0.to_string();
-            let header_value = header.1.to_str().map_err(|e| {
-                MdInterpretError::TransformError(
-                    HmdTransformError::BadHeaderValue(e.to_string()).into(),
-                )
-            })?;
+            let header_value = header
+                .1
+                .to_str()
+                .map_err(|e| NativeRequestTransformError::BadHeaderValue(e.to_string()))?;
 
             (res.set_header)(
                 to_null_terminated_str(&header_name).as_ptr() as *const i8,
@@ -157,24 +156,23 @@ unsafe fn do_brooks_express_proxy(
     req: *mut c_void,
     res: BrooksExpressResponseConfig,
     log: LogMsgs,
-) -> Result<LogMsgs, (Box<MdInterpretError>, LogMsgs)> {
+) -> Result<LogMsgs, (Box<ProxyError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
     let mel_scope: Scopes<TypedValue> = builtin_builtin_function_interpreters().into();
 
     let http_req = Box::from_raw(req as *mut BrooksExpressRequest).request;
-
     let runtime = match runtime::Builder::new_multi_thread().enable_all().build() {
         Ok(o) => o,
         Err(e) => {
-            return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
+            return Err((ProxyError::SetupError(e.into()).into(), log));
         }
     };
 
-    let hmds_key = match http_req.headers().get(HOST).cloned() {
+    let hmds_key = match http_req.headers().get(HOST) {
         Some(o) => o,
         None => {
             return Err((
-                MdInterpretError::ProxyError("Could not get host from request".to_string()).into(),
+                ProxyError::SetupError("Could not get host from request".into()).into(),
                 log,
             ));
         }
@@ -182,7 +180,7 @@ unsafe fn do_brooks_express_proxy(
     let hmds_key = match hmds_key.to_str() {
         Ok(o) => o,
         Err(e) => {
-            return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
+            return Err((ProxyError::SetupError(e.into()).into(), log));
         }
     };
 
@@ -196,7 +194,7 @@ unsafe fn do_brooks_express_proxy(
     )?;
 
     if let Err(e) = try_from_response(&response, status, res) {
-        return Err((e, log));
+        return Err((ProxyError::NativeRequestTransformError(e).into(), log));
     }
 
     Ok(log)

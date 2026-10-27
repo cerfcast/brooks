@@ -25,6 +25,7 @@ use crate::{
     environment::scope::Scopes,
     integrations::{
         common::safe_brooks_integration_handle,
+        error::{NativeRequestTransformError, ProxyError},
         hmds::{HmdsConfiguration, HmdsServerConfiguration},
         nginx::{
             nginx_lib::{from_nginx_str, log_nginx_msgs, to_nginx_buf, to_nginx_str},
@@ -33,7 +34,6 @@ use crate::{
     },
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::interpreter::{builtins::builtin_builtin_function_interpreters, values::TypedValue},
-    processing::imdi::{HmdTransformError, MdInterpretError},
 };
 
 #[repr(C)]
@@ -85,7 +85,7 @@ pub unsafe extern "C" fn ngx_brooks_configure(
 }
 
 impl TryFrom<ngx_http_request_s> for Request<Vec<u8>> {
-    type Error = Box<HmdTransformError>;
+    type Error = Box<NativeRequestTransformError>;
 
     fn try_from(value: ngx_http_request_s) -> Result<Self, Self::Error> {
         let mut header_part = &value.headers_in.headers.part;
@@ -110,10 +110,10 @@ impl TryFrom<ngx_http_request_s> for Request<Vec<u8>> {
                 let k = from_nginx_str((*header_element).key);
                 let val = from_nginx_str((*header_element).value);
 
-                let header_name =
-                    HeaderName::from_str(&k).map_err(|_| HmdTransformError::BadHeaderName(k))?;
+                let header_name = HeaderName::from_str(&k)
+                    .map_err(|_| NativeRequestTransformError::BadHeaderName(k))?;
                 let header_value = HeaderValue::from_str(&val)
-                    .map_err(|_| HmdTransformError::BadHeaderValue(val.clone()))?;
+                    .map_err(|_| NativeRequestTransformError::BadHeaderValue(val.clone()))?;
                 request = request.header(header_name.clone(), header_value.clone());
 
                 if header_name == HOST {
@@ -126,7 +126,11 @@ impl TryFrom<ngx_http_request_s> for Request<Vec<u8>> {
 
             let host = match host {
                 Some(h) => h,
-                None => return Err(HmdTransformError::BadUrl(from_nginx_str(value.uri)).into()),
+                None => {
+                    return Err(
+                        NativeRequestTransformError::BadUrl(from_nginx_str(value.uri)).into(),
+                    );
+                }
             };
 
             let http_s = if (*value.http_connection).ssl() != 0 {
@@ -142,19 +146,19 @@ impl TryFrom<ngx_http_request_s> for Request<Vec<u8>> {
                 from_nginx_str(value.uri),
                 from_nginx_str(value.args)
             ))
-            .map_err(|e| HmdTransformError::BadUri(e.to_string()))?;
+            .map_err(|e| NativeRequestTransformError::BadUri(e.to_string()))?;
 
             request = request.uri(parsed_uri.clone());
 
             request = request.method(
                 Method::from_str(&from_nginx_str(value.method_name))
-                    .map_err(|e| HmdTransformError::BadMethodValue(e.to_string()))?,
+                    .map_err(|e| NativeRequestTransformError::BadMethodValue(e.to_string()))?,
             );
         }
 
         request
             .body(vec![])
-            .map_err(|e| Box::new(HmdTransformError::BadBody(e.to_string())))
+            .map_err(|e| Box::new(NativeRequestTransformError::BadBody(e.to_string())))
     }
 }
 
@@ -162,13 +166,13 @@ unsafe fn try_from_response(
     response: &http::Response<Vec<u8>>,
     status: StatusCode,
     req: *mut ngx_http_request_s,
-) -> Result<(), Box<HmdTransformError>> {
+) -> Result<(), Box<NativeRequestTransformError>> {
     for (hsh, header) in response.headers().iter().enumerate() {
         let header_name = header.0.to_string();
         let header_value = header
             .1
             .to_str()
-            .map_err(|e| HmdTransformError::BadHeaderValue(e.to_string()))?;
+            .map_err(|e| NativeRequestTransformError::BadHeaderValue(e.to_string()))?;
 
         let he = ngx_list_push(&mut (*req).headers_out.headers) as *mut ngx_table_elt_s;
 
@@ -234,19 +238,19 @@ unsafe fn do_ngx_brooks_proxy(
     req: *mut ngx_http_request_s,
     body: *mut *mut ngx_buf_s,
     log: LogMsgs,
-) -> Result<LogMsgs, (Box<MdInterpretError>, LogMsgs)> {
+) -> Result<LogMsgs, (Box<ProxyError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
     let mel_scope: Scopes<TypedValue> = builtin_builtin_function_interpreters().into();
 
     let http_req = match TryInto::<Request<Vec<u8>>>::try_into(*req) {
         Ok(o) => o,
-        Err(e) => return Err((MdInterpretError::TransformError(e).into(), log)),
+        Err(e) => return Err((ProxyError::NativeRequestTransformError(e).into(), log)),
     };
 
     let runtime = match runtime::Builder::new_multi_thread().enable_all().build() {
         Ok(o) => o,
         Err(e) => {
-            return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
+            return Err((ProxyError::SetupError(e.into()).into(), log));
         }
     };
 
@@ -254,7 +258,7 @@ unsafe fn do_ngx_brooks_proxy(
         Some(o) => o,
         None => {
             return Err((
-                MdInterpretError::ProxyError("Could not get host from request".to_string()).into(),
+                ProxyError::SetupError("Could not get host from request".into()).into(),
                 log,
             ));
         }
@@ -262,7 +266,7 @@ unsafe fn do_ngx_brooks_proxy(
     let hmds_key = match hmds_key.to_str() {
         Ok(o) => o,
         Err(e) => {
-            return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
+            return Err((ProxyError::SetupError(e.into()).into(), log));
         }
     };
 
@@ -276,12 +280,12 @@ unsafe fn do_ngx_brooks_proxy(
     )?;
 
     if let Err(e) = try_from_response(&response, status, req) {
-        return Err((MdInterpretError::TransformError(e).into(), log));
+        return Err((ProxyError::NativeRequestTransformError(e).into(), log));
     }
 
     *body = match to_nginx_buf(response.body(), (*req).pool) {
         Ok(o) => o,
-        Err(e) => return Err((MdInterpretError::TransformError(e).into(), log)),
+        Err(e) => return Err((ProxyError::NativeRequestTransformError(e).into(), log)),
     };
 
     Ok(log)

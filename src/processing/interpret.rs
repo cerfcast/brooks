@@ -82,6 +82,8 @@ impl Display for Error {
     }
 }
 
+impl std::error::Error for Error {}
+
 /// The context for the interpretation of a validated representation of a given piece of Metadata Information.
 ///
 ///

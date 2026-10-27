@@ -30,6 +30,8 @@ pub mod express;
 #[cfg(feature = "hmds")]
 pub mod common;
 #[cfg(feature = "hmds")]
+pub mod error;
+#[cfg(feature = "hmds")]
 pub mod hmds;
 #[cfg(feature = "hmds")]
 pub mod support;

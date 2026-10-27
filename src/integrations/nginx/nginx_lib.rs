@@ -16,11 +16,11 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    integrations::nginx::{
-        ngx_buf_s, ngx_log_error_core, ngx_log_s, ngx_pcalloc, ngx_pool_s, ngx_str_t,
+    integrations::{
+        error::NativeRequestTransformError,
+        nginx::{ngx_buf_s, ngx_log_error_core, ngx_log_s, ngx_pcalloc, ngx_pool_s, ngx_str_t},
     },
     logging::{LogLevel, LogMsgs},
-    processing::imdi::HmdTransformError,
 };
 
 /// Create an owned String from an nginx string.
@@ -68,9 +68,9 @@ pub(crate) unsafe fn copy_to_pool(s: &[u8], pool: *mut ngx_pool_s) -> (*mut u8, 
 pub(crate) unsafe fn to_nginx_buf(
     s: &[u8],
     pool: *mut ngx_pool_s,
-) -> Result<*mut ngx_buf_s, Box<HmdTransformError>> {
+) -> Result<*mut ngx_buf_s, Box<NativeRequestTransformError>> {
     let buf = ngx_pcalloc(pool, size_of::<ngx_buf_s>()) as *mut ngx_buf_s;
-    let buf = buf.as_mut().ok_or(HmdTransformError::BadMemory)?;
+    let buf = buf.as_mut().ok_or(NativeRequestTransformError::BadMemory)?;
 
     // Say that it is a memory buffer.
     buf.set_memory(1);

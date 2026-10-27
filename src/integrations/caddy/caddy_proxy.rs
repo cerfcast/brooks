@@ -32,12 +32,12 @@ use crate::{
             caddyi::{BrooksCaddyConfiguration, BrooksCaddyRequest, drain_to_caddy_log},
         },
         common::safe_brooks_integration_handle,
+        error::{NativeRequestTransformError, ProxyError},
         hmds::{HmdsConfiguration, HmdsServerConfiguration},
         support::to_null_terminated_str,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::interpreter::{builtins::builtin_builtin_function_interpreters, values::TypedValue},
-    processing::imdi::{HmdTransformError, MdInterpretError},
 };
 
 #[allow(clippy::missing_safety_doc)]
@@ -94,15 +94,14 @@ fn try_from_response(
     response: &http::Response<Vec<u8>>,
     status: StatusCode,
     reqres: *mut c_void,
-) -> Result<(), Box<MdInterpretError>> {
+) -> Result<(), Box<NativeRequestTransformError>> {
     unsafe {
         for header in response.headers().iter() {
             let header_name = header.0.to_string();
-            let header_value = header.1.to_str().map_err(|e| {
-                MdInterpretError::TransformError(
-                    HmdTransformError::BadHeaderValue(e.to_string()).into(),
-                )
-            })?;
+            let header_value = header
+                .1
+                .to_str()
+                .map_err(|e| NativeRequestTransformError::BadHeaderValue(e.to_string()))?;
 
             caddy_response_set_header(
                 reqres,
@@ -155,7 +154,7 @@ unsafe fn do_brooks_caddy_proxy(
     req: *mut c_void,
     res: *mut c_void,
     log: LogMsgs,
-) -> Result<LogMsgs, (Box<MdInterpretError>, LogMsgs)> {
+) -> Result<LogMsgs, (Box<ProxyError>, LogMsgs)> {
     // When interpreting MEL expressions in the HMD, use all builtin functions.
     let mel_scope: Scopes<TypedValue> = builtin_builtin_function_interpreters().into();
 
@@ -164,15 +163,15 @@ unsafe fn do_brooks_caddy_proxy(
     let runtime = match runtime::Builder::new_multi_thread().enable_all().build() {
         Ok(o) => o,
         Err(e) => {
-            return Err((MdInterpretError::RuntimeError(e.to_string()).into(), log));
+            return Err((ProxyError::SetupError(e.into()).into(), log));
         }
     };
 
-    let hmds_key = match http_req.headers().get(HOST).cloned() {
+    let hmds_key = match http_req.headers().get(HOST) {
         Some(o) => o,
         None => {
             return Err((
-                MdInterpretError::ProxyError("Could not get host from request".to_string()).into(),
+                ProxyError::SetupError("Could not get host from request".into()).into(),
                 log,
             ));
         }
@@ -180,7 +179,7 @@ unsafe fn do_brooks_caddy_proxy(
     let hmds_key = match hmds_key.to_str() {
         Ok(o) => o,
         Err(e) => {
-            return Err((MdInterpretError::ProxyError(e.to_string()).into(), log));
+            return Err((ProxyError::SetupError(e.into()).into(), log));
         }
     };
 
@@ -194,7 +193,7 @@ unsafe fn do_brooks_caddy_proxy(
     )?;
 
     if let Err(e) = try_from_response(&response, status, res) {
-        return Err((e, log));
+        return Err((ProxyError::NativeRequestTransformError(e).into(), log));
     }
 
     caddy_response_set_body(
