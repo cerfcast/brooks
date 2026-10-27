@@ -17,7 +17,7 @@
 
 use tree_sitter;
 
-use crate::common::GrammarLocation;
+use crate::common::TextLocation;
 use crate::mel::ast::Expr;
 use crate::mel::compiler::compile::CompileResult;
 use crate::mel::compiler::compile::MELCompiler;
@@ -38,7 +38,7 @@ pub fn compile(source: &str) -> CompileResult<Expr<()>> {
         .set_language(&language.into())
         .map_err(|e| MelCompilerLocatableError {
             error: MelCompilerError::SyntaxError(format!("Could not parse: {e}")),
-            location: GrammarLocation {
+            location: TextLocation {
                 start: 0,
                 extent: 0,
             },
@@ -47,7 +47,7 @@ pub fn compile(source: &str) -> CompileResult<Expr<()>> {
         .parse(source, None)
         .ok_or(MelCompilerLocatableError {
             error: MelCompilerError::SyntaxError("Could not parse.".to_string()),
-            location: GrammarLocation {
+            location: TextLocation {
                 start: 0,
                 extent: 0,
             },
@@ -63,7 +63,7 @@ pub fn compile(source: &str) -> CompileResult<Expr<()>> {
         MELCompilerContext::Expr(expr) => Ok(expr),
         _ => Err(MelCompilerLocatableError {
             error: MelCompilerError::EmptyContext,
-            location: GrammarLocation {
+            location: TextLocation {
                 start: 0,
                 extent: 0,
             },

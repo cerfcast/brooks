@@ -60,7 +60,7 @@ pub fn grammar_location(_: TokenStream, item: TokenStream) -> TokenStream {
         ty: syn::Type::Path(TypePath {
             qself: None,
             path: PathSegment {
-                ident: Ident::new("GrammarLocation", ast.span().clone()),
+                ident: Ident::new("TextLocation", ast.span().clone()),
                 arguments: syn::PathArguments::None,
             }
             .into(),

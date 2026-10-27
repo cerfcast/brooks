@@ -22,7 +22,7 @@ use crate::{
         gmd::spec::TypedGenericMetadata,
         mel::spec::{SetVariable, TypedSetVariable},
     },
-    common::GrammarLocation,
+    common::TextLocation,
     mel::{
         MEL_USER_SET_VARIABLE_STRUCT_NAME,
         analysis::{self, Analyzed, MelAnalysisError, MelAnalysisLocatableError},
@@ -125,7 +125,7 @@ impl Verifier<MetadataAnalysisContext, MetadataVerificationError> for SetVariabl
                             MEL_USER_SET_VARIABLE_STRUCT_NAME.to_string(),
                         )
                         .into(),
-                        location: GrammarLocation {
+                        location: TextLocation {
                             start: 0,
                             extent: 0,
                         },
@@ -148,7 +148,7 @@ impl Verifier<MetadataAnalysisContext, MetadataVerificationError> for SetVariabl
                                 it,
                             )
                             .into(),
-                            location: GrammarLocation {
+                            location: TextLocation {
                                 start: 0,
                                 extent: 0,
                             },

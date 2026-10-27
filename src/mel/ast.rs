@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::common::GrammarLocation;
+use crate::common::TextLocation;
 use crate::mel::grammar::GrammarNode;
 use brooks_macros::{grammar_location, grammar_name};
 use regex::Regex;
@@ -157,12 +157,12 @@ pub enum Expr<A: Debug + Clone> {
     Identifier(Arc<Identifier<A>>),
     ArgumentList(Arc<ArgumentList<A>>),
     Argument(Arc<Argument<A>>),
-    Literal(Literal, GrammarLocation, A),
+    Literal(Literal, TextLocation, A),
     MemberAccess(Arc<MemberAccessExpression<A>>),
 }
 
 impl<A: Debug + Clone> Expr<A> {
-    pub fn location(&self) -> GrammarLocation {
+    pub fn location(&self) -> TextLocation {
         match self {
             Expr::FunctionCall(function_call) => function_call.location.clone(),
             Expr::BinaryExpr(binary_expr) => binary_expr.location.clone(),
@@ -267,7 +267,7 @@ pub trait AstVisitor<T, A: Debug + Clone, E> {
     ) -> AstVisitorResult<T, E>;
     fn visit_literal(
         &self,
-        ast: (&Literal, &GrammarLocation, &A),
+        ast: (&Literal, &TextLocation, &A),
         context: T,
         driver: &AstVisitorDriver,
     ) -> AstVisitorResult<T, E>;

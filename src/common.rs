@@ -21,14 +21,14 @@ use std::fmt::Display;
 pub trait Location: Display + Debug {}
 
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct GrammarLocation {
+pub struct TextLocation {
     pub start: usize,
     pub extent: usize,
 }
 
-impl Location for GrammarLocation {}
+impl Location for TextLocation {}
 
-impl Display for GrammarLocation {
+impl Display for TextLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} to {}", self.start, self.start + self.extent)
     }

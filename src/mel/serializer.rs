@@ -17,7 +17,7 @@
 
 use std::fmt::Display;
 
-use crate::common::GrammarLocation;
+use crate::common::TextLocation;
 use crate::mel::ast::{
     BinaryInfixOperator, ComparisonOperator, LogicOperator, MathOperator, MemberAccessOperator,
     StringConcatOperator, TernaryOperator,
@@ -280,7 +280,7 @@ impl AstVisitor<AstTextSerializerContext, (), AstTextSerializerError> for AstTex
 
     fn visit_literal(
         &self,
-        ast: (&ast::Literal, &GrammarLocation, &()),
+        ast: (&ast::Literal, &TextLocation, &()),
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {
@@ -893,7 +893,7 @@ impl AstVisitor<AstTextSerializerContext, Analyzed, AstTextSerializerError> for 
 
     fn visit_literal(
         &self,
-        ast: (&ast::Literal, &GrammarLocation, &Analyzed),
+        ast: (&ast::Literal, &TextLocation, &Analyzed),
         context: AstTextSerializerContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<AstTextSerializerContext, AstTextSerializerError> {

@@ -23,7 +23,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use tree_sitter::{self, Node};
 
-use crate::common::GrammarLocation;
+use crate::common::TextLocation;
 use crate::mel::ast::Expr::BinaryExpr;
 use crate::mel::ast::Expr::MemberAccess;
 use crate::mel::ast::Expr::TernaryExpr;
@@ -1073,9 +1073,9 @@ impl SyntaxVisitorDriver {
     }
 }
 
-impl From<Node<'_>> for GrammarLocation {
+impl From<Node<'_>> for TextLocation {
     fn from(value: Node) -> Self {
-        GrammarLocation {
+        TextLocation {
             start: value.start_byte(),
             extent: value.end_byte() - value.start_byte(),
         }
@@ -1096,7 +1096,7 @@ pub enum MelCompilerError {
 #[derive(Debug, Clone)]
 pub struct MelCompilerLocatableError {
     pub error: MelCompilerError,
-    pub location: GrammarLocation,
+    pub location: TextLocation,
 }
 
 impl Display for MelCompilerError {

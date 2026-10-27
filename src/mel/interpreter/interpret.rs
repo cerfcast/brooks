@@ -21,7 +21,7 @@ use std::{
 };
 
 use crate::{
-    common::GrammarLocation,
+    common::TextLocation,
     environment::scope::Scopes,
     mel::interpreter::{
         builtins::BuiltinInterpError,
@@ -128,7 +128,7 @@ impl Error for MelInterpError {}
 #[derive(Debug)]
 pub struct MelInterpLocatableError {
     pub error: Box<MelInterpError>,
-    pub location: GrammarLocation,
+    pub location: TextLocation,
     pub context: MelInterpContext,
 }
 
@@ -806,7 +806,7 @@ impl AstVisitor<MelInterpContext, Analyzed, Box<MelInterpLocatableError>> for Me
 
     fn visit_literal(
         &self,
-        ast: (&ast::Literal, &GrammarLocation, &Analyzed),
+        ast: (&ast::Literal, &TextLocation, &Analyzed),
         context: MelInterpContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelInterpContext, Box<MelInterpLocatableError>> {

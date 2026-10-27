@@ -17,7 +17,7 @@
 
 use std::fmt::Debug;
 
-use crate::common::GrammarLocation;
+use crate::common::TextLocation;
 use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
 
@@ -42,7 +42,7 @@ pub enum MelCodegenError {
 
 #[derive(Debug)]
 pub struct MelCodegenLocatableError {
-    pub location: GrammarLocation,
+    pub location: TextLocation,
     pub error: MelCodegenError,
     pub context: MelCodegenContext,
 }
@@ -52,7 +52,7 @@ pub type MelCodegenResult = Result<MelCodegenContext, MelCodegenLocatableError>;
 #[derive(Clone, Debug)]
 pub struct LocatableString {
     pub s: String,
-    pub l: GrammarLocation,
+    pub l: TextLocation,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -382,7 +382,7 @@ impl AstVisitor<MelCodegenContext, Analyzed, MelCodegenLocatableError> for MelCo
 
     fn visit_literal(
         &self,
-        ast: (&ast::Literal, &GrammarLocation, &Analyzed),
+        ast: (&ast::Literal, &TextLocation, &Analyzed),
         context: MelCodegenContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelCodegenContext, MelCodegenLocatableError> {

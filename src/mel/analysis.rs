@@ -22,7 +22,7 @@ use std::{
 };
 
 use crate::{
-    common::GrammarLocation,
+    common::TextLocation,
     environment::scope::Scopes,
     mel::{
         compiler::compile::MelCompilerLocatableError,
@@ -207,7 +207,7 @@ impl Display for MelAnalysisError {
 #[derive(Debug, Clone)]
 pub struct MelAnalysisLocatableError {
     pub error: Box<MelAnalysisError>,
-    pub location: GrammarLocation,
+    pub location: TextLocation,
 }
 
 impl Display for MelAnalysisLocatableError {
@@ -547,7 +547,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 
     fn visit_literal(
         &self,
-        ast: (&ast::Literal, &GrammarLocation, &()),
+        ast: (&ast::Literal, &TextLocation, &()),
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
@@ -724,7 +724,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelTypeCh
 
 #[cfg(test)]
 mod type_check_tests {
-    use crate::common::GrammarLocation;
+    use crate::common::TextLocation;
     use crate::mel::MEL_USER_SET_VARIABLE_STRUCT_NAME;
     use crate::mel::types::Type::IPAddress;
     use crate::mel::types::{
@@ -831,7 +831,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 0,
                 extent: 1
             }
@@ -859,7 +859,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 15,
                 extent: 5
             }
@@ -885,7 +885,7 @@ mod type_check_tests {
             .expect_err("Could analyze expression with type error");
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 0,
                 extent: 9
             }
@@ -912,7 +912,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 13,
                 extent: 7
             }
@@ -1009,7 +1009,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 4,
                 extent: 9
             }
@@ -1037,7 +1037,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 0,
                 extent: 1
             }
@@ -1106,7 +1106,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 0,
                 extent: 5
             }
@@ -1137,7 +1137,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 4,
                 extent: 4
             }
@@ -1213,7 +1213,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 7,
                 extent: 6
             }
@@ -1249,7 +1249,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 4,
                 extent: 6
             }
@@ -1285,7 +1285,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 6,
                 extent: 6
             }
@@ -1544,7 +1544,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 6,
                 extent: 14
             }
@@ -1639,7 +1639,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 5,
                 extent: 9
             }
@@ -1702,7 +1702,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 1,
                 extent: 5
             }
@@ -1916,7 +1916,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 48,
                 extent: 1
             }
@@ -1947,7 +1947,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 48,
                 extent: 1
             }
@@ -1980,7 +1980,7 @@ mod type_check_tests {
 
         assert_eq!(
             result.location,
-            GrammarLocation {
+            TextLocation {
                 start: 10,
                 extent: 1
             }
@@ -2046,7 +2046,7 @@ impl Display for MelOptimizerError {
 #[derive(Debug, Clone)]
 pub struct MelOptimizerLocatableError {
     pub error: MelOptimizerError,
-    pub location: GrammarLocation,
+    pub location: TextLocation,
 }
 
 impl Display for MelOptimizerLocatableError {
@@ -2272,7 +2272,7 @@ impl AstVisitor<MelAnalysisContext, (), MelAnalysisLocatableError> for MelOptimi
 
     fn visit_literal(
         &self,
-        _ast: (&ast::Literal, &GrammarLocation, &()),
+        _ast: (&ast::Literal, &TextLocation, &()),
         context: MelAnalysisContext,
         _driver: &AstVisitorDriver,
     ) -> AstVisitorResult<MelAnalysisContext, MelAnalysisLocatableError> {
@@ -3035,7 +3035,7 @@ pub fn analyze(expr: &Expr<()>, scopes: &Scopes<Type>) -> MelAnalysisResult {
 
     let result = result.expr.ok_or(MelAnalysisLocatableError {
         error: MelAnalysisError::Incalculable.into(),
-        location: GrammarLocation {
+        location: TextLocation {
             start: 0,
             extent: 0,
         },
