@@ -90,15 +90,11 @@ impl HmdsServerConfiguration {
     }
 }
 
+pub type HostMetadataCacheValue = (HostMetadata<CdniVerificationKey>, Scopes<Type>);
+
 pub struct HmdsConfiguration {
     pub(crate) hmds_server: HmdsServerConfiguration,
-    pub(crate) hmds_cache: HashMap<
-        String,
-        (
-            chrono::DateTime<Utc>,
-            (HostMetadata<CdniVerificationKey>, Scopes<Type>),
-        ),
-    >,
+    pub(crate) hmds_cache: HashMap<String, (chrono::DateTime<Utc>, HostMetadataCacheValue)>,
 }
 
 impl From<HmdsServerConfiguration> for HmdsConfiguration {
