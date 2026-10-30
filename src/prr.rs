@@ -91,7 +91,7 @@ impl Display for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// A request that can be manipulated by interpretation processing stages.
+/// A request or response that can be manipulated during processing of metadata.
 pub trait Prr<Body>: Debug {
     // Header Manipulation and Access
 
