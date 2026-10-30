@@ -20,7 +20,7 @@
 use crate::{
     cdni::{
         gmd::spec::TypedGenericMetadata,
-        original::spec::{Source, TypedSource},
+        original::spec::{SourceMetadata, TypedSourceMetadata},
     },
     verifying::verify::{
         AnalysisResult, CdniVerificationKey, MetadataAnalysisContext, MetadataVerificationError,
@@ -35,8 +35,7 @@ use std::{
 
 #[derive(Debug, Clone, Default)]
 pub struct SourceVerificationKey {
-    pub endpoints: Vec<SocketAddr>,
-    pub protocol: SourceProtocol,
+    pub sources: Vec<(Vec<SocketAddr>, SourceProtocol)>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -67,6 +66,37 @@ impl FromStr for SourceProtocol {
     }
 }
 
+fn analyze_source_metadata(
+    to_verify: TypedSourceMetadata<()>,
+    input: MetadataAnalysisContext,
+) -> AnalysisResult<MetadataAnalysisContext, MetadataVerificationError> {
+    let mut sources: Vec<(Vec<SocketAddr>, SourceProtocol)> = vec![];
+
+    for s in &to_verify.value.sources {
+        let typed_protocol: SourceProtocol = s.protocol.parse()?;
+
+        let mut typed_endpoints: Vec<SocketAddr> = vec![];
+        for ep in &s.endpoints {
+            typed_endpoints.push(ep.parse().map_err(|_| {
+                MetadataVerificationError::JsonError(format!(
+                    "{ep} is not a valid IP/Port combination"
+                ))
+            })?);
+        }
+
+        sources.push((typed_endpoints, typed_protocol));
+    }
+
+    let res = TypedSourceMetadata {
+        tpe: TypedSourceMetadata::<()>::typed_cdni_metadata_name(),
+        value: SourceMetadata::<SourceVerificationKey> {
+            sources: to_verify.value.sources,
+            aug: SourceVerificationKey { sources },
+        },
+    };
+
+    Ok((input, CdniVerificationKey::Source(Box::new(res))))
+}
 #[derive(Debug)]
 pub struct SourceMetadataAnalyzer {}
 
@@ -76,39 +106,62 @@ impl Verifier<MetadataAnalysisContext, MetadataVerificationError> for SourceMeta
         v: &TypedGenericMetadata<()>,
         input: MetadataAnalysisContext,
     ) -> AnalysisResult<MetadataAnalysisContext, MetadataVerificationError> {
-        let typed_source = serde_json::from_value::<TypedSource<()>>(
+        let typed_source = serde_json::from_value::<TypedSourceMetadata<()>>(
             serde_json::to_value(v)
                 .map_err(|e| MetadataVerificationError::JsonError(e.to_string()))?,
         )
         .map_err(|e| MetadataVerificationError::JsonError(e.to_string()))?;
 
-        let typed_protocol: SourceProtocol = typed_source.value.protocol.parse()?;
-
-        let mut typed_endpoints: Vec<SocketAddr> = vec![];
-        for ep in typed_source.value.endpoints {
-            typed_endpoints.push(ep.parse().map_err(|_| {
-                MetadataVerificationError::JsonError(format!(
-                    "{ep} is not a valid IP/Port combination"
-                ))
-            })?);
-        }
-
-        let res = TypedSource {
-            tpe: TypedSource::<()>::typed_cdni_metadata_name(),
-            value: Source {
-                endpoints: vec![],
-                protocol: SourceProtocol::Http11.to_string(),
-                aug: SourceVerificationKey {
-                    endpoints: typed_endpoints,
-                    protocol: typed_protocol,
-                },
-            },
-        };
-
-        Ok((input, CdniVerificationKey::Source(Box::new(res))))
+        analyze_source_metadata(typed_source, input)
     }
 
     fn type_name(&self, candidate: &str) -> bool {
-        candidate == TypedSource::<()>::typed_cdni_metadata_name()
+        candidate == TypedSourceMetadata::<()>::typed_cdni_metadata_name()
+    }
+}
+
+#[cfg(test)]
+mod test_verify_source_metadata {
+    use std::{assert_matches, path::Path};
+
+    use crate::{
+        cdni::original::spec::{SourceMetadata, TypedSourceMetadata},
+        tests::read_test_file,
+        verifying::{
+            original::verify::analyze_source_metadata,
+            verify::{CdniVerificationKey, MetadataAnalysisContext},
+        },
+    };
+
+    #[test]
+    fn test_verify_8006_example() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/source/modified-8006-example.json",
+        ));
+        let cop_metadata = serde_json::from_str::<TypedSourceMetadata<()>>(&json)
+            .expect("Could not parse JSON test file");
+        assert_eq!(
+            cop_metadata.tpe,
+            TypedSourceMetadata::<()>::typed_cdni_metadata_name()
+        );
+
+        let (_, result) = analyze_source_metadata(cop_metadata, MetadataAnalysisContext::default())
+            .expect("Could not verify valid CDNI Source Metadata");
+
+        let result = match result {
+            CdniVerificationKey::Source(source) => source,
+            _ => panic!("Incorrect CDNI Verification Key type returned by analyze_source_metadata"),
+        };
+
+        assert_matches!(
+            *result,
+            TypedSourceMetadata {
+                tpe: _,
+                value: SourceMetadata { sources, aug: _ }
+            }
+            if sources.len() == 2 &&
+                sources[0].endpoints.len() == 2 &&
+                sources[1].endpoints.len() == 1
+        )
     }
 }

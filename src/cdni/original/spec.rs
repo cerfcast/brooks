@@ -26,19 +26,24 @@ use serde_json::Value;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Source<A: Debug + Clone + Default> {
+pub struct Source {
     pub endpoints: Vec<String>,
     pub protocol: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceMetadata<A: Debug + Clone + Default> {
+    pub sources: Vec<Source>,
     #[serde(skip)]
     pub aug: A,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
-pub struct TypedSource<A: Debug + Clone + Default> {
+pub struct TypedSourceMetadata<A: Debug + Clone + Default> {
     #[serde(rename = "generic-metadata-type")]
     pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
-    pub value: Source<A>,
+    pub value: SourceMetadata<A>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,4 +59,24 @@ pub struct TypedCachePolicy<A: Debug + Clone + Default> {
     pub tpe: String,
     #[serde(rename = "generic-metadata-value")]
     pub value: CachePolicy<A>,
+}
+
+#[cfg(test)]
+mod test_parse_source_metadata {
+    use std::path::Path;
+
+    use crate::{cdni::original::spec::TypedSourceMetadata, tests::read_test_file};
+
+    #[test]
+    fn test_verify_8006_example() {
+        let json = read_test_file(Path::new(
+            "./src/cdni/tests/source/modified-8006-example.json",
+        ));
+        let cop_metadata = serde_json::from_str::<TypedSourceMetadata<()>>(&json)
+            .expect("Could not parse JSON test file");
+        assert_eq!(
+            cop_metadata.tpe,
+            TypedSourceMetadata::<()>::typed_cdni_metadata_name()
+        );
+    }
 }

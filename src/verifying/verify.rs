@@ -21,7 +21,7 @@ use std::fmt::Debug;
 
 use crate::cdni::cors::spec::TypedCrossoriginPolicy;
 use crate::cdni::mel::spec::TypedSetVariable;
-use crate::cdni::original::spec::TypedSource;
+use crate::cdni::original::spec::TypedSourceMetadata;
 use crate::verifying::cors::verify::{
     CrossoriginPolicyVerificationError, CrossoriginPolicyVerificationKey,
 };
@@ -96,7 +96,7 @@ pub enum CdniVerifiedMetadataTypes {
 #[derive(Debug, Clone, Default)]
 pub enum CdniVerificationKey {
     Stage(Box<TypedStage<PsVerificationKey>>),
-    Source(Box<TypedSource<SourceVerificationKey>>),
+    Source(Box<TypedSourceMetadata<SourceVerificationKey>>),
     SetVariable(Box<TypedSetVariable<SetVariableVerificationKey>>),
     CrossoriginPolicy(Box<TypedCrossoriginPolicy<CrossoriginPolicyVerificationKey>>),
     #[default]

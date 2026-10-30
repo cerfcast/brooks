@@ -20,7 +20,7 @@
 use reqwest::dns::{Addrs, Resolve};
 
 use crate::{
-    cdni::original::spec::TypedSource,
+    cdni::original::spec::TypedSourceMetadata,
     processing::{
         imdi,
         interpret::{
@@ -53,7 +53,7 @@ impl
         SimpleProcessorsInterpreterContext<'_>,
         (imdi::ResultValue, MetadataInformationResultElements),
         Error,
-    > for TypedSource<SourceVerificationKey>
+    > for TypedSourceMetadata<SourceVerificationKey>
 {
     fn interpret<'a>(
         &self,
@@ -78,7 +78,12 @@ impl
             addr: *self
                 .value
                 .aug
-                .endpoints
+                .sources
+                .first()
+                .ok_or(Error::AssertionFailure(
+                    "Missing sources".to_string().into(),
+                ))?
+                .0
                 .first()
                 .ok_or(Error::AssertionFailure(
                     "Missing endpoints".to_string().into(),

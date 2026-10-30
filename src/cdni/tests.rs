@@ -22,7 +22,7 @@ pub mod test_helpers {
     use crate::cdni::{
         gmd::spec::TypedGenericMetadata,
         mel::spec::{SetVariable, TypedSetVariable},
-        original::spec::{Source, TypedSource},
+        original::spec::{Source, SourceMetadata, TypedSourceMetadata},
         ps::spec::{
             ClientRequestStage, ExpressionMatch, Header, HeaderTransform, MatchGroup,
             ProcessingStages, RequestTransform, ResponseTransform, StageMetadata, StageRules,
@@ -94,12 +94,17 @@ pub mod test_helpers {
         }
     }
 
-    pub fn generic_source(endpoints: Vec<&str>, protocol: &str) -> TypedGenericMetadata<()> {
+    pub fn generic_source(sources: Vec<(Vec<&str>, &str)>) -> TypedGenericMetadata<()> {
         TypedGenericMetadata {
-            tpe: TypedSource::<()>::typed_cdni_metadata_name(),
-            value: serde_json::to_value(Source {
-                endpoints: endpoints.iter().map(|f| f.to_string()).collect(),
-                protocol: protocol.to_string(),
+            tpe: TypedSourceMetadata::<()>::typed_cdni_metadata_name(),
+            value: serde_json::to_value(SourceMetadata {
+                sources: sources
+                    .iter()
+                    .map(|(endpoints, protocol)| Source {
+                        endpoints: endpoints.iter().map(|s| s.to_string()).collect(),
+                        protocol: protocol.to_string(),
+                    })
+                    .collect(),
                 aug: (),
             })
             .expect("TODO"),
