@@ -21,12 +21,13 @@ use crate::{
     cdni::cors::spec::TypedCrossoriginPolicy,
     processing::{
         self,
+        imdi::ImdiResultValue,
         interpret::{
             self,
             Error::{self, AssertionFailure, NotImplemented},
             InterpretationResult, MetadataInformationResultElements,
         },
-        processors::{SimpleProcessorsInterpreterContext, ps::PsInterpretValue},
+        processors::SimpleProcessorsInterpreterContext,
     },
     verifying::cors::verify::CrossoriginPolicyVerificationKey,
 };
@@ -34,7 +35,7 @@ use crate::{
 impl
     interpret::Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
-        (PsInterpretValue, MetadataInformationResultElements),
+        (ImdiResultValue, MetadataInformationResultElements),
         Error,
     > for TypedCrossoriginPolicy<CrossoriginPolicyVerificationKey>
 {
@@ -43,7 +44,7 @@ impl
         input: SimpleProcessorsInterpreterContext<'a>,
     ) -> InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
-        (PsInterpretValue, MetadataInformationResultElements),
+        (ImdiResultValue, MetadataInformationResultElements),
         Error,
     > {
         if let Some(preflight_only) = self.value.preflight_only
@@ -119,10 +120,7 @@ impl
 
         Ok((
             updated_context,
-            (
-                PsInterpretValue::MatchYes,
-                MetadataInformationResultElements::default(),
-            ),
+            (None, MetadataInformationResultElements::default()),
         ))
     }
 

@@ -26,16 +26,23 @@ use crate::processing::interpret::{
 use crate::verifying::verify::CdniVerificationKey;
 
 use crate::processing::processors::SimpleProcessorsInterpreterContext;
-use crate::processing::processors::ps::{PsInterpretMode, PsInterpretValue};
 use crate::prr;
 use crate::{cdni::imd::spec::HostMetadata, mel::interpreter::values::TypedValue};
+
+pub type ImdiResultValue = Option<http::Response<Vec<u8>>>;
+
+#[derive(Debug, Clone)]
+pub enum ImdiInterpretMode {
+    Request,
+    Response,
+}
 
 // Generic implementation of `interpret::Interpreter` for CdniVerificationKey
 // that simply redirects to the implementation of the underlying key.
 impl
     Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
-        (PsInterpretValue, MetadataInformationResultElements),
+        (ImdiResultValue, MetadataInformationResultElements),
         Error,
     > for CdniVerificationKey
 {
@@ -44,7 +51,7 @@ impl
         input: SimpleProcessorsInterpreterContext<'a>,
     ) -> InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
-        (PsInterpretValue, MetadataInformationResultElements),
+        (ImdiResultValue, MetadataInformationResultElements),
         Error,
     > {
         match &self {
@@ -85,7 +92,7 @@ pub fn interpret_interconnection_metadata(
 ) -> ImdInterpretResult {
     let mut request_context = SimpleProcessorsInterpreterContext {
         scopes: mel_scopes,
-        mode: PsInterpretMode::Request,
+        mode: ImdiInterpretMode::Request,
         runtime,
         req: request,
         res: None,
@@ -141,7 +148,7 @@ pub fn interpret_interconnection_metadata(
 
     let mut source_context = SimpleProcessorsInterpreterContext {
         scopes: request_context.scopes,
-        mode: PsInterpretMode::Request,
+        mode: ImdiInterpretMode::Request,
         req: request_context.req,
         res: None,
         runtime: request_context.runtime,
@@ -190,7 +197,7 @@ pub fn interpret_interconnection_metadata(
 
     let mut response_context = SimpleProcessorsInterpreterContext {
         scopes: source_context.scopes,
-        mode: PsInterpretMode::Response,
+        mode: ImdiInterpretMode::Response,
         req: source_context.req,
         res: source_context.res,
         runtime: source_context.runtime,
@@ -212,12 +219,9 @@ pub fn interpret_interconnection_metadata(
             };
 
             // Handle a result, if any.
-            if let PsInterpretValue::SyntheticResponse(sr) = result.0 {
-                log = debug!(
-                    log,
-                    "Got a synthetic response from an origin response stage."
-                );
-                return Ok((sr.status(), sr, log));
+            if let Some(result) = result.0 {
+                log = debug!(log, "Got a response from an origin response stage.");
+                return Ok((result.status(), result, log));
             }
 
             response_context = updated_response_context;
@@ -246,12 +250,9 @@ pub fn interpret_interconnection_metadata(
             };
 
             // Handle a result, if any.
-            if let PsInterpretValue::SyntheticResponse(sr) = result.0 {
-                log = debug!(
-                    log,
-                    "Got a synthetic response from an client response stage."
-                );
-                return Ok((sr.status(), sr, log));
+            if let Some(result) = result.0 {
+                log = debug!(log, "Got a response from an origin response stage.");
+                return Ok((result.status(), result, log));
             }
 
             // TODO: Handle other values from the PS Interpreter that indicate

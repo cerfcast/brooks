@@ -29,15 +29,13 @@ use crate::{
         types::{Struct, Type},
     },
     processing::{
+        imdi::ImdiResultValue,
         interpret::{
             self,
             Error::{self, InvalidType, RuntimeError},
             InterpretationResult, MetadataInformationResultElements,
         },
-        processors::{
-            SimpleProcessorsInterpreterContext,
-            ps::{self, PsInterpretValue::MatchYes},
-        },
+        processors::SimpleProcessorsInterpreterContext,
     },
     verifying::mel::verify::SetVariableVerificationKey,
 };
@@ -45,7 +43,7 @@ use crate::{
 impl
     interpret::Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
-        (ps::PsInterpretValue, MetadataInformationResultElements),
+        (ImdiResultValue, MetadataInformationResultElements),
         Error,
     > for TypedSetVariable<SetVariableVerificationKey>
 {
@@ -54,7 +52,7 @@ impl
         input: SimpleProcessorsInterpreterContext<'a>,
     ) -> InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
-        (ps::PsInterpretValue, MetadataInformationResultElements),
+        (ImdiResultValue, MetadataInformationResultElements),
         Error,
     > {
         let lmsgs = LogMsgs::new(Debug);
@@ -106,10 +104,7 @@ impl
                 },
             );
 
-            Ok((
-                output,
-                (MatchYes, MetadataInformationResultElements::default()),
-            ))
+            Ok((output, (None, MetadataInformationResultElements::default())))
         } else if let Some(_value) = &self.value.aug.value {
             todo!()
         } else {
@@ -140,8 +135,9 @@ mod test {
             types::{Type, builtin_function_types, minimal_core_variable_types},
         },
         processing::{
+            imdi::ImdiInterpretMode,
             interpret::{Interpreter, ProcessedRequestResponse},
-            processors::{SimpleProcessorsInterpreterContext, ps::PsInterpretMode},
+            processors::SimpleProcessorsInterpreterContext,
         },
         verifying::{
             mel::verify::SetVariableMetadataAnalyzer,
@@ -197,7 +193,7 @@ mod test {
                     MEL_USER_SET_VARIABLE_STRUCT_NAME,
                     mel_var_value_from_type(var),
                 ),
-                mode: PsInterpretMode::None,
+                mode: ImdiInterpretMode::Request,
                 runtime: rt.handle(),
                 req: Box::new(ProcessedRequestResponse::new_request(
                     &Url::from_str("http://www.example.com/")

@@ -39,6 +39,7 @@ use crate::mel::interpreter::error::{
 use crate::mel::interpreter::interpret::MelInterpContext;
 use crate::mel::interpreter::values::{TypedValue, Value};
 use crate::mel::types::Type;
+use crate::processing::imdi::{ImdiInterpretMode, ImdiResultValue};
 use crate::processing::interpret;
 use crate::processing::interpret::Error::AssertionFailure;
 use crate::processing::interpret::Stages::{
@@ -232,6 +233,15 @@ pub enum PsInterpretMode {
     HeaderCalculate,
     #[default]
     None,
+}
+
+impl From<ImdiInterpretMode> for PsInterpretMode {
+    fn from(value: ImdiInterpretMode) -> Self {
+        match value {
+            ImdiInterpretMode::Request => PsInterpretMode::Request,
+            ImdiInterpretMode::Response => PsInterpretMode::Response,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -915,7 +925,7 @@ impl
     interpret::Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
         (
-            PsInterpretValue,
+            ImdiResultValue,
             interpret::MetadataInformationResultElements,
         ),
         interpret::Error,
@@ -927,15 +937,15 @@ impl
     ) -> interpret::InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
         (
-            PsInterpretValue,
+            ImdiResultValue,
             interpret::MetadataInformationResultElements,
         ),
         interpret::Error,
     > {
         let (mut res, mut req) = (input.res, input.req);
         let reqres = match input.mode {
-            PsInterpretMode::Request => &mut req,
-            PsInterpretMode::Response => {
+            ImdiInterpretMode::Request => &mut req,
+            ImdiInterpretMode::Response => {
                 if let Some(res) = &mut res {
                     res
                 } else {
@@ -945,12 +955,6 @@ impl
                     .into());
                 }
             }
-            _ => {
-                return Err(interpret::Error::RuntimeError(
-                    AssertionFailure("Wrong mode".into()).into(),
-                )
-                .into());
-            }
         };
 
         let mut visitor = PsInterpreter { rr: &mut **reqres };
@@ -958,7 +962,7 @@ impl
         visitor.install_generic_visitors();
 
         let context = PsInterpretContext {
-            mode: input.mode.clone(),
+            mode: input.mode.clone().into(),
             mel_scopes: input.scopes.clone(),
             ..Default::default()
         };
@@ -983,6 +987,13 @@ impl
         let result = result.result.ok_or(interpret::Error::RuntimeError(
             PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult).into(),
         ))?;
+
+        // If there was a synthetic result, then that should be the result. Otherwise,
+        // there is no result worth reporting.
+        let result = match result {
+            PsInterpretValue::SyntheticResponse(sr) => Some(sr),
+            _ => None,
+        };
 
         let updated_context = SimpleProcessorsInterpreterContext {
             scopes: input.scopes,

@@ -19,7 +19,7 @@
 
 use crate::{
     environment::scope::Scopes, mel::interpreter::values::TypedValue,
-    processing::processors::ps::PsInterpretMode, prr,
+    processing::imdi::ImdiInterpretMode, prr,
 };
 
 pub mod cors;
@@ -30,7 +30,7 @@ pub mod source;
 #[derive(Debug)]
 pub struct SimpleProcessorsInterpreterContext<'a> {
     pub scopes: Scopes<TypedValue>,
-    pub mode: PsInterpretMode,
+    pub mode: ImdiInterpretMode,
     pub runtime: &'a tokio::runtime::Handle,
     pub req: Box<dyn prr::Prr<Vec<u8>>>,
     pub res: Option<Box<dyn prr::Prr<Vec<u8>>>>,
@@ -42,8 +42,8 @@ impl<'a> SimpleProcessorsInterpreterContext<'a> {
         Self {
             scopes: self.scopes,
             mode: match res.tpe() {
-                prr::PrrType::Request => PsInterpretMode::Request,
-                prr::PrrType::Response => PsInterpretMode::Response,
+                prr::PrrType::Request => ImdiInterpretMode::Request,
+                prr::PrrType::Response => ImdiInterpretMode::Response,
             },
             runtime: self.runtime,
             req: self.req,
