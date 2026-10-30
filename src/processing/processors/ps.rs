@@ -39,13 +39,12 @@ use crate::mel::interpreter::error::{
 use crate::mel::interpreter::interpret::MelInterpContext;
 use crate::mel::interpreter::values::{TypedValue, Value};
 use crate::mel::types::Type;
-use crate::processing::imdi::{ImdiInterpretMode, ImdiResultValue};
-use crate::processing::interpret;
 use crate::processing::interpret::Error::AssertionFailure;
 use crate::processing::interpret::Stages::{
     ClientRequest, ClientResponse, OriginRequest, OriginResponse,
 };
 use crate::processing::processors::SimpleProcessorsInterpreterContext;
+use crate::processing::{imdi, interpret};
 use crate::verifying::ps::verify::PsVerificationKey;
 use crate::visitors::{PsVisitor, PsVisitorResult};
 use crate::{mel, prr};
@@ -235,11 +234,11 @@ pub enum PsInterpretMode {
     None,
 }
 
-impl From<ImdiInterpretMode> for PsInterpretMode {
-    fn from(value: ImdiInterpretMode) -> Self {
+impl From<imdi::InterpretMode> for PsInterpretMode {
+    fn from(value: imdi::InterpretMode) -> Self {
         match value {
-            ImdiInterpretMode::Request => PsInterpretMode::Request,
-            ImdiInterpretMode::Response => PsInterpretMode::Response,
+            imdi::InterpretMode::Request => PsInterpretMode::Request,
+            imdi::InterpretMode::Response => PsInterpretMode::Response,
         }
     }
 }
@@ -925,7 +924,7 @@ impl
     interpret::Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
         (
-            ImdiResultValue,
+            imdi::ResultValue,
             interpret::MetadataInformationResultElements,
         ),
         interpret::Error,
@@ -937,15 +936,15 @@ impl
     ) -> interpret::InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
         (
-            ImdiResultValue,
+            imdi::ResultValue,
             interpret::MetadataInformationResultElements,
         ),
         interpret::Error,
     > {
         let (mut res, mut req) = (input.res, input.req);
         let reqres = match input.mode {
-            ImdiInterpretMode::Request => &mut req,
-            ImdiInterpretMode::Response => {
+            imdi::InterpretMode::Request => &mut req,
+            imdi::InterpretMode::Response => {
                 if let Some(res) = &mut res {
                     res
                 } else {

@@ -22,7 +22,7 @@ use reqwest::dns::{Addrs, Resolve};
 use crate::{
     cdni::original::spec::TypedSource,
     processing::{
-        imdi::ImdiResultValue,
+        imdi,
         interpret::{
             self, Error, InterpretationResult, MetadataInformationResultElements,
             ProcessedRequestResponse, Stages,
@@ -51,7 +51,7 @@ impl Resolve for SourceMetadataResolver {
 impl
     interpret::Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
-        (ImdiResultValue, MetadataInformationResultElements),
+        (imdi::ResultValue, MetadataInformationResultElements),
         Error,
     > for TypedSource<SourceVerificationKey>
 {
@@ -60,7 +60,7 @@ impl
         input: SimpleProcessorsInterpreterContext<'a>,
     ) -> InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
-        (ImdiResultValue, MetadataInformationResultElements),
+        (imdi::ResultValue, MetadataInformationResultElements),
         Error,
     > {
         let req = &*input.req;

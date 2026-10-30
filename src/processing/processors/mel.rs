@@ -29,7 +29,7 @@ use crate::{
         types::{Struct, Type},
     },
     processing::{
-        imdi::ImdiResultValue,
+        imdi,
         interpret::{
             self,
             Error::{self, InvalidType, RuntimeError},
@@ -43,7 +43,7 @@ use crate::{
 impl
     interpret::Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
-        (ImdiResultValue, MetadataInformationResultElements),
+        (imdi::ResultValue, MetadataInformationResultElements),
         Error,
     > for TypedSetVariable<SetVariableVerificationKey>
 {
@@ -52,7 +52,7 @@ impl
         input: SimpleProcessorsInterpreterContext<'a>,
     ) -> InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
-        (ImdiResultValue, MetadataInformationResultElements),
+        (imdi::ResultValue, MetadataInformationResultElements),
         Error,
     > {
         let lmsgs = LogMsgs::new(Debug);
@@ -135,7 +135,7 @@ mod test {
             types::{Type, builtin_function_types, minimal_core_variable_types},
         },
         processing::{
-            imdi::ImdiInterpretMode,
+            imdi,
             interpret::{Interpreter, ProcessedRequestResponse},
             processors::SimpleProcessorsInterpreterContext,
         },
@@ -193,7 +193,7 @@ mod test {
                     MEL_USER_SET_VARIABLE_STRUCT_NAME,
                     mel_var_value_from_type(var),
                 ),
-                mode: ImdiInterpretMode::Request,
+                mode: imdi::InterpretMode::Request,
                 runtime: rt.handle(),
                 req: Box::new(ProcessedRequestResponse::new_request(
                     &Url::from_str("http://www.example.com/")

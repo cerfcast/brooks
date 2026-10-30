@@ -29,10 +29,10 @@ use crate::processing::processors::SimpleProcessorsInterpreterContext;
 use crate::prr;
 use crate::{cdni::imd::spec::HostMetadata, mel::interpreter::values::TypedValue};
 
-pub type ImdiResultValue = Option<http::Response<Vec<u8>>>;
+pub type ResultValue = Option<http::Response<Vec<u8>>>;
 
 #[derive(Debug, Clone)]
-pub enum ImdiInterpretMode {
+pub enum InterpretMode {
     Request,
     Response,
 }
@@ -42,7 +42,7 @@ pub enum ImdiInterpretMode {
 impl
     Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
-        (ImdiResultValue, MetadataInformationResultElements),
+        (ResultValue, MetadataInformationResultElements),
         Error,
     > for CdniVerificationKey
 {
@@ -51,7 +51,7 @@ impl
         input: SimpleProcessorsInterpreterContext<'a>,
     ) -> InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
-        (ImdiResultValue, MetadataInformationResultElements),
+        (ResultValue, MetadataInformationResultElements),
         Error,
     > {
         match &self {
@@ -92,7 +92,7 @@ pub fn interpret_interconnection_metadata(
 ) -> ImdInterpretResult {
     let mut request_context = SimpleProcessorsInterpreterContext {
         scopes: mel_scopes,
-        mode: ImdiInterpretMode::Request,
+        mode: InterpretMode::Request,
         runtime,
         req: request,
         res: None,
@@ -148,7 +148,7 @@ pub fn interpret_interconnection_metadata(
 
     let mut source_context = SimpleProcessorsInterpreterContext {
         scopes: request_context.scopes,
-        mode: ImdiInterpretMode::Request,
+        mode: InterpretMode::Request,
         req: request_context.req,
         res: None,
         runtime: request_context.runtime,
@@ -197,7 +197,7 @@ pub fn interpret_interconnection_metadata(
 
     let mut response_context = SimpleProcessorsInterpreterContext {
         scopes: source_context.scopes,
-        mode: ImdiInterpretMode::Response,
+        mode: InterpretMode::Response,
         req: source_context.req,
         res: source_context.res,
         runtime: source_context.runtime,
