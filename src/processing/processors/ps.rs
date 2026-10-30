@@ -40,6 +40,7 @@ use crate::mel::interpreter::interpret::MelInterpContext;
 use crate::mel::interpreter::values::{TypedValue, Value};
 use crate::mel::types::Type;
 use crate::processing::interpret;
+use crate::processing::interpret::Error::AssertionFailure;
 use crate::processing::interpret::Stages::{
     ClientRequest, ClientResponse, OriginRequest, OriginResponse,
 };
@@ -922,7 +923,7 @@ impl
 {
     fn interpret<'a>(
         &self,
-        mut input: SimpleProcessorsInterpreterContext<'a>,
+        input: SimpleProcessorsInterpreterContext<'a>,
     ) -> interpret::InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
         (
@@ -931,9 +932,28 @@ impl
         ),
         interpret::Error,
     > {
-        let reqres = &mut *input.rr;
+        let (mut res, mut req) = (input.res, input.req);
+        let reqres = match input.mode {
+            PsInterpretMode::Request => &mut req,
+            PsInterpretMode::Response => {
+                if let Some(res) = &mut res {
+                    res
+                } else {
+                    return Err(interpret::Error::RuntimeError(
+                        AssertionFailure("Missing request".into()).into(),
+                    )
+                    .into());
+                }
+            }
+            _ => {
+                return Err(interpret::Error::RuntimeError(
+                    AssertionFailure("Wrong mode".into()).into(),
+                )
+                .into());
+            }
+        };
 
-        let mut visitor = PsInterpreter { rr: reqres };
+        let mut visitor = PsInterpreter { rr: &mut **reqres };
 
         visitor.install_generic_visitors();
 
@@ -963,7 +983,15 @@ impl
         let result = result.result.ok_or(interpret::Error::RuntimeError(
             PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult).into(),
         ))?;
-        Ok((input, (result, md)))
+
+        let updated_context = SimpleProcessorsInterpreterContext {
+            scopes: input.scopes,
+            mode: input.mode,
+            runtime: input.runtime,
+            req,
+            res,
+        };
+        Ok((updated_context, (result, md)))
     }
 
     fn at(&self, stage: interpret::Stages) -> bool {

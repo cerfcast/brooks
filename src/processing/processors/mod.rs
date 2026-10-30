@@ -31,20 +31,22 @@ pub struct SimpleProcessorsInterpreterContext<'a> {
     pub scopes: Scopes<TypedValue>,
     pub mode: PsInterpretMode,
     pub runtime: &'a tokio::runtime::Handle,
-    pub rr: Box<dyn prr::Prr<Vec<u8>>>,
+    pub req: Box<dyn prr::Prr<Vec<u8>>>,
+    pub res: Option<Box<dyn prr::Prr<Vec<u8>>>>,
 }
 
 impl<'a> SimpleProcessorsInterpreterContext<'a> {
     /// Create an interpreter context based on an existing one, but with a new RR.
-    pub fn with_new_rr(self, new_rr: Box<dyn prr::Prr<Vec<u8>>>) -> Self {
+    pub fn with_res(self, res: Box<dyn prr::Prr<Vec<u8>>>) -> Self {
         Self {
             scopes: self.scopes,
-            mode: match new_rr.tpe() {
+            mode: match res.tpe() {
                 prr::PrrType::Request => PsInterpretMode::Request,
                 prr::PrrType::Response => PsInterpretMode::Response,
             },
             runtime: self.runtime,
-            rr: new_rr,
+            req: self.req,
+            res: Some(res),
         }
     }
 
@@ -53,7 +55,8 @@ impl<'a> SimpleProcessorsInterpreterContext<'a> {
             scopes: self.scopes.insert(name, new_value),
             mode: self.mode,
             runtime: self.runtime,
-            rr: self.rr,
+            req: self.req,
+            res: self.res,
         }
     }
 }

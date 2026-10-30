@@ -65,9 +65,9 @@ impl
         (ps::PsInterpretValue, MetadataInformationResultElements),
         Error,
     > {
-        let reqres = &*input.rr;
+        let req = &*input.req;
 
-        let req: reqwest::Request = reqres
+        let req: reqwest::Request = req
             .try_into()
             .map_err(|e: prr::Error| Error::InvalidInput(e.into()))?;
 
@@ -111,7 +111,7 @@ impl
         });
 
         Ok((
-            input.with_new_rr(Box::new(result?)),
+            input.with_res(Box::new(result?)),
             (
                 PsInterpretValue::MatchNo,
                 MetadataInformationResultElements::default(),

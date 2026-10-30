@@ -199,11 +199,12 @@ mod test {
                 ),
                 mode: PsInterpretMode::None,
                 runtime: rt.handle(),
-                rr: Box::new(ProcessedRequestResponse::new_request(
+                req: Box::new(ProcessedRequestResponse::new_request(
                     &Url::from_str("http://www.example.com/")
                         .expect("Could not get a URI from a valid HTTP address"),
                     &http::Method::GET,
                 )),
+                res: None,
             })
             .expect("Could not interpret correct MI.SetVariable");
 
