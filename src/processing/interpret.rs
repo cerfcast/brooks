@@ -79,6 +79,7 @@ pub enum Error {
     NoProcessor(String /* type for which processor is missing */),
     InvalidInput(Box<dyn std::error::Error>),
     AssertionFailure(Box<dyn std::error::Error>),
+    NotImplemented(String),
     InvalidOutput,
     RuntimeError(Box<dyn std::error::Error>),
 }
@@ -86,6 +87,7 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Error::NotImplemented(feature) => write!(f, "Feature {feature} is not yet implemented"),
             Error::InvalidType(_, _) => write!(f, "Invalid type"),
             Error::InvalidMetadata(_) => write!(f, "Invalid metadata"),
             Error::NoProcessor(_) => write!(f, "No processor"),

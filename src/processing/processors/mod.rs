@@ -22,6 +22,7 @@ use crate::{
     processing::processors::ps::PsInterpretMode, prr,
 };
 
+pub mod cors;
 pub mod mel;
 pub mod ps;
 pub mod source;

@@ -17,6 +17,7 @@
 
 //! Verification of [Interconnection Metadata](https://datatracker.ietf.org/doc/rfc8006/)
 
+use crate::verifying::cors::verify::CrossoriginPolicyMetadataAnalyzer;
 use crate::verifying::mel::verify::SetVariableMetadataAnalyzer;
 use crate::verifying::verify::{
     CdniVerificationKey, MetadataAnalysisContext, MetadataVerificationError, Verifier,
@@ -42,6 +43,8 @@ pub fn verify_interconnection_metadata(
         &SourceMetadataAnalyzer {}
             as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>,
         &SetVariableMetadataAnalyzer {}
+            as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>,
+        &CrossoriginPolicyMetadataAnalyzer {}
             as &dyn Verifier<MetadataAnalysisContext, MetadataVerificationError>,
     ];
 

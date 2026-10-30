@@ -17,6 +17,7 @@
 
 //! Verification of CDNI Metadata
 
+pub mod cors;
 pub mod gmd;
 pub mod imdv;
 pub mod mel;

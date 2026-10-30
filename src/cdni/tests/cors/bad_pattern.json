@@ -1,0 +1,13 @@
+{
+    "generic-metadata-type": "MI.CrossoriginPolicy",
+    "generic-metadata-value": {
+        "allow-origin": {
+            "allow-list": [
+                {
+                    "pattern": "["
+                }
+            ],
+            "wildcard-return": true
+        }
+    }
+}

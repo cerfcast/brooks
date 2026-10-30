@@ -19,8 +19,12 @@
 
 use std::fmt::Debug;
 
+use crate::cdni::cors::spec::TypedCrossoriginPolicy;
 use crate::cdni::mel::spec::TypedSetVariable;
 use crate::cdni::original::spec::TypedSource;
+use crate::verifying::cors::verify::{
+    CrossoriginPolicyVerificationError, CrossoriginPolicyVerificationKey,
+};
 use crate::verifying::mel::verify::{MelVerificationError, SetVariableVerificationKey};
 use crate::verifying::ps::error::VerificationError;
 use crate::{environment::scope::Scopes, mel::types::Type};
@@ -42,7 +46,7 @@ pub struct MetadataAnalysisContext {
     pub scopes: Scopes<Type>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub enum MetadataVerificationError {
     #[default]
     NoError,
@@ -51,6 +55,7 @@ pub enum MetadataVerificationError {
     JsonError(String),
     PsVerificationError(Box<VerificationError>),
     MelVerificationError(Box<MelVerificationError>),
+    CrossoriginPolicyVerificationError(Box<CrossoriginPolicyVerificationError>),
 }
 
 impl Error for MetadataVerificationError {}
@@ -70,6 +75,11 @@ impl Display for MetadataVerificationError {
             MetadataVerificationError::MelVerificationError(mel_verification_error) => {
                 write!(f, "{mel_verification_error}")
             }
+            MetadataVerificationError::CrossoriginPolicyVerificationError(
+                cop_verification_error,
+            ) => {
+                write!(f, "{cop_verification_error}")
+            }
         }
     }
 }
@@ -79,6 +89,7 @@ pub enum CdniVerifiedMetadataTypes {
     ProcessingStages,
     Source,
     SetVariable,
+    CrossoriginPolicy,
     None,
 }
 
@@ -87,6 +98,7 @@ pub enum CdniVerificationKey {
     Stage(Box<TypedStage<PsVerificationKey>>),
     Source(Box<TypedSource<SourceVerificationKey>>),
     SetVariable(Box<TypedSetVariable<SetVariableVerificationKey>>),
+    CrossoriginPolicy(Box<TypedCrossoriginPolicy<CrossoriginPolicyVerificationKey>>),
     #[default]
     None,
 }
@@ -97,6 +109,9 @@ impl From<&CdniVerificationKey> for CdniVerifiedMetadataTypes {
             CdniVerificationKey::Stage(_) => CdniVerifiedMetadataTypes::ProcessingStages,
             CdniVerificationKey::Source(_) => CdniVerifiedMetadataTypes::Source,
             CdniVerificationKey::SetVariable(_) => CdniVerifiedMetadataTypes::SetVariable,
+            CdniVerificationKey::CrossoriginPolicy(_) => {
+                CdniVerifiedMetadataTypes::CrossoriginPolicy
+            }
             CdniVerificationKey::None => CdniVerifiedMetadataTypes::None,
         }
     }

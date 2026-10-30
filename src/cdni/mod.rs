@@ -17,6 +17,7 @@
 
 //! Definitions for metadata specified by CDNI
 
+pub mod cors;
 pub mod gmd;
 pub mod imd;
 pub mod mel;
