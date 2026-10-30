@@ -20,13 +20,58 @@
 use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
 use crate::processing::error::{ImdInterpretError, ImdInterpretResult};
-use crate::processing::interpret::{Interpreter, Stages};
+use crate::processing::interpret::{
+    Error, InterpretationResult, Interpreter, MetadataInformationResultElements, Stages,
+};
 use crate::verifying::verify::CdniVerificationKey;
 
 use crate::processing::processors::SimpleProcessorsInterpreterContext;
 use crate::processing::processors::ps::{PsInterpretMode, PsInterpretValue};
 use crate::prr;
 use crate::{cdni::imd::spec::HostMetadata, mel::interpreter::values::TypedValue};
+
+// Generic implementation of `interpret::Interpreter` for CdniVerificationKey
+// that simply redirects to the implementation of the underlying key.
+impl
+    Interpreter<
+        SimpleProcessorsInterpreterContext<'_>,
+        (PsInterpretValue, MetadataInformationResultElements),
+        Error,
+    > for CdniVerificationKey
+{
+    fn interpret<'a>(
+        &self,
+        input: SimpleProcessorsInterpreterContext<'a>,
+    ) -> InterpretationResult<
+        SimpleProcessorsInterpreterContext<'a>,
+        (PsInterpretValue, MetadataInformationResultElements),
+        Error,
+    > {
+        match &self {
+            CdniVerificationKey::Stage(typed_stage) => typed_stage.interpret(input),
+            CdniVerificationKey::Source(typed_source) => typed_source.interpret(input),
+            CdniVerificationKey::SetVariable(typed_set_variable) => {
+                typed_set_variable.interpret(input)
+            }
+            CdniVerificationKey::CrossoriginPolicy(typed_crossorigin_policy) => {
+                typed_crossorigin_policy.interpret(input)
+            }
+            CdniVerificationKey::None => todo!(),
+        }
+    }
+
+    fn at(&self, stage: Stages) -> bool {
+        match &self {
+            CdniVerificationKey::Stage(typed_stage) => typed_stage.at(stage),
+            CdniVerificationKey::Source(typed_source) => typed_source.at(stage),
+            CdniVerificationKey::SetVariable(typed_set_variable) => typed_set_variable.at(stage),
+            CdniVerificationKey::CrossoriginPolicy(typed_crossorigin_policy) => {
+                typed_crossorigin_policy.at(stage)
+            }
+            CdniVerificationKey::None => todo!(),
+        }
+    }
+}
 
 /// Interpret given Host Metadata for the given request.
 ///
