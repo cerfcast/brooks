@@ -1,1 +1,1 @@
-tests/ text eol=lf
+**/tests/* text eol=lf
