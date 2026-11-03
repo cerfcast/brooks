@@ -1,0 +1,9 @@
+{
+  "timestamp-ns": 1672938865000000000,
+  "cs-uri": "https://cdn.example.com/assets/b874bc5b/index.m3u8",
+  "sc-status": "200",
+  "s-ccid": "XX",
+  "sc-total-bytes": 1784,
+  "s-upstream-header-size-bytes": 208,
+  "s-upstream-total-bytes": 1784
+}

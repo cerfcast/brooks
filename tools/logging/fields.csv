@@ -1,0 +1,23 @@
+timestamp-ns,u64,u64,|The timestamp of the first byte read by the OCN application to a best effort of accuracy.|,Minimal, Standard, Extended
+timestamp-iso8601,String,chrono::DateTime<Utc>,|The timestamp of the first byte read by the OCN application to a best effort of accuracy. It is RECOMMENDED that timestamps use Coordinated Universal Time (UTC).|, Extended
+s-time-total-ms,u64,u64,|The elapsed time between reading the first byte of the request and sending the last byte of the response to a best effort of accuracy.|,Standard, Extended
+c-groupid,String,String,|An opaque identifier for an aggregate set of clients, derived from the client IPv4 or IPv6 address in the request received by the surrogate and/or other network-level identifying information. See [RFC7937] section 3.4.1.|,Extended
+cs-method,String,http::method::Method,|The HTTP request method.|, Extended
+cs-version,String,String,| The protocol version (e.g., HTTP/1.1).|, Extended
+cs-uri,String,http::Uri,|Request URI prior to any transformation from MI.ProcessingStages. It is RECOMMENDED to limit the maximum length of this field with an applied MI.LoggingTransformTruncate, allowing at least 2048 bytes.|, Minimal, Standard, Extended
+cs-uri-transformed,String,http::Uri,|Full request URI, including query parameters. If this field is identical to cs-uri, the field SHOULD be truncated to an empty string.|, Extended
+sc-status,String,http::StatusCode,|The response status code.|, Minimal, Standard, Extended
+sc-total-bytes,u64,u64,|The response size total bytes, including headers.|, Minimal, Standard, Extended
+s-ccid,String,String,|The ccid assigned via MI.Grouping or MI.GroupingExtended configuration. For backward compatibility, s-ccid is aliased to ccid, and either identifier may be used to refer to this field.|, Minimal,Standard, Extended
+s-sid,String,String,|The Session ID assigned by the dCDN. This can be derived from Common Media Client Data (CMCD) or another mechanism, but it is defined by the dCDN, and uCDN allocated session identifiers are outside the scope of this field.|, Standard, Extended
+s-cached,bool,bool,|Indicates a cache hit or cache miss. For this field, a cache hit is defined as a request that does not result in content retrieval from the upstream source.|, Standard, Extended
+c-ip, String,net::IpAddr,|The client IP address.|, Standard, Extended
+s-shortname,String,String,|A short name for the dCDN intended to be used as an identifier, e.g. in log records. Example: "CDN Example Company" might have s-shortname of "cdn-ec".|, Standard, Extended
+s-id,String,String,|The server instance ID assigned by the dCDN. This value SHOULD be unique to a particular instance.|, Extended
+s-time-first-ms,u64,u64,|The elapsed time from the first request byte read until the first response byte sent.|, Extended
+s-sdur-ms,u64,u64,|The session duration as determined by the dCDN.|, Extended
+s-time-upstream-ms,u64,u64,|The time spent accessing the upstream source. The value of this field is a "best effort". If there are intermediate cache layers, it is understood that this value may not accurately reflect the complete upstream picture.|, Extended
+s-upstream-header-size-bytes,u64,u64,|Content header length from the upstream source. The value of this field is a "best effort". If there are intermediate cache layers, it is understood that this value may not accurately reflect the complete upstream picture.|, Minimal, Standard, Extended
+s-upstream-total-bytes,u64,u64,|Total bytes transferred from the upstream source. The value of this field is a "best effort". If there are intermediate cache layers, it is understood that this value may not accurately reflect the complete upstream picture.|, Minimal, Standard, Extended
+s-upstream-status,String,http::StatusCode,|The response status code returned by the upstream source in the event of a cache miss.|, Extended
+s-upstream-ip,String,net::IpAddr,|The IP address of the upstream source.|, Extended

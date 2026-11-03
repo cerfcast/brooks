@@ -1,0 +1,14 @@
+{
+        "generic-metadata-type": "MI.LoggingMetadata",
+        "generic-metadata-value": {
+                "transports": [
+                        {
+                                "transport-type": "MI.LoggingTransportKafka",
+                                "record-type": "opencaching_minimal_json_v1",
+                                "container-metadata": {
+                                        "container-type": "json_v1"
+                                }
+                        }
+                ]
+        }
+}

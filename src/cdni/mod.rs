@@ -20,6 +20,7 @@
 pub mod cors;
 pub mod gmd;
 pub mod imd;
+pub mod logging;
 pub mod mel;
 pub mod original;
 pub mod ps;
