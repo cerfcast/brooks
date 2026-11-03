@@ -56,7 +56,7 @@ jobs:
       - run: cargo build
       - run: cargo test
       - run: cargo test --manifest-path parser/Cargo.toml
-library-tests-windows:
+  library-tests-windows:
     name: Library Tests (Default Features)
     runs-on: windows-latest
     steps:
