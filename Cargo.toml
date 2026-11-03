@@ -34,7 +34,7 @@ nginx = ["hmds"]
 caddy = ["hmds"]
 express = ["hmds"]
 
-dcdn = ["dep:reqwest", "dep:tokio"]
+dcdn = ["hmds", "dep:reqwest", "dep:tokio"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

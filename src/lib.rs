@@ -40,6 +40,8 @@ pub mod cdni;
 #[cfg(feature = "dcdn")]
 pub mod dcdn;
 
+#[allow(dead_code)]
+#[cfg(feature = "hmds")]
 pub mod hmds;
 
 #[allow(dead_code)]
