@@ -28,6 +28,14 @@ use crate::cdni::ps::spec::{
     TypedProcessingStages, TypedRequestTransform, TypedResponseTransform, TypedStage,
     TypedStageMetadata, TypedStageRules, TypedSyntheticResponse,
 };
+use crate::dcdn::imdi;
+use crate::dcdn::interpret::Stages::{
+    ClientRequest, ClientResponse, OriginRequest, OriginResponse,
+};
+use crate::dcdn::interpret::{
+    Error, MetadataInformationResultElement, MetadataInformationResultElements, Stages,
+};
+use crate::dcdn::processors::SimpleProcessorsInterpreterContext;
 use crate::environment::scope::Scopes;
 use crate::logging::LogMsgs;
 use crate::mel::analysis::Analyzed;
@@ -39,23 +47,13 @@ use crate::mel::interpreter::error::{
 use crate::mel::interpreter::interpret::MelInterpContext;
 use crate::mel::interpreter::values::{TypedValue, Value};
 use crate::mel::types::Type;
-use crate::processing::interpret::Error::AssertionFailure;
-use crate::processing::interpret::Stages::{
-    ClientRequest, ClientResponse, OriginRequest, OriginResponse,
-};
-use crate::processing::processors::SimpleProcessorsInterpreterContext;
-use crate::processing::{imdi, interpret};
+use crate::processing::interpret::{self, Interpreter};
 use crate::verifying::ps::verify::PsVerificationKey;
 use crate::visitors::{PsVisitor, PsVisitorResult};
 use crate::{mel, prr};
 
-pub type PsInterpretResult = Result<
-    (
-        PsInterpretValue,
-        interpret::MetadataInformationResultElements,
-    ),
-    Box<PsInterpretError>,
->;
+pub type PsInterpretResult =
+    Result<(PsInterpretValue, MetadataInformationResultElements), Box<PsInterpretError>>;
 
 #[derive(Debug, Clone)]
 pub enum PsInterpretAssertionFailures {
@@ -298,7 +296,7 @@ impl From<bool> for PsInterpretValue {
 pub(crate) struct PsInterpretContext {
     pub mode: PsInterpretMode,
     pub result: Option<PsInterpretValue>,
-    pub metadata: interpret::MetadataInformationResultElements,
+    pub metadata: MetadataInformationResultElements,
     pub mel_scopes: Scopes<TypedValue>,
 }
 
@@ -316,7 +314,7 @@ impl PsInterpretContext {
 
     fn update_metadata_elements(
         self,
-        new_element: Box<dyn interpret::MetadataInformationResultElement>,
+        new_element: Box<dyn MetadataInformationResultElement>,
     ) -> PsInterpretContext {
         let mut nc = self;
         nc.metadata.elements.push(new_element);
@@ -324,7 +322,7 @@ impl PsInterpretContext {
     }
     fn replace_metadata_elements(
         self,
-        new_elements: interpret::MetadataInformationResultElements,
+        new_elements: MetadataInformationResultElements,
     ) -> PsInterpretContext {
         let mut nc = self;
         nc.metadata = new_elements;
@@ -921,13 +919,11 @@ impl prr::Prr<Vec<u8>> for EffectfulProcessableRequestResponse {
 }
 
 impl
-    interpret::Interpreter<
+    Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
-        (
-            imdi::ResultValue,
-            interpret::MetadataInformationResultElements,
-        ),
-        interpret::Error,
+        (imdi::ResultValue, MetadataInformationResultElements),
+        Stages,
+        Error,
     > for TypedStage<PsVerificationKey>
 {
     fn interpret<'a>(
@@ -935,11 +931,8 @@ impl
         input: SimpleProcessorsInterpreterContext<'a>,
     ) -> interpret::InterpretationResult<
         SimpleProcessorsInterpreterContext<'a>,
-        (
-            imdi::ResultValue,
-            interpret::MetadataInformationResultElements,
-        ),
-        interpret::Error,
+        (imdi::ResultValue, MetadataInformationResultElements),
+        Error,
     > {
         let (mut res, mut req) = (input.res, input.req);
         let reqres = match input.mode {
@@ -948,8 +941,8 @@ impl
                 if let Some(res) = &mut res {
                     res
                 } else {
-                    return Err(interpret::Error::RuntimeError(
-                        AssertionFailure("Missing request".into()).into(),
+                    return Err(Error::RuntimeError(
+                        Error::AssertionFailure("Missing request".into()).into(),
                     )
                     .into());
                 }
@@ -980,10 +973,10 @@ impl
                 visitor.visit_origin_response_stage(typed_origin_response_stage, context)
             }
         }
-        .map_err(|e| interpret::Error::RuntimeError(e.into()))?;
+        .map_err(|e| Error::RuntimeError(e.into()))?;
 
         let md = result.metadata;
-        let result = result.result.ok_or(interpret::Error::RuntimeError(
+        let result = result.result.ok_or(Error::RuntimeError(
             PsInterpretError::AssertionFailure(PsInterpretAssertionFailures::MissingResult).into(),
         ))?;
 
@@ -1004,7 +997,7 @@ impl
         Ok((updated_context, (result, md)))
     }
 
-    fn at(&self, stage: interpret::Stages) -> bool {
+    fn at(&self, stage: Stages) -> bool {
         match &self {
             // The [Origin|Client]RequestStage metadata can contain request and response transforms.
             TypedStage::ClientRequest(_) => stage == ClientRequest || stage == ClientResponse,
@@ -1026,12 +1019,12 @@ mod ps_interpreter_tests {
                 typed_stage_rule,
             },
         },
-        environment::scope::Scopes,
-        mel::types::Type,
-        processing::processors::ps::{
+        dcdn::processors::ps::{
             EffectfulProcessableRequestResponse, EffectfulRequestActions, PsInterpretMode,
             PsInterpretValue, interpret_stage,
         },
+        environment::scope::Scopes,
+        mel::types::Type,
         tests::read_test_file,
         verifying::ps::verify::{PsVerifierContextValue, verifier, verify_ps_request_stage},
         visitors::PsVisitor,

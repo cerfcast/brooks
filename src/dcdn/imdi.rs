@@ -15,17 +15,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Interpret CDNI Interconnection Metadata
+//! Interpret CDNI Interconnection Metadata as a dCDN
 
+use crate::dcdn::error::{ImdInterpretError, ImdInterpretResult};
+use crate::dcdn::interpret::{Error, MetadataInformationResultElements, Stages};
+use crate::dcdn::processors::SimpleProcessorsInterpreterContext;
 use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
-use crate::processing::error::{ImdInterpretError, ImdInterpretResult};
-use crate::processing::interpret::{
-    Error, InterpretationResult, Interpreter, MetadataInformationResultElements, Stages,
-};
+use crate::processing::interpret::{InterpretationResult, Interpreter};
 use crate::verifying::verify::CdniVerificationKey;
 
-use crate::processing::processors::SimpleProcessorsInterpreterContext;
 use crate::prr;
 use crate::{cdni::imd::spec::HostMetadata, mel::interpreter::values::TypedValue};
 
@@ -43,6 +42,7 @@ impl
     Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
         (ResultValue, MetadataInformationResultElements),
+        Stages,
         Error,
     > for CdniVerificationKey
 {

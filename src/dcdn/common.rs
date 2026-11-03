@@ -21,21 +21,21 @@ use tokio::runtime::Handle;
 
 use crate::{
     cdni::imd::spec::TypedHostMetadata,
-    environment::scope::{Scope, Scopes},
-    integrations::{
-        error::{ProxyError, ProxyResult},
-        hmds::{HmdsConfiguration, query_hmds},
+    dcdn::{
+        error::{ImdInterpretError, ProxyError, ProxyResult},
+        imdi::interpret_interconnection_metadata,
+        interpret::{
+            Error::{self, AssertionFailure},
+            ProcessedRequestResponse,
+        },
     },
+    environment::scope::{Scope, Scopes},
+    hmds::{HmdsConfiguration, query_hmds},
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
         MEL_USER_SET_VARIABLE_STRUCT_NAME,
         interpreter::values::{TypedValue, mel_var_value_from_type},
         types::{Type, builtin_function_types, minimal_core_variable_types},
-    },
-    processing::{
-        error::ImdInterpretError,
-        imdi::interpret_interconnection_metadata,
-        interpret::{self, Error::AssertionFailure, ProcessedRequestResponse},
     },
     prr,
     verifying::imdv::verify_interconnection_metadata,
@@ -145,7 +145,7 @@ pub fn safe_brooks_integration_handle(
     let var = match updated_types_scopes
         .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
         .ok_or(ProxyError::ImdiError(ImdInterpretError::RuntimeError(
-            interpret::Error::AssertionFailure(
+            Error::AssertionFailure(
                 format!(
                     "Missing {} struct type after analyzing HMD",
                     MEL_USER_SET_VARIABLE_STRUCT_NAME

@@ -16,9 +16,3 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod interpret;
-
-pub mod processors;
-
-pub mod error;
-
-pub mod imdi;

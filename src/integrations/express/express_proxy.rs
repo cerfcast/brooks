@@ -24,15 +24,15 @@ use http::{StatusCode, header::HOST};
 use tokio::runtime;
 
 use crate::{
+    dcdn::{common::safe_brooks_integration_handle, error::ProxyError},
     environment::scope::Scopes,
+    hmds::{HmdsConfiguration, HmdsServerConfiguration},
     integrations::{
-        common::safe_brooks_integration_handle,
-        error::{NativeRequestTransformError, ProxyError},
+        error::NativeRequestTransformError,
         express::expressi::{
             BrooksExpressConfiguration, BrooksExpressLoggerCallback, BrooksExpressRequest,
             BrooksExpressResponseConfig, drain_to_express_log,
         },
-        hmds::{HmdsConfiguration, HmdsServerConfiguration},
         support::to_null_terminated_str,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
@@ -194,7 +194,7 @@ unsafe fn do_brooks_express_proxy(
     )?;
 
     if let Err(e) = try_from_response(&response, status, res) {
-        return Err((ProxyError::NativeRequestTransformError(e).into(), log));
+        return Err((ProxyError::NativeError(e).into(), log));
     }
 
     Ok(log)

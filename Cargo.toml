@@ -26,17 +26,15 @@ url = "2.5.8"
 log = { version = "0.4.34" }
 
 [features]
-default = ["processing"]
+default = ["dcdn"]
 
 domain = []
-hmds = []
-nginx = ["hmds", "processing"]
-caddy = ["hmds", "processing"]
-express = ["hmds", "processing"]
+hmds = ["dep:reqwest", "dep:tokio"]
+nginx = ["hmds"]
+caddy = ["hmds"]
+express = ["hmds"]
 
-mel = []
-verifying = ["mel"]
-processing = ["verifying", "dep:reqwest", "dep:tokio"]
+dcdn = ["dep:reqwest", "dep:tokio"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

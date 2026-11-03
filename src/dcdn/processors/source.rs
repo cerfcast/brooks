@@ -21,14 +21,12 @@ use reqwest::dns::{Addrs, Resolve};
 
 use crate::{
     cdni::original::spec::TypedSourceMetadata,
-    processing::{
+    dcdn::{
         imdi,
-        interpret::{
-            self, Error, InterpretationResult, MetadataInformationResultElements,
-            ProcessedRequestResponse, Stages,
-        },
+        interpret::{Error, MetadataInformationResultElements, ProcessedRequestResponse, Stages},
         processors::SimpleProcessorsInterpreterContext,
     },
+    processing::interpret::{self, InterpretationResult},
     prr::{self, Prr},
     verifying::original::verify::SourceVerificationKey,
 };
@@ -52,6 +50,7 @@ impl
     interpret::Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
         (imdi::ResultValue, MetadataInformationResultElements),
+        Stages,
         Error,
     > for TypedSourceMetadata<SourceVerificationKey>
 {

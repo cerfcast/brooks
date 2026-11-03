@@ -19,22 +19,23 @@
 
 use crate::{
     cdni::cors::spec::TypedCrossoriginPolicy,
-    processing::{
-        self, imdi,
+    dcdn::{
+        imdi,
         interpret::{
-            self,
-            Error::{self, AssertionFailure, NotImplemented},
-            InterpretationResult, MetadataInformationResultElements,
+            Error::{self, NotImplemented},
+            MetadataInformationResultElements, Stages,
         },
         processors::SimpleProcessorsInterpreterContext,
     },
+    processing::interpret::{InterpretationResult, Interpreter},
     verifying::cors::verify::CrossoriginPolicyVerificationKey,
 };
 
 impl
-    interpret::Interpreter<
+    Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
         (imdi::ResultValue, MetadataInformationResultElements),
+        Stages,
         Error,
     > for TypedCrossoriginPolicy<CrossoriginPolicyVerificationKey>
 {
@@ -49,7 +50,7 @@ impl
         if let Some(preflight_only) = self.value.preflight_only
             && preflight_only
         {
-            return Err(interpret::Error::RuntimeError(
+            return Err(Error::RuntimeError(
                 NotImplemented("Missing response when processing MI.CrossoriginPolicy".into())
                     .into(),
             )
@@ -59,8 +60,8 @@ impl
         let mut res = match input.res {
             Some(res) => res,
             None => {
-                return Err(interpret::Error::RuntimeError(
-                    AssertionFailure(
+                return Err(Error::RuntimeError(
+                    Error::AssertionFailure(
                         "Missing response when processing MI.CrossoriginPolicy".into(),
                     )
                     .into(),
@@ -80,7 +81,7 @@ impl
         };
 
         let origin_value = origin_value.to_str().map_err(|e| {
-            processing::interpret::Error::InvalidInput(
+            Error::InvalidInput(
                 format!("ORIGIN header value could not be converted to string: {e}").into(),
             )
         })?;
@@ -99,13 +100,13 @@ impl
         if apply {
             if self.value.allow_origin.wildcard_return {
                 res.set_header_value(http::header::ACCESS_CONTROL_ALLOW_ORIGIN.as_str(), "*")
-                    .map_err(|e| interpret::Error::RuntimeError(e.into()))?;
+                    .map_err(|e| Error::RuntimeError(e.into()))?;
             } else {
                 res.set_header_value(
                     http::header::ACCESS_CONTROL_ALLOW_ORIGIN.as_str(),
                     origin_value,
                 )
-                .map_err(|e| interpret::Error::RuntimeError(e.into()))?;
+                .map_err(|e| Error::RuntimeError(e.into()))?;
             }
         }
 
@@ -123,8 +124,8 @@ impl
         ))
     }
 
-    fn at(&self, stage: interpret::Stages) -> bool {
-        stage == interpret::Stages::Post
+    fn at(&self, stage: Stages) -> bool {
+        stage == Stages::Post
     }
 }
 

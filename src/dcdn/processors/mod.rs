@@ -17,9 +17,7 @@
 
 //! Processors for Metadata Information.
 
-use crate::{
-    environment::scope::Scopes, mel::interpreter::values::TypedValue, processing::imdi, prr,
-};
+use crate::{dcdn::imdi, environment::scope::Scopes, mel::interpreter::values::TypedValue, prr};
 
 pub mod cors;
 pub mod mel;

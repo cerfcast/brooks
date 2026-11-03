@@ -27,7 +27,8 @@ use http::{
 };
 
 use crate::{
-    integrations::{caddy::caddy_log, hmds::HmdsConfiguration, support::to_null_terminated_str},
+    hmds::HmdsConfiguration,
+    integrations::{caddy::caddy_log, support::to_null_terminated_str},
     logging::{LogLevel, LogMsgs},
 };
 

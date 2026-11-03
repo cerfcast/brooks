@@ -22,11 +22,11 @@ use libc::intptr_t;
 use tokio::runtime;
 
 use crate::{
+    dcdn::{common::safe_brooks_integration_handle, error::ProxyError},
     environment::scope::Scopes,
+    hmds::{HmdsConfiguration, HmdsServerConfiguration},
     integrations::{
-        common::safe_brooks_integration_handle,
-        error::{NativeRequestTransformError, ProxyError},
-        hmds::{HmdsConfiguration, HmdsServerConfiguration},
+        error::NativeRequestTransformError,
         nginx::{
             nginx_lib::{from_nginx_str, log_nginx_msgs, to_nginx_buf, to_nginx_str},
             ngx_buf_s, ngx_http_request_s, ngx_list_push, ngx_log_s, ngx_str_t, ngx_table_elt_s,
@@ -244,7 +244,7 @@ unsafe fn do_ngx_brooks_proxy(
 
     let http_req = match TryInto::<Request<Vec<u8>>>::try_into(*req) {
         Ok(o) => o,
-        Err(e) => return Err((ProxyError::NativeRequestTransformError(e).into(), log)),
+        Err(e) => return Err((ProxyError::NativeError(e).into(), log)),
     };
 
     let runtime = match runtime::Builder::new_multi_thread().enable_all().build() {
@@ -280,12 +280,12 @@ unsafe fn do_ngx_brooks_proxy(
     )?;
 
     if let Err(e) = try_from_response(&response, status, req) {
-        return Err((ProxyError::NativeRequestTransformError(e).into(), log));
+        return Err((ProxyError::NativeError(e).into(), log));
     }
 
     *body = match to_nginx_buf(response.body(), (*req).pool) {
         Ok(o) => o,
-        Err(e) => return Err((ProxyError::NativeRequestTransformError(e).into(), log)),
+        Err(e) => return Err((ProxyError::NativeError(e).into(), log)),
     };
 
     Ok(log)

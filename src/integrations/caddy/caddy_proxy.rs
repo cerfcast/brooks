@@ -25,15 +25,15 @@ use libc::intptr_t;
 use tokio::runtime;
 
 use crate::{
+    dcdn::{common::safe_brooks_integration_handle, error::ProxyError},
     environment::scope::Scopes,
+    hmds::{HmdsConfiguration, HmdsServerConfiguration},
     integrations::{
         caddy::{
             GoInt, caddy_response_set_body, caddy_response_set_header, caddy_response_set_status,
             caddyi::{BrooksCaddyConfiguration, BrooksCaddyRequest, drain_to_caddy_log},
         },
-        common::safe_brooks_integration_handle,
-        error::{NativeRequestTransformError, ProxyError},
-        hmds::{HmdsConfiguration, HmdsServerConfiguration},
+        error::NativeRequestTransformError,
         support::to_null_terminated_str,
     },
     logging::{LogLevel, LogMsg, LogMsgs},
@@ -193,7 +193,7 @@ unsafe fn do_brooks_caddy_proxy(
     )?;
 
     if let Err(e) = try_from_response(&response, status, res) {
-        return Err((ProxyError::NativeRequestTransformError(e).into(), log));
+        return Err((ProxyError::NativeError(e).into(), log));
     }
 
     caddy_response_set_body(

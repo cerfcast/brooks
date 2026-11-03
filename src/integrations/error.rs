@@ -17,13 +17,6 @@
 
 use std::fmt::Display;
 
-use http::StatusCode;
-
-use crate::{logging::LogMsgs, processing::error::ImdInterpretError};
-
-pub type ProxyValue = (StatusCode, http::Response<Vec<u8>>, LogMsgs);
-pub type ProxyResult = Result<ProxyValue, (Box<ProxyError>, LogMsgs)>;
-
 #[derive(Debug, Clone)]
 pub enum NativeRequestTransformError {
     BadHeaderName(String),
@@ -60,24 +53,4 @@ impl Display for NativeRequestTransformError {
     }
 }
 
-#[derive(Debug)]
-pub enum ProxyError {
-    SetupError(Box<dyn std::error::Error>),
-    HmdsError(Box<dyn std::error::Error>),
-    ImdiError(ImdInterpretError),
-    NativeRequestTransformError(Box<NativeRequestTransformError>),
-}
-
-impl Display for ProxyError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Error proxying to/from the native request: ")?;
-        match &self {
-            ProxyError::SetupError(error) => write!(f, "{error}"),
-            ProxyError::HmdsError(error) => write!(f, "{error}"),
-            ProxyError::ImdiError(imd_interpret_error) => write!(f, "{imd_interpret_error}"),
-            ProxyError::NativeRequestTransformError(native_request_transform_error) => {
-                write!(f, "{native_request_transform_error}")
-            }
-        }
-    }
-}
+impl std::error::Error for NativeRequestTransformError {}

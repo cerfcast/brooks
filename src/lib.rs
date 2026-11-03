@@ -23,15 +23,11 @@ pub mod common;
 pub mod utils;
 
 #[allow(dead_code)]
-#[cfg(feature = "mel")]
 pub mod mel;
 
 #[allow(dead_code)]
-#[cfg(feature = "verifying")]
 pub mod verifying;
 
-#[allow(dead_code)]
-#[cfg(feature = "processing")]
 pub mod processing;
 
 #[allow(dead_code)]
@@ -39,6 +35,12 @@ pub mod visitors;
 
 #[allow(dead_code)]
 pub mod cdni;
+
+#[allow(dead_code)]
+#[cfg(feature = "dcdn")]
+pub mod dcdn;
+
+pub mod hmds;
 
 #[allow(dead_code)]
 pub mod integrations;

@@ -15,15 +15,34 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-//! Interpret CDNI Interconnection Metadata
-
 use std::fmt::Display;
 
 use http::StatusCode;
 
-use crate::logging::LogMsgs;
+use crate::{dcdn::interpret::Error, logging::LogMsgs};
 
-use crate::processing;
+pub type ProxyValue = (StatusCode, http::Response<Vec<u8>>, LogMsgs);
+pub type ProxyResult = Result<ProxyValue, (Box<ProxyError>, LogMsgs)>;
+
+#[derive(Debug)]
+pub enum ProxyError {
+    SetupError(Box<dyn std::error::Error>),
+    HmdsError(Box<dyn std::error::Error>),
+    ImdiError(ImdInterpretError),
+    NativeError(Box<dyn std::error::Error>),
+}
+
+impl Display for ProxyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error proxying to/from the native request: ")?;
+        match &self {
+            ProxyError::SetupError(error) => write!(f, "{error}"),
+            ProxyError::HmdsError(error) => write!(f, "{error}"),
+            ProxyError::ImdiError(imd_interpret_error) => write!(f, "{imd_interpret_error}"),
+            ProxyError::NativeError(native_error) => write!(f, "{native_error}"),
+        }
+    }
+}
 
 pub type ImdInterpretValue = (StatusCode, http::Response<Vec<u8>>, LogMsgs);
 pub type ImdInterpretResultError = (Box<ImdInterpretError>, LogMsgs);
@@ -34,7 +53,7 @@ pub enum ImdInterpretError {
     TransformError(Box<dyn std::error::Error>),
     UpstreamError(String),
     RuntimeError(Box<dyn std::error::Error>),
-    MetadataProcessingError(Box<processing::interpret::Error>),
+    MetadataProcessingError(Box<Error>),
 }
 
 impl Display for ImdInterpretError {
@@ -54,3 +73,5 @@ impl Display for ImdInterpretError {
         }
     }
 }
+
+impl std::error::Error for ImdInterpretError {}

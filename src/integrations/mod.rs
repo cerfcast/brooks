@@ -27,11 +27,7 @@ pub mod caddy;
 #[cfg(feature = "express")]
 pub mod express;
 
-#[cfg(feature = "hmds")]
-pub mod common;
-#[cfg(feature = "hmds")]
+#[cfg(any(feature = "nginx", feature = "caddy", feature = "express"))]
 pub mod error;
-#[cfg(feature = "hmds")]
-pub mod hmds;
-#[cfg(feature = "hmds")]
+#[cfg(any(feature = "nginx", feature = "caddy", feature = "express"))]
 pub mod support;

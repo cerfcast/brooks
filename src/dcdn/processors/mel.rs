@@ -19,6 +19,14 @@
 
 use crate::{
     cdni::mel::spec::TypedSetVariable,
+    dcdn::{
+        imdi,
+        interpret::{
+            Error::{self, InvalidType},
+            MetadataInformationResultElements, Stages,
+        },
+        processors::SimpleProcessorsInterpreterContext,
+    },
     logging::{LogLevel::Debug, LogMsgs},
     mel::{
         self, MEL_USER_SET_VARIABLE_STRUCT_NAME,
@@ -28,22 +36,15 @@ use crate::{
         },
         types::{Struct, Type},
     },
-    processing::{
-        imdi,
-        interpret::{
-            self,
-            Error::{self, InvalidType, RuntimeError},
-            InterpretationResult, MetadataInformationResultElements,
-        },
-        processors::SimpleProcessorsInterpreterContext,
-    },
+    processing::interpret::{InterpretationResult, Interpreter},
     verifying::mel::verify::SetVariableVerificationKey,
 };
 
 impl
-    interpret::Interpreter<
+    Interpreter<
         SimpleProcessorsInterpreterContext<'_>,
         (imdi::ResultValue, MetadataInformationResultElements),
+        Stages,
         Error,
     > for TypedSetVariable<SetVariableVerificationKey>
 {
@@ -61,7 +62,7 @@ impl
         let var = input
             .scopes
             .lookup(MEL_USER_SET_VARIABLE_STRUCT_NAME)
-            .ok_or(RuntimeError("var not in scope".into()))?;
+            .ok_or(Error::RuntimeError("var not in scope".into()))?;
 
         let (mut var, var_tpe) = match var {
             TypedValue {
@@ -86,15 +87,15 @@ impl
                     log: lmsgs,
                 },
             )
-            .map_err(|e| RuntimeError(Box::new(e)))?;
+            .map_err(|e| Error::RuntimeError(Box::new(e)))?;
 
             var.insert_field(
                 &self.value.variable_name,
-                result.val.ok_or(RuntimeError(
+                result.val.ok_or(Error::RuntimeError(
                     "Missing value after successful interpretation of Mel expression".into(),
                 ))?,
             )
-            .map_err(|e| RuntimeError(e))?;
+            .map_err(|e| Error::RuntimeError(e))?;
 
             let output = input.with_new_value_in_scope(
                 MEL_USER_SET_VARIABLE_STRUCT_NAME,
@@ -112,8 +113,8 @@ impl
         }
     }
 
-    fn at(&self, stage: interpret::Stages) -> bool {
-        stage == interpret::Stages::Pre
+    fn at(&self, stage: Stages) -> bool {
+        stage == Stages::Pre
     }
 }
 
@@ -128,17 +129,17 @@ mod test {
             mel::spec::TypedSetVariable,
             tests::test_helpers::{generic_metadata, set_variable},
         },
+        dcdn::{
+            imdi, interpret::ProcessedRequestResponse,
+            processors::SimpleProcessorsInterpreterContext,
+        },
         environment::scope::Scopes,
         mel::{
             MEL_USER_SET_VARIABLE_STRUCT_NAME,
             interpreter::values::{TypedValue, Value, mel_var_value_from_type},
             types::{Type, builtin_function_types, minimal_core_variable_types},
         },
-        processing::{
-            imdi,
-            interpret::{Interpreter, ProcessedRequestResponse},
-            processors::SimpleProcessorsInterpreterContext,
-        },
+        processing::interpret::Interpreter,
         verifying::{
             mel::verify::SetVariableMetadataAnalyzer,
             verify::{CdniVerificationKey, MetadataAnalysisContext, Verifier},
