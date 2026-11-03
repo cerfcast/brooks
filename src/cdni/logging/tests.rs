@@ -58,20 +58,14 @@ mod test_logging_record {
     fn test_serialize_logging_record() {
         let r = LogRecordRaw::default();
 
-        let serialized_record =
+        let _serialized_record =
             serde_json::to_string_pretty(&r).expect("Could not serialize valid logging record");
-
-        println!("{serialized_record}");
-        panic!()
     }
 
     #[test]
     fn test_parse_draft_figure_5() {
         let json = read_test_file(Path::new("./src/cdni/tests/logging/figure-5.json"));
-        let r =
+        let _r =
             serde_json::from_str::<LogRecordRaw>(&json).expect("Could not parse JSON test file");
-
-        println!("{r:?}");
-        panic!()
     }
 }
