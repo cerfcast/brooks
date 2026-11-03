@@ -60,6 +60,9 @@ jobs:
     name: Library Tests (Default Features)
     runs-on: windows-latest
     steps:
+      - run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
       - uses: actions/checkout@v7
       - uses: tree-sitter/setup-action@v2
         with:
