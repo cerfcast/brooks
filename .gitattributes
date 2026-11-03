@@ -1,2 +1,1 @@
-**tests/* text eol=lf
-**tests/* text autocrlf=input
+**tests/* -text
