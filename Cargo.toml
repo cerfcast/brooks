@@ -28,7 +28,7 @@ log = { version = "0.4.34" }
 [features]
 default = ["dcdn"]
 
-domain = []
+disable-domain = []
 hmds = ["dep:reqwest", "dep:tokio"]
 nginx = ["hmds"]
 caddy = ["hmds"]

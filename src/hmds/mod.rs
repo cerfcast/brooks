@@ -15,8 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[cfg(feature = "domain")]
-use std::path::Path;
 use std::{collections::HashMap, fs, io, path::PathBuf, str::FromStr};
 
 use chrono::{DateTime, Utc};
@@ -24,7 +22,9 @@ use http::Uri;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[cfg(feature = "domain")]
+#[cfg(all(unix, not(feature = "disable-domain")))]
+use std::path::Path;
+#[cfg(all(unix, not(feature = "disable-domain")))]
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::UnixStream,
@@ -113,7 +113,7 @@ pub struct ExpirableJsonValue {
     pub value: Value,
 }
 
-#[cfg(feature = "domain")]
+#[cfg(all(unix, not(feature = "disable-domain")))]
 async fn hmds_write_entire(s: &mut UnixStream, d: &[u8]) -> io::Result<usize> {
     s.write_u64_le(d.len() as u64).await?;
 
@@ -139,7 +139,7 @@ async fn hmds_write_entire(s: &mut UnixStream, d: &[u8]) -> io::Result<usize> {
     }
 }
 
-#[cfg(feature = "domain")]
+#[cfg(all(unix, not(feature = "disable-domain")))]
 async fn hmds_read_entire(s: &mut UnixStream, d: &mut [u8]) -> io::Result<usize> {
     let mut already_read = 0usize;
     loop {
@@ -167,7 +167,7 @@ pub async fn query_hmds(
     query: &str,
     config: &HmdsServerConfiguration,
 ) -> io::Result<Option<(DateTime<Utc>, Value)>> {
-    #[cfg(feature = "domain")]
+    #[cfg(all(unix, not(feature = "disable-domain")))]
     if config.is_domain() {
         return query_hmds_domain(query, config.path.as_ref().unwrap().as_path()).await;
     }
@@ -181,7 +181,7 @@ pub async fn query_hmds(
     }
 }
 
-#[cfg(feature = "domain")]
+#[cfg(all(unix, not(feature = "disable-domain")))]
 pub async fn query_hmds_domain(
     query: &str,
     server_path: &Path,
