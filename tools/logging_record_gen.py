@@ -42,8 +42,8 @@ class RecordField:
 if __name__ == "__main__":
     fields: List[RecordField] = []
 
-    with open("logging/fields.csv", newline='') as fh:
-        reader = csv.reader(fh, delimiter=',', quotechar='|')
+    with open("logging/fields.csv", newline="") as fh:
+        reader = csv.reader(fh, delimiter=",", quotechar="|")
         for line in reader:
             line = list(map(lambda x: str.strip(x), line))
             name = line[0]
@@ -54,11 +54,13 @@ if __name__ == "__main__":
             minimal = "Minimal" in levels
             extended = "Extended" in levels
             standard = "Standard" in levels
-            fields.append(RecordField(name, minimal, standard, extended, raw_ty, ty, descr))
+            fields.append(
+                RecordField(name, minimal, standard, extended, raw_ty, ty, descr)
+            )
 
     with open("logging/template.rs") as fh:
         template = "".join(fh.readlines())
-    
+
     with open("../src/cdni/logging/record.rs", "wt") as fh:
         fh.write(template)
         fh.write("#[derive(Debug, Clone, Deserialize, Serialize, Default)]\n")
