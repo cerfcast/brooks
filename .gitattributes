@@ -1,2 +1,2 @@
 * text
-*.json -text 
+**tests/* -text 
