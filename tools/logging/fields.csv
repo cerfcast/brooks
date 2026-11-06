@@ -1,7 +1,7 @@
 timestamp-ns,u64,u64,|The timestamp of the first byte read by the OCN application to a best effort of accuracy.|,Minimal, Standard, Extended
 timestamp-iso8601,String,chrono::DateTime<Utc>,|The timestamp of the first byte read by the OCN application to a best effort of accuracy. It is RECOMMENDED that timestamps use Coordinated Universal Time (UTC).|, Extended
 s-time-total-ms,u64,u64,|The elapsed time between reading the first byte of the request and sending the last byte of the response to a best effort of accuracy.|,Standard, Extended
-c-groupid,String,String,|An opaque identifier for an aggregate set of clients, derived from the client IPv4 or IPv6 address in the request received by the surrogate and/or other network-level identifying information. See [RFC7937] section 3.4.1.|,Extended
+c-groupid,String,String,|An opaque identifier for an aggregate set of clients, derived from the client IPv4 or IPv6 address in the request received by the surrogate and/or other network-level identifying information. See [RFC7937] section 3.4.1.|,Minimal, Standard, Extended
 cs-method,String,http::method::Method,|The HTTP request method.|, Extended
 cs-version,String,String,| The protocol version (e.g., HTTP/1.1).|, Extended
 cs-uri,String,http::Uri,|Request URI prior to any transformation from MI.ProcessingStages. It is RECOMMENDED to limit the maximum length of this field with an applied MI.LoggingTransformTruncate, allowing at least 2048 bytes.|, Minimal, Standard, Extended

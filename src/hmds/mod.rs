@@ -18,22 +18,24 @@
 use std::{collections::HashMap, fs, io, path::PathBuf, str::FromStr};
 
 use chrono::{DateTime, Utc};
-use http::Uri;
+use http::{Uri, header::CONTENT_TYPE};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[cfg(all(unix, not(feature = "disable-domain")))]
-use std::path::Path;
-#[cfg(all(unix, not(feature = "disable-domain")))]
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::UnixStream,
-};
-
 use crate::{
-    cdni::imd::spec::HostMetadata, environment::scope::Scopes, mel::types::Type,
+    cdni::{
+        imd::spec::HostMetadata,
+        logging::{self, record::LogRecordRaw},
+    },
+    environment::scope::Scopes,
+    mel::types::Type,
     verifying::verify::CdniVerificationKey,
 };
+
+#[cfg(all(unix, not(feature = "disable-domain")))]
+use crate::hmds::hmds_domain_communication::{post_log_hmds_domain, query_hmds_domain};
+
+//BEGIN: HMDS Server Configuration
 
 #[derive(Debug, Default, Clone)]
 pub struct HmdsServerConfiguration {
@@ -106,6 +108,8 @@ impl From<HmdsServerConfiguration> for HmdsConfiguration {
     }
 }
 
+//BEGIN: HMDS Server Domain Protocol
+
 #[derive(Serialize, Deserialize)]
 pub struct ExpirableJsonValue {
     pub expiry: DateTime<Utc>,
@@ -113,54 +117,121 @@ pub struct ExpirableJsonValue {
     pub value: Value,
 }
 
-#[cfg(all(unix, not(feature = "disable-domain")))]
-async fn hmds_write_entire(s: &mut UnixStream, d: &[u8]) -> io::Result<usize> {
-    s.write_u64_le(d.len() as u64).await?;
+#[derive(Debug, Serialize, Deserialize)]
+pub enum HmdsDomainMessageType {
+    Query,
+    Log,
+}
 
-    let mut already_sent = 0usize;
-    loop {
-        s.writable().await?;
-        match s.try_write(&d[already_sent..]) {
-            Ok(n) => {
-                if n == 0 {
-                    return Ok(already_sent);
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HmdsDomainMessageQuery {
+    pub query: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HmdsDomainMessageLog {
+    pub log: LogRecordRaw,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HmdsDomainMessage {
+    pub ty: HmdsDomainMessageType,
+    pub value: Value,
+}
+
+//BEGIN HMDS Domain Support Methods
+
+#[cfg(all(unix, not(feature = "disable-domain")))]
+pub mod hmds_domain_support {
+    use std::io;
+
+    use tokio::{io::AsyncWriteExt, net::UnixStream};
+
+    pub(crate) async fn hmds_write_entire(s: &mut UnixStream, d: &[u8]) -> io::Result<usize> {
+        s.write_u64_le(d.len() as u64).await?;
+
+        let mut already_sent = 0usize;
+        loop {
+            s.writable().await?;
+            match s.try_write(&d[already_sent..]) {
+                Ok(n) => {
+                    if n == 0 {
+                        return Ok(already_sent);
+                    }
+                    already_sent += n;
+                    if already_sent == d.len() {
+                        return Ok(already_sent);
+                    }
+                    continue;
                 }
-                already_sent += n;
-                if already_sent == d.len() {
-                    return Ok(already_sent);
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    continue;
                 }
-                continue;
+                Err(e) => return Err(e),
             }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                continue;
+        }
+    }
+
+    pub(crate) async fn hmds_read_entire(s: &mut UnixStream, d: &mut [u8]) -> io::Result<usize> {
+        let mut already_read = 0usize;
+        loop {
+            s.readable().await?;
+            match s.try_read(&mut d[already_read..]) {
+                Ok(n) => {
+                    if n == 0 {
+                        return Ok(already_read);
+                    }
+                    already_read += n;
+                    if already_read == d.len() {
+                        return Ok(already_read);
+                    }
+                    continue;
+                }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    continue;
+                }
+                Err(e) => return Err(e),
             }
-            Err(e) => return Err(e),
         }
     }
 }
 
-#[cfg(all(unix, not(feature = "disable-domain")))]
-async fn hmds_read_entire(s: &mut UnixStream, d: &mut [u8]) -> io::Result<usize> {
-    let mut already_read = 0usize;
-    loop {
-        s.readable().await?;
-        match s.try_read(&mut d[already_read..]) {
-            Ok(n) => {
-                if n == 0 {
-                    return Ok(already_read);
-                }
-                already_read += n;
-                if already_read == d.len() {
-                    return Ok(already_read);
-                }
-                continue;
-            }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                continue;
-            }
-            Err(e) => return Err(e),
-        }
+pub async fn post_log_hmds(
+    log: &logging::record::LogRecord,
+    config: &HmdsServerConfiguration,
+) -> io::Result<()> {
+    let log_raw: LogRecordRaw = log.into();
+
+    #[cfg(all(unix, not(feature = "disable-domain")))]
+    if config.is_domain() {
+        return post_log_hmds_domain(&log_raw, config.path.as_ref().unwrap().as_path()).await;
     }
+
+    if config.is_http() {
+        return post_log_hmds_http(&log_raw, config.url.as_ref().unwrap()).await;
+    } else {
+        Err(io::Error::other(
+            "Posting logs to HMDS over HTTP is the only supported option and configuration is missing",
+        ))
+    }
+}
+
+async fn post_log_hmds_http(log: &logging::record::LogRecordRaw, server: &Uri) -> io::Result<()> {
+    let post_log_uri =
+        reqwest::Url::from_str(&(server.to_string() + "plog/")).map_err(io::Error::other)?;
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(post_log_uri)
+        .header(CONTENT_TYPE, "application/json")
+        .body(serde_json::to_string(log).expect("Could not serialize log record"))
+        .send()
+        .await
+        .map_err(io::Error::other)?;
+
+    response.error_for_status().map_err(io::Error::other)?;
+
+    Ok(())
 }
 
 pub async fn query_hmds(
@@ -182,38 +253,86 @@ pub async fn query_hmds(
 }
 
 #[cfg(all(unix, not(feature = "disable-domain")))]
-pub async fn query_hmds_domain(
-    query: &str,
-    server_path: &Path,
-) -> io::Result<Option<(DateTime<Utc>, Value)>> {
-    let mut socket = UnixStream::connect(server_path).await?;
+pub mod hmds_domain_communication {
+    use std::{io, path::Path};
 
-    // Wait for the socket to be readable
-    socket.writable().await?;
+    use chrono::{DateTime, Utc};
+    use serde_json::Value;
+    use tokio::io::AsyncReadExt;
+    use tokio::net::UnixStream;
 
-    hmds_write_entire(&mut socket, query.as_bytes()).await?;
+    use crate::hmds::{
+        ExpirableJsonValue, HmdsDomainMessageQuery, hmds_domain_support::hmds_read_entire,
+    };
+    use crate::{
+        cdni::logging,
+        hmds::{
+            HmdsDomainMessage, HmdsDomainMessageLog, HmdsDomainMessageType,
+            hmds_domain_support::hmds_write_entire,
+        },
+    };
 
-    socket.readable().await?;
+    pub(crate) async fn post_log_hmds_domain(
+        log: &logging::record::LogRecordRaw,
+        server_path: &Path,
+    ) -> io::Result<()> {
+        let log_message = serde_json::to_string(&HmdsDomainMessage {
+            ty: HmdsDomainMessageType::Log,
+            value: serde_json::to_value(HmdsDomainMessageLog { log: log.clone() })
+                .map_err(std::io::Error::other)?,
+        })
+        .map_err(std::io::Error::other)?;
+        let mut socket = UnixStream::connect(server_path).await?;
 
-    let incoming_buffer_size = socket.read_u64_le().await?;
+        // Wait for the socket to be readable
+        socket.writable().await?;
 
-    let mut buf: Vec<u8> = vec![0; incoming_buffer_size as usize];
+        hmds_write_entire(&mut socket, log_message.as_bytes()).await?;
 
-    hmds_read_entire(&mut socket, &mut buf).await?;
-
-    let s = String::from_utf8(buf).map_err(|_| io::ErrorKind::InvalidData)?;
-
-    if s.is_empty() {
-        return Ok(None);
+        Ok(())
     }
 
-    let result: ExpirableJsonValue =
-        serde_json::from_str(&s).map_err(|_| io::ErrorKind::InvalidData)?;
+    pub(crate) async fn query_hmds_domain(
+        query: &str,
+        server_path: &Path,
+    ) -> io::Result<Option<(DateTime<Utc>, Value)>> {
+        let query_message = serde_json::to_string(&HmdsDomainMessage {
+            ty: HmdsDomainMessageType::Query,
+            value: serde_json::to_value(HmdsDomainMessageQuery {
+                query: query.to_string(),
+            })
+            .map_err(std::io::Error::other)?,
+        })
+        .map_err(std::io::Error::other)?;
+        let mut socket = UnixStream::connect(server_path).await?;
 
-    Ok(Some((result.expiry, result.value)))
+        // Wait for the socket to be readable
+        socket.writable().await?;
+
+        hmds_write_entire(&mut socket, query_message.as_bytes()).await?;
+
+        socket.readable().await?;
+
+        let incoming_buffer_size = socket.read_u64_le().await?;
+
+        let mut buf: Vec<u8> = vec![0; incoming_buffer_size as usize];
+
+        hmds_read_entire(&mut socket, &mut buf).await?;
+
+        let s = String::from_utf8(buf).map_err(|_| io::ErrorKind::InvalidData)?;
+
+        if s.is_empty() {
+            return Ok(None);
+        }
+
+        let result: ExpirableJsonValue =
+            serde_json::from_str(&s).map_err(|_| io::ErrorKind::InvalidData)?;
+
+        Ok(Some((result.expiry, result.value)))
+    }
 }
 
-pub async fn query_hmds_http(
+pub(crate) async fn query_hmds_http(
     query: &str,
     server: &Uri,
 ) -> io::Result<Option<(DateTime<Utc>, Value)>> {

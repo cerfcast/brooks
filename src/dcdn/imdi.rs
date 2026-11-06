@@ -17,6 +17,11 @@
 
 //! Interpret CDNI Interconnection Metadata as a dCDN
 
+use std::str::FromStr;
+
+use chrono::Utc;
+
+use crate::cdni::logging::record::LogRecord;
 use crate::dcdn::error::{ImdInterpretError, ImdInterpretResult};
 use crate::dcdn::interpret::{Error, MetadataInformationResultElements, Stages};
 use crate::dcdn::processors::SimpleProcessorsInterpreterContext;
@@ -90,6 +95,10 @@ pub fn interpret_interconnection_metadata(
     runtime: &tokio::runtime::Handle,
     mut log: LogMsgs,
 ) -> ImdInterpretResult {
+    let timestamp_ns = Utc::now().timestamp();
+    let cs_uri: http::Uri =
+        http::Uri::from_str(request.url().expect("TODO").as_str()).expect("TODO");
+
     let mut request_context = SimpleProcessorsInterpreterContext {
         scopes: mel_scopes,
         mode: InterpretMode::Request,
@@ -221,7 +230,7 @@ pub fn interpret_interconnection_metadata(
             // Handle a result, if any.
             if let Some(result) = result.0 {
                 log = debug!(log, "Got a response from an origin response stage.");
-                return Ok((result.status(), result, log));
+                return Ok((result.status(), result, log, None));
             }
 
             response_context = updated_response_context;
@@ -252,7 +261,7 @@ pub fn interpret_interconnection_metadata(
             // Handle a result, if any.
             if let Some(result) = result.0 {
                 log = debug!(log, "Got a response from an origin response stage.");
-                return Ok((result.status(), result, log));
+                return Ok((result.status(), result, log, None));
             }
 
             // TODO: Handle other values from the PS Interpreter that indicate
@@ -304,9 +313,28 @@ pub fn interpret_interconnection_metadata(
         &format!("Response code: {}", interpreted_http_response.status())
     );
 
+    let sc_status = interpreted_http_response.status();
+    let s_upstream_header_size_bytes = 0u64;
+    let s_upstream_total_bytes = 0u64;
+    // TODO: Add headers
+    let sc_total_bytes = interpreted_http_response.body().len();
+    let s_ccid = "TODO".to_string();
+
+    let lr = LogRecord::new_basic(
+        timestamp_ns as u64,
+        "",
+        cs_uri,
+        sc_status,
+        sc_total_bytes as u64,
+        &s_ccid,
+        s_upstream_header_size_bytes,
+        s_upstream_total_bytes,
+    );
+
     Ok((
         interpreted_http_response.status(),
         interpreted_http_response,
         log,
+        Some(lr),
     ))
 }

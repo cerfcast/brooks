@@ -17,8 +17,28 @@
 
 //! Logging (and related) metadata
 
+use std::fmt::Display;
+
 pub mod record;
+pub mod recordi;
 pub mod spec;
+
+#[derive(Debug, Clone)]
+pub enum Error {
+    InvalidRawValue(String /* Field */, String /* Value */),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::InvalidRawValue(field, value) => {
+                write!(f, "{value} is an invalid value for {field} of a log record")
+            }
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests;

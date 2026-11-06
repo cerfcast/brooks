@@ -30,7 +30,7 @@ use crate::{
         },
     },
     environment::scope::{Scope, Scopes},
-    hmds::{HmdsConfiguration, query_hmds},
+    hmds::{HmdsConfiguration, post_log_hmds, query_hmds},
     logging::{LogLevel, LogMsg, LogMsgs},
     mel::{
         MEL_USER_SET_VARIABLE_STRUCT_NAME,
@@ -183,11 +183,28 @@ pub fn safe_brooks_integration_handle(
             MEL_USER_SET_VARIABLE_STRUCT_NAME, var
         )
     );
+
     let mel_scopes = mel_scopes.insert(
         MEL_USER_SET_VARIABLE_STRUCT_NAME,
         mel_var_value_from_type(var),
     );
 
-    interpret_interconnection_metadata(&verified_md, mel_scopes, processed_http_req, runtime, log)
-        .map_err(|(e, log)| (ProxyError::ImdiError(*e).into(), log))
+    let (status_code, response, mut log, log_rcrd) = interpret_interconnection_metadata(
+        &verified_md,
+        mel_scopes,
+        processed_http_req,
+        runtime,
+        log,
+    )
+    .map_err(|(e, log)| (ProxyError::ImdiError(*e).into(), log))?;
+
+    if let Some(log_rcrd) = log_rcrd {
+        if let Err(e) = runtime.block_on(post_log_hmds(&log_rcrd, &hmds_config.hmds_server)) {
+            return Err((ProxyError::HmdsError(e.into()).into(), log));
+        } else {
+            log = debug!(log, "Successfully filed log with HMDS");
+        }
+    }
+
+    Ok((status_code, response, log))
 }

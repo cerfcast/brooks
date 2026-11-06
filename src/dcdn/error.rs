@@ -19,7 +19,7 @@ use std::fmt::Display;
 
 use http::StatusCode;
 
-use crate::{dcdn::interpret::Error, logging::LogMsgs};
+use crate::{cdni::logging::record::LogRecord, dcdn::interpret::Error, logging::LogMsgs};
 
 pub type ProxyValue = (StatusCode, http::Response<Vec<u8>>, LogMsgs);
 pub type ProxyResult = Result<ProxyValue, (Box<ProxyError>, LogMsgs)>;
@@ -44,7 +44,12 @@ impl Display for ProxyError {
     }
 }
 
-pub type ImdInterpretValue = (StatusCode, http::Response<Vec<u8>>, LogMsgs);
+pub type ImdInterpretValue = (
+    StatusCode,
+    http::Response<Vec<u8>>,
+    LogMsgs,
+    Option<LogRecord>,
+);
 pub type ImdInterpretResultError = (Box<ImdInterpretError>, LogMsgs);
 pub type ImdInterpretResult = Result<ImdInterpretValue, (Box<ImdInterpretError>, LogMsgs)>;
 
