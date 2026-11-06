@@ -20,7 +20,6 @@
 use std::fmt::Display;
 
 pub mod record;
-pub mod recordi;
 pub mod spec;
 
 #[derive(Debug, Clone)]
