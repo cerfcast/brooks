@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-// @ts-types="npm:@types/express@4.17.15"
+// @ts-types="npm:@types/express"
 import express from "express";
 import { Request, Response } from "express";
 
@@ -148,8 +148,7 @@ if (import.meta.main) {
     const brooks_response = new BrooksExpressResponse(res);
     const response_handler = BrooksExpressResponseMediator.to(brooks_response);
     const result = brooks.proxy(brooks_request, response_handler);
-
-    console.log(`${result}`);
+    console.log(`Debug: brooks proxy: Proxy result: ${result}`)
 
     return brooks_response.send();
   });
