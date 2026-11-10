@@ -43,28 +43,25 @@ fn main() {
         let url = "https://github.com/nginx/nginx.git";
         Repository::clone(url, nginx_path).expect("Could not clone nginx source code repository.");
 
-        println!(
-            "{:?}",
-            std::process::Command::new("./auto/configure")
-                .current_dir(nginx_path)
-                .args([
-                    "--with-debug",
-                    &format!(
-                        "--add-module={}",
-                        nginx_module_path
-                            .to_str()
-                            .expect("could not convert the nginx module path to a string")
-                    ),
-                    &format!(
-                        "--prefix={}",
-                        nginx_install_path
-                            .to_str()
-                            .expect("Could not convert the nginx install path to a string")
-                    ),
-                ])
-                .output()
-                .expect("Could not configure nginx")
-        );
+        let configure_result = std::process::Command::new("./auto/configure")
+            .current_dir(nginx_path)
+            .args([
+                "--with-debug",
+                &format!(
+                    "--add-module={}",
+                    nginx_module_path
+                        .to_str()
+                        .expect("could not convert the nginx module path to a string")
+                ),
+                &format!(
+                    "--prefix={}",
+                    nginx_install_path
+                        .to_str()
+                        .expect("Could not convert the nginx install path to a string")
+                ),
+            ])
+            .output()
+            .expect("Could not configure nginx");
     }
 
     // The bindgen::Builder is the main entry point

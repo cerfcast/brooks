@@ -39,4 +39,4 @@ express = ["hmds"]
 dcdn = ["hmds", "dep:reqwest", "dep:tokio"]
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["staticlib", "dylib"]
