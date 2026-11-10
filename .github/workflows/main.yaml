@@ -40,7 +40,7 @@ jobs:
       - run: cargo test --no-default-features
       - run: cargo test --manifest-path parser/Cargo.toml
   library-tests:
-    name: Library Tests (Default Features)
+    name: Library Tests (Default Features - Linux)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -57,7 +57,7 @@ jobs:
       - run: cargo test
       - run: cargo test --manifest-path parser/Cargo.toml
   library-tests-windows:
-    name: Library Tests (Default Features)
+    name: Library Tests (Default Features - Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
