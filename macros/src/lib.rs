@@ -53,12 +53,14 @@ pub fn grammar_location(_: TokenStream, item: TokenStream) -> TokenStream {
 
     items.named.push(Field {
         attrs: vec![],
+        default: None,
+        modifiers: Default::default(),
         vis: syn::Visibility::Public(token::Pub { span: ast.span() }),
-        mutability: syn::FieldMutability::None,
         ident: Some(Ident::new("location", ast.span())),
         colon_token: None,
         ty: syn::Type::Path(TypePath {
             qself: None,
+            attrs: vec![],
             path: PathSegment {
                 ident: Ident::new("TextLocation", ast.span().clone()),
                 arguments: syn::PathArguments::None,
