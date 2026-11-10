@@ -19,7 +19,7 @@ use std::fmt::Display;
 
 use http::StatusCode;
 
-use crate::{cdni::logging::record::LogRecord, dcdn::interpret::Error, logging::LogMsgs};
+use crate::{cdni::logging::record::LogRecord, logging::LogMsgs};
 
 pub type ProxyValue = (StatusCode, http::Response<Vec<u8>>, LogMsgs);
 pub type ProxyResult = Result<ProxyValue, (Box<ProxyError>, LogMsgs)>;
@@ -58,7 +58,7 @@ pub enum ImdInterpretError {
     TransformError(Box<dyn std::error::Error>),
     UpstreamError(String),
     RuntimeError(Box<dyn std::error::Error>),
-    MetadataProcessingError(Box<Error>),
+    MetadataProcessingError(Box<dyn std::error::Error>),
 }
 
 impl Display for ImdInterpretError {
