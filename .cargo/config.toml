@@ -1,2 +1,3 @@
-[target.'cfg(unix)']
-rustflags=["--cfg", 'feature="domain"']
+[target.'cfg(macos)']
+[build]
+rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]

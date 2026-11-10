@@ -43,23 +43,29 @@ fn main() {
         let url = "https://github.com/nginx/nginx.git";
         Repository::clone(url, nginx_path).expect("Could not clone nginx source code repository.");
 
+        let mut configure_args: Vec<String> = vec![
+            "--with-debug".into(),
+            format!(
+                "--add-module={}",
+                nginx_module_path
+                    .to_str()
+                    .expect("could not convert the nginx module path to a string")
+            ),
+            format!(
+                "--prefix={}",
+                nginx_install_path
+                    .to_str()
+                    .expect("Could not convert the nginx install path to a string")
+            ),
+        ];
+
+        if cfg!(target_os = "macos") {
+            configure_args.push("--without-pcre2".into());
+            configure_args.push("--without-http_rewrite_module".into());
+        }
         let _configure_result = std::process::Command::new("./auto/configure")
             .current_dir(nginx_path)
-            .args([
-                "--with-debug",
-                &format!(
-                    "--add-module={}",
-                    nginx_module_path
-                        .to_str()
-                        .expect("could not convert the nginx module path to a string")
-                ),
-                &format!(
-                    "--prefix={}",
-                    nginx_install_path
-                        .to_str()
-                        .expect("Could not convert the nginx install path to a string")
-                ),
-            ])
+            .args(configure_args)
             .output()
             .expect("Could not configure nginx");
     }
