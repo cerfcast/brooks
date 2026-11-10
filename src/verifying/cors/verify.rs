@@ -103,17 +103,6 @@ fn verify_allow_origin(
 #[derive(Debug, Clone, Default)]
 pub struct AllowCompressVerificationKey {}
 
-#[derive(Debug)]
-pub enum AllowCompressVerificationError {}
-
-impl Display for AllowCompressVerificationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
-
-impl Error for AllowCompressVerificationError {}
-
 fn analyze_allow_compress(
     allow_compress: &TypedAllowCompress<()>,
     input: MetadataAnalysisContext,
