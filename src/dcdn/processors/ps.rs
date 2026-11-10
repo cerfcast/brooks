@@ -942,7 +942,7 @@ impl
                     res
                 } else {
                     return Err(Error::RuntimeError(
-                        Error::AssertionFailure("Missing request".into()).into(),
+                        Error::AssertionFailure("Missing response".into()).into(),
                     )
                     .into());
                 }

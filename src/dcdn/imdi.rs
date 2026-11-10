@@ -23,7 +23,9 @@ use chrono::Utc;
 
 use crate::cdni::logging::record::LogRecord;
 use crate::dcdn::error::{ImdInterpretError, ImdInterpretResult};
-use crate::dcdn::interpret::{Error, MetadataInformationResultElements, Stages};
+use crate::dcdn::interpret::{
+    Error, MetadataInformationResultElements, ProcessedRequestResponse, Stages,
+};
 use crate::dcdn::processors::SimpleProcessorsInterpreterContext;
 use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
@@ -186,6 +188,22 @@ pub fn interpret_interconnection_metadata(
         }
     }
 
+    let mut response_context = SimpleProcessorsInterpreterContext {
+        scopes: source_context.scopes,
+        mode: InterpretMode::Response,
+        req: source_context.req,
+        res: source_context.res,
+        runtime: source_context.runtime,
+    };
+
+    let source_response = if let Some(res) = &response_context.res
+        && res.tpe() == prr::PrrType::Response
+    {
+        true
+    } else {
+        false
+    };
+
     log = debug!(
         log,
         &format!(
@@ -198,25 +216,28 @@ pub fn interpret_interconnection_metadata(
         log,
         &format!(
             "There was{}data retrieved by the source processor.",
-            if let Some(res) = &source_context.res
-                && res.tpe() == prr::PrrType::Response
-            {
-                " "
-            } else {
-                " not "
-            }
+            if source_response { " " } else { " not " }
         )
     );
 
-    // TODO: Handle no source processor!
-
-    let mut response_context = SimpleProcessorsInterpreterContext {
-        scopes: source_context.scopes,
-        mode: InterpretMode::Response,
-        req: source_context.req,
-        res: source_context.res,
-        runtime: source_context.runtime,
-    };
+    // If there was no response, make a 404 response.
+    if !source_response {
+        let response_404_url = match response_context.req.url() {
+            Ok(url) => url,
+            Err(e) => {
+                return Err((
+                    ImdInterpretError::MetadataProcessingError(e.into()).into(),
+                    log,
+                ));
+            }
+        };
+        let mut response_404 = ProcessedRequestResponse::new_response(
+            &response_404_url,
+            &response_context.req.get_method(),
+        );
+        response_404.ostatus = Some(http::StatusCode::NOT_FOUND);
+        response_context.res = Some(Box::new(response_404));
+    }
 
     log = debug!(log, "Stop: processing source stages.");
 
