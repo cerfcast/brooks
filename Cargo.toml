@@ -24,6 +24,8 @@ tokio = {version = "1.53.1", features=["rt-multi-thread"], optional = true }
 chrono = { version = "0.4.45", features = ["serde"] }
 url = "2.5.8"
 log = { version = "0.4.34" }
+zlib-rs = "0.6.8"
+flate2 = "1.1.11"
 
 [features]
 default = ["dcdn"]

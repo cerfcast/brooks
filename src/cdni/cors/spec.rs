@@ -65,11 +65,32 @@ pub struct TypedCrossoriginPolicy<A: Debug + Clone + Default> {
     pub value: CrossoriginPolicy<A>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AllowCompress<A: Debug + Clone + Default> {
+    #[serde(rename = "allow-compress")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub allow_compress: Option<bool>,
+
+    #[serde(skip)]
+    pub aug: A,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, CdniMetadata)]
+pub struct TypedAllowCompress<A: Debug + Clone + Default> {
+    #[serde(rename = "generic-metadata-type")]
+    pub tpe: String,
+    #[serde(rename = "generic-metadata-value")]
+    pub value: AllowCompress<A>,
+}
+
 #[cfg(test)]
 mod test_parse_cors_metadata {
     use std::path::Path;
 
-    use crate::{cdni::cors::spec::TypedCrossoriginPolicy, tests::read_test_file};
+    use crate::{
+        cdni::cors::spec::{TypedAllowCompress, TypedCrossoriginPolicy},
+        tests::read_test_file,
+    };
 
     #[test]
     fn test_verify_draft_figure1() {
@@ -79,6 +100,17 @@ mod test_parse_cors_metadata {
         assert_eq!(
             cop_metadata.tpe,
             TypedCrossoriginPolicy::<()>::typed_cdni_metadata_name()
+        );
+    }
+
+    #[test]
+    fn test_verify_draft_figure3() {
+        let json = read_test_file(Path::new("./src/cdni/tests/cors/figure3.json"));
+        let cop_metadata = serde_json::from_str::<TypedAllowCompress<()>>(&json)
+            .expect("Could not parse JSON test file");
+        assert_eq!(
+            cop_metadata.tpe,
+            TypedAllowCompress::<()>::typed_cdni_metadata_name()
         );
     }
 }

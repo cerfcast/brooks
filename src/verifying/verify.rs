@@ -19,11 +19,12 @@
 
 use std::fmt::Debug;
 
-use crate::cdni::cors::spec::TypedCrossoriginPolicy;
+use crate::cdni::cors::spec::{TypedAllowCompress, TypedCrossoriginPolicy};
 use crate::cdni::mel::spec::TypedSetVariable;
 use crate::cdni::original::spec::TypedSourceMetadata;
 use crate::verifying::cors::verify::{
-    CrossoriginPolicyVerificationError, CrossoriginPolicyVerificationKey,
+    AllowCompressVerificationKey, CrossoriginPolicyVerificationError,
+    CrossoriginPolicyVerificationKey,
 };
 use crate::verifying::mel::verify::{MelVerificationError, SetVariableVerificationKey};
 use crate::verifying::ps::error::VerificationError;
@@ -90,6 +91,7 @@ pub enum CdniVerifiedMetadataTypes {
     Source,
     SetVariable,
     CrossoriginPolicy,
+    AllowCompress,
     None,
 }
 
@@ -99,6 +101,7 @@ pub enum CdniVerificationKey {
     Source(Box<TypedSourceMetadata<SourceVerificationKey>>),
     SetVariable(Box<TypedSetVariable<SetVariableVerificationKey>>),
     CrossoriginPolicy(Box<TypedCrossoriginPolicy<CrossoriginPolicyVerificationKey>>),
+    AllowCompress(Box<TypedAllowCompress<AllowCompressVerificationKey>>),
     #[default]
     None,
 }
@@ -109,6 +112,7 @@ impl From<&CdniVerificationKey> for CdniVerifiedMetadataTypes {
             CdniVerificationKey::Stage(_) => CdniVerifiedMetadataTypes::ProcessingStages,
             CdniVerificationKey::Source(_) => CdniVerifiedMetadataTypes::Source,
             CdniVerificationKey::SetVariable(_) => CdniVerifiedMetadataTypes::SetVariable,
+            CdniVerificationKey::AllowCompress(_) => CdniVerifiedMetadataTypes::AllowCompress,
             CdniVerificationKey::CrossoriginPolicy(_) => {
                 CdniVerifiedMetadataTypes::CrossoriginPolicy
             }

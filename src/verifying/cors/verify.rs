@@ -22,8 +22,8 @@ use regex::Regex;
 use crate::{
     cdni::{
         cors::spec::{
-            AccessControlAllowOrigin, AccessControlAllowOriginPattern, CrossoriginPolicy,
-            TypedCrossoriginPolicy,
+            AccessControlAllowOrigin, AccessControlAllowOriginPattern, AllowCompress,
+            CrossoriginPolicy, TypedAllowCompress, TypedCrossoriginPolicy,
         },
         gmd::spec::TypedGenericMetadata,
     },
@@ -100,6 +100,61 @@ fn verify_allow_origin(
     })
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct AllowCompressVerificationKey {}
+
+#[derive(Debug)]
+pub enum AllowCompressVerificationError {}
+
+impl Display for AllowCompressVerificationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl Error for AllowCompressVerificationError {}
+
+fn analyze_allow_compress(
+    allow_compress: &TypedAllowCompress<()>,
+    input: MetadataAnalysisContext,
+) -> AnalysisResult<MetadataAnalysisContext, MetadataVerificationError> {
+    let res = TypedAllowCompress::<AllowCompressVerificationKey> {
+        tpe: TypedAllowCompress::<()>::typed_cdni_metadata_name(),
+        value: AllowCompress::<AllowCompressVerificationKey> {
+            allow_compress: allow_compress.value.allow_compress,
+            aug: AllowCompressVerificationKey::default(),
+        },
+    };
+
+    Ok((input, CdniVerificationKey::AllowCompress(Box::new(res))))
+}
+
+#[derive(Debug)]
+pub struct AllowCompressMetadataAnalyzer {}
+
+impl Verifier<MetadataAnalysisContext, MetadataVerificationError>
+    for AllowCompressMetadataAnalyzer
+{
+    fn analyze(
+        &self,
+        v: &TypedGenericMetadata<()>,
+        input: MetadataAnalysisContext,
+    ) -> AnalysisResult<MetadataAnalysisContext, MetadataVerificationError> {
+        let typed_cop = serde_json::from_value::<TypedAllowCompress<()>>(
+            serde_json::to_value(v)
+                .map_err(|e| MetadataVerificationError::JsonError(e.to_string()))?,
+        )
+        .map_err(|e| MetadataVerificationError::JsonError(e.to_string()))?;
+
+        // Verify the allow-list.
+        analyze_allow_compress(&typed_cop, input)
+    }
+
+    fn type_name(&self, candidate: &str) -> bool {
+        candidate == TypedAllowCompress::<()>::typed_cdni_metadata_name()
+    }
+}
+
 #[derive(Debug)]
 pub struct CrossoriginPolicyMetadataAnalyzer {}
 
@@ -149,12 +204,14 @@ mod test {
     use std::{assert_matches, path::Path};
 
     use crate::{
-        cdni::cors::spec::{CrossoriginPolicy, TypedCrossoriginPolicy},
+        cdni::cors::spec::{
+            AllowCompress, CrossoriginPolicy, TypedAllowCompress, TypedCrossoriginPolicy,
+        },
         environment::scope::Scopes,
         mel::types::Type,
         tests::read_test_file,
         verifying::{
-            cors::verify::analyze_crossoriginpolicy,
+            cors::verify::{analyze_allow_compress, analyze_crossoriginpolicy},
             verify::{CdniVerificationKey, MetadataAnalysisContext},
         },
     };
@@ -213,5 +270,40 @@ mod test {
         );
 
         assert_matches!(result, Err(_));
+    }
+
+    #[test]
+    fn test_verify_draft_figure3() {
+        let json = read_test_file(Path::new("./src/cdni/tests/cors/figure3.json"));
+        let cop_metadata = serde_json::from_str::<TypedAllowCompress<()>>(&json)
+            .expect("Could not parse JSON test file");
+        assert_eq!(
+            cop_metadata.tpe,
+            TypedAllowCompress::<()>::typed_cdni_metadata_name()
+        );
+
+        let (_, result) = analyze_allow_compress(
+            &cop_metadata,
+            MetadataAnalysisContext {
+                scopes: Scopes::<Type>::default(),
+            },
+        )
+        .expect("Could not verify valid MI.CrossoriginPolicy metadata");
+
+        let result = match result {
+            CdniVerificationKey::AllowCompress(r) => r,
+            _ => todo!(),
+        };
+
+        assert_matches!(
+            *result,
+            TypedAllowCompress {
+                tpe: _,
+                value: AllowCompress {
+                    allow_compress: Some(true),
+                    aug: _,
+                }
+            }
+        );
     }
 }

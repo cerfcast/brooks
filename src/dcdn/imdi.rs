@@ -68,6 +68,9 @@ impl
             CdniVerificationKey::CrossoriginPolicy(typed_crossorigin_policy) => {
                 typed_crossorigin_policy.interpret(input)
             }
+            CdniVerificationKey::AllowCompress(typed_allow_compress) => {
+                typed_allow_compress.interpret(input)
+            }
             CdniVerificationKey::None => todo!(),
         }
     }
@@ -77,6 +80,9 @@ impl
             CdniVerificationKey::Stage(typed_stage) => typed_stage.at(stage),
             CdniVerificationKey::Source(typed_source) => typed_source.at(stage),
             CdniVerificationKey::SetVariable(typed_set_variable) => typed_set_variable.at(stage),
+            CdniVerificationKey::AllowCompress(typed_allow_compress) => {
+                typed_allow_compress.at(stage)
+            }
             CdniVerificationKey::CrossoriginPolicy(typed_crossorigin_policy) => {
                 typed_crossorigin_policy.at(stage)
             }
