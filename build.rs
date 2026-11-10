@@ -43,7 +43,7 @@ fn main() {
         let url = "https://github.com/nginx/nginx.git";
         Repository::clone(url, nginx_path).expect("Could not clone nginx source code repository.");
 
-        let configure_result = std::process::Command::new("./auto/configure")
+        let _configure_result = std::process::Command::new("./auto/configure")
             .current_dir(nginx_path)
             .args([
                 "--with-debug",
