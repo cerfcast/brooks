@@ -70,6 +70,9 @@ fn main() {
             .expect("Could not configure nginx");
     }
 
+    //TODO: If we did not need ngx_auto_headers.h (that is generated during the configure process),
+    //we would not have to configure. That would be _really_ nice.
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
