@@ -70,7 +70,10 @@ jobs:
       # See https://github.com/orgs/community/discussions/25742
       - run: tree-sitter generate
         working-directory: ./parser
+      - run: pwd
       - run: cargo build --verbose
+        working-directory: ../
+      - run: pwd
       - run: cargo test --verbose
       - run: cargo test --manifest-path parser/Cargo.toml
   library-tests-windows:
@@ -134,7 +137,10 @@ jobs:
       # See https://github.com/orgs/community/discussions/25742
       - run: tree-sitter generate
         working-directory: ./parser
+      - run: pwd
       - run: cargo build -F nginx --verbose
+        working-directory: ../
+      - run: pwd
   library-integration-express-build:
     name: Library Integration - Express Build
     runs-on: ubuntu-latest
