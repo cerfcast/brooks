@@ -70,15 +70,9 @@ jobs:
       # See https://github.com/orgs/community/discussions/25742
       - run: tree-sitter generate
         working-directory: ./parser
-      - run: cargo build --target aarch64-apple-darwin
-      - run: cargo test --target aarch64-apple-darwin
-      - run: cargo test --manifest-path parser/Cargo.toml --target aarch64-apple-darwin
-  debugging-macos:
-    name: Debugging Rustup - macOS
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v7
-      - run: rustup show
+      - run: cargo build --verbose
+      - run: cargo test --verbose
+      - run: cargo test --manifest-path parser/Cargo.toml
   library-tests-windows:
     name: Library Tests (Default Features - Windows)
     runs-on: windows-latest
@@ -140,7 +134,7 @@ jobs:
       # See https://github.com/orgs/community/discussions/25742
       - run: tree-sitter generate
         working-directory: ./parser
-      - run: cargo build -F nginx --target aarch64-apple-darwin
+      - run: cargo build -F nginx --verbose
   library-integration-express-build:
     name: Library Integration - Express Build
     runs-on: ubuntu-latest
