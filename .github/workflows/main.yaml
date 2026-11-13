@@ -27,18 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: tree-sitter/setup-action@v2
-        with:
-          tree-sitter-ref: "master"
-      # Because our tree-sitter code is in a subdirectory,
-      # and working-directory does not apply to uses, we
-      # are forced to specify calls to the CI ourselves.
-      # See https://github.com/orgs/community/discussions/25742
-      - run: tree-sitter generate
-        working-directory: ./parser
       - run: cargo build --no-default-features
       - run: cargo test --no-default-features
-      - run: cargo test --manifest-path parser/Cargo.toml
   library-tests:
     name: Library Tests (Default Features - Linux)
     runs-on: ubuntu-latest
@@ -66,15 +56,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: tree-sitter/setup-action@v2
-        with:
-          tree-sitter-ref: "master"
-      # Because our tree-sitter code is in a subdirectory,
-      # and working-directory does not apply to uses, we
-      # are forced to specify calls to the CI ourselves.
-      # See https://github.com/orgs/community/discussions/25742
-      - run: tree-sitter generate
-        working-directory: ./parser
       - run: cargo build -F caddy
   library-integration-nginx-build:
     name: Library Integration - Nginx Build
@@ -87,23 +68,12 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
-      - run: pwd
-      - run: cargo build -F nginx --verbose
-      - run: pwd
+      - run: cargo build -F nginx
   library-integration-express-build:
     name: Library Integration - Express Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: tree-sitter/setup-action@v2
-        with:
-          tree-sitter-ref: "master"
-      # Because our tree-sitter code is in a subdirectory,
-      # and working-directory does not apply to uses, we
-      # are forced to specify calls to the CI ourselves.
-      # See https://github.com/orgs/community/discussions/25742
-      - run: tree-sitter generate
-        working-directory: ./parser
       - run: cargo build -F express
   library-format-tests:
     name: Library Format Tests
@@ -121,15 +91,6 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
-      - uses: tree-sitter/setup-action@v2
-        with:
-          tree-sitter-ref: "master"
-      # Because our tree-sitter code is in a subdirectory,
-      # and working-directory does not apply to uses, we
-      # are forced to specify calls to the CI ourselves.
-      # See https://github.com/orgs/community/discussions/25742
-      - run: tree-sitter generate
-        working-directory: ./parser
       - run: cargo build
       - run: cargo doc --no-deps
       - name: Delete lock file
