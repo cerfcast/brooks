@@ -44,52 +44,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: tree-sitter/setup-action@v2
-        with:
-          tree-sitter-ref: "master"
-      # Because our tree-sitter code is in a subdirectory,
-      # and working-directory does not apply to uses, we
-      # are forced to specify calls to the CI ourselves.
-      # See https://github.com/orgs/community/discussions/25742
-      - run: tree-sitter generate
-        working-directory: ./parser
       - run: cargo build
       - run: cargo test
-      - run: cargo test --manifest-path parser/Cargo.toml
   library-tests-macos:
     name: Library Tests (Default Features - macOS)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: tree-sitter/setup-action@v2
-        with:
-          tree-sitter-ref: "master"
-      # Because our tree-sitter code is in a subdirectory,
-      # and working-directory does not apply to uses, we
-      # are forced to specify calls to the CI ourselves.
-      # See https://github.com/orgs/community/discussions/25742
-      - run: tree-sitter generate
-        working-directory: ./parser
-      - run: pwd
       - run: cargo build --verbose
-        working-directory: ../
-      - run: pwd
       - run: cargo test --verbose
-      - run: cargo test --manifest-path parser/Cargo.toml
   library-tests-windows:
     name: Library Tests (Default Features - Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: tree-sitter/setup-action@v2
-        with:
-          tree-sitter-ref: "master"
-      # Because our tree-sitter code is in a subdirectory,
-      # and working-directory does not apply to uses, we
-      # are forced to specify calls to the CI ourselves.
-      # See https://github.com/orgs/community/discussions/25742
-      - run: tree-sitter generate
-        working-directory: ./parser
       - run: cargo build
       - run: cargo test
       - run: cargo test --manifest-path parser/Cargo.toml
@@ -113,15 +81,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: tree-sitter/setup-action@v2
-        with:
-          tree-sitter-ref: "master"
-      # Because our tree-sitter code is in a subdirectory,
-      # and working-directory does not apply to uses, we
-      # are forced to specify calls to the CI ourselves.
-      # See https://github.com/orgs/community/discussions/25742
-      - run: tree-sitter generate
-        working-directory: ./parser
       - run: cargo build -F nginx
   library-integration-nginx-build-macos:
     name: Library Integration - Nginx Build - macOS
