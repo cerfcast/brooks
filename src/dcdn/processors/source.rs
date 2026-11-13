@@ -18,17 +18,19 @@
 //! The Source Generic Metadata Processing Implementation
 
 use http::{HeaderMap, HeaderName, HeaderValue};
-use reqwest::dns::{Addrs, Resolve};
+use reqwest::{
+    ResponseBuilderExt,
+    dns::{Addrs, Resolve},
+};
 
 use crate::{
     cdni::original::spec::TypedSourceMetadata,
     dcdn::{
         imdi,
-        interpret::{Error, MetadataInformationResultElements, ProcessedRequestResponse, Stages},
+        interpret::{Error, FromableRequest, MetadataInformationResultElements, Stages},
         processors::SimpleProcessorsInterpreterContext,
     },
     processing::interpret::{self, InterpretationResult},
-    prr::{self, Prr},
     verifying::original::verify::SourceVerificationKey,
 };
 
@@ -125,13 +127,11 @@ impl
     > {
         let req = &*input.req;
 
-        let mut req: reqwest::Request = req
-            .try_into()
-            .map_err(|e: prr::Error| Error::InvalidInput(e.into()))?;
+        let mut req: reqwest::Request =
+            TryInto::<reqwest::Request>::try_into(FromableRequest(req))?;
 
         *req.headers_mut() = filter_edge_headers_from_request(req.headers());
 
-        let req_method = req.method().clone();
         let req_url = req.url().clone();
 
         let mut clientb = reqwest::Client::builder();
@@ -156,22 +156,26 @@ impl
 
         let client = clientb.build().map_err(|e| Error::RuntimeError(e.into()))?;
 
-        let result: Result<ProcessedRequestResponse, Error> = input.runtime.block_on(async {
+        let result: Result<http::Response<Vec<u8>>, Error> = input.runtime.block_on(async {
             let r = client
                 .execute(req)
                 .await
                 .map_err(|e| Error::RuntimeError(e.into()))?;
 
-            let mut result = ProcessedRequestResponse::new_response(&req_url, &req_method);
+            let mut result = http::Response::builder().url(req_url);
 
-            result.oheaders = filter_hop_by_hop_headers_from_response(r.headers());
+            for (h, v) in filter_hop_by_hop_headers_from_response(r.headers()) {
+                if let Some(h) = h {
+                    result = result.header(h, v);
+                } else {
+                    todo!()
+                }
+            }
 
-            result
-                .set_status(&r.status().as_u16())
-                .map_err(|_| Error::RuntimeError(prr::Error::BadStatus.into()))?;
+            result = result.status(r.status());
 
             let b = r.bytes().await.map_err(|e| Error::RuntimeError(e.into()))?;
-            result.obody = b.to_vec();
+            let result = result.body(b.to_vec()).expect("TODO");
             Ok(result)
         });
 

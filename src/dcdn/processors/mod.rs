@@ -17,7 +17,7 @@
 
 //! Processors for Metadata Information.
 
-use crate::{dcdn::imdi, environment::scope::Scopes, mel::interpreter::values::TypedValue, prr};
+use crate::{dcdn::imdi, environment::scope::Scopes, mel::interpreter::values::TypedValue};
 
 pub mod cors;
 pub mod mel;
@@ -29,19 +29,16 @@ pub struct SimpleProcessorsInterpreterContext<'a> {
     pub scopes: Scopes<TypedValue>,
     pub mode: imdi::InterpretMode,
     pub runtime: &'a tokio::runtime::Handle,
-    pub req: Box<dyn prr::Prr<Vec<u8>>>,
-    pub res: Option<Box<dyn prr::Prr<Vec<u8>>>>,
+    pub req: Box<http::Request<Vec<u8>>>,
+    pub res: Option<Box<http::Response<Vec<u8>>>>,
 }
 
 impl<'a> SimpleProcessorsInterpreterContext<'a> {
     /// Create an interpreter context based on an existing one, but with a new RR.
-    pub fn with_res(self, res: Box<dyn prr::Prr<Vec<u8>>>) -> Self {
+    pub fn with_res(self, res: Box<http::Response<Vec<u8>>>) -> Self {
         Self {
             scopes: self.scopes,
-            mode: match res.tpe() {
-                prr::PrrType::Request => imdi::InterpretMode::Request,
-                prr::PrrType::Response => imdi::InterpretMode::Response,
-            },
+            mode: self.mode,
             runtime: self.runtime,
             req: self.req,
             res: Some(res),

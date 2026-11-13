@@ -24,10 +24,7 @@ use crate::{
     dcdn::{
         error::{ImdInterpretError, ProxyError, ProxyResult},
         imdi::interpret_interconnection_metadata,
-        interpret::{
-            Error::{self, AssertionFailure},
-            ProcessedRequestResponse,
-        },
+        interpret::Error::{self, AssertionFailure},
     },
     environment::scope::{Scope, Scopes},
     hmds::{HmdsConfiguration, post_log_hmds, query_hmds},
@@ -37,7 +34,6 @@ use crate::{
         interpreter::values::{TypedValue, mel_var_value_from_type},
         types::{Type, builtin_function_types, minimal_core_variable_types},
     },
-    prr,
     verifying::imdv::verify_interconnection_metadata,
 };
 
@@ -128,17 +124,9 @@ pub fn safe_brooks_integration_handle(
         (verified_md, updated_types_scope)
     };
 
-    let processed_http_req = match TryInto::<ProcessedRequestResponse>::try_into(request) {
-        Ok(o) => o,
-        Err(e) => {
-            return Err((ProxyError::SetupError(e.into()).into(), log));
-        }
-    };
-
-    let processed_http_req = Box::new(processed_http_req);
-    let mel_scopes: Scopes<TypedValue> = mel.enter_scope(Into::<Scope<TypedValue>>::into(
-        &*processed_http_req as &dyn prr::Prr<Vec<u8>>,
-    ));
+    let mel_scopes: Scopes<TypedValue> =
+        mel.enter_scope(TryInto::<Scope<TypedValue>>::try_into(request).expect("TODO"));
+    let processed_http_req = Box::new(request.clone());
 
     // Get the updated var struct (after processing any MI.SetVariables in the HMD), and
     // build up a more complete type for its value during interpretation.

@@ -120,19 +120,14 @@ impl
 
 #[cfg(test)]
 mod test {
-    use std::{assert_matches, str::FromStr};
-
-    use url::Url;
+    use std::assert_matches;
 
     use crate::{
         cdni::{
             mel::spec::TypedSetVariable,
             tests::test_helpers::{generic_metadata, set_variable},
         },
-        dcdn::{
-            imdi, interpret::ProcessedRequestResponse,
-            processors::SimpleProcessorsInterpreterContext,
-        },
+        dcdn::{imdi, processors::SimpleProcessorsInterpreterContext},
         environment::scope::Scopes,
         mel::{
             MEL_USER_SET_VARIABLE_STRUCT_NAME,
@@ -184,7 +179,6 @@ mod test {
             Type::Struct(s) => s,
             _ => panic!("var had the wrong type in the analyzed generic metadata"),
         };
-
         let rt = tokio::runtime::Builder::new_current_thread()
             .build()
             .expect("Could not get a runtime to use for testing interpret function");
@@ -196,11 +190,13 @@ mod test {
                 ),
                 mode: imdi::InterpretMode::Request,
                 runtime: rt.handle(),
-                req: Box::new(ProcessedRequestResponse::new_request(
-                    &Url::from_str("http://www.example.com/")
-                        .expect("Could not get a URI from a valid HTTP address"),
-                    &http::Method::GET,
-                )),
+                req: Box::new(
+                    http::Request::builder()
+                        .uri("http://www.example.com")
+                        .method(http::Method::GET)
+                        .body(vec![])
+                        .unwrap(),
+                ),
                 res: None,
             })
             .expect("Could not interpret correct MI.SetVariable");

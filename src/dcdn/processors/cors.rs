@@ -20,7 +20,10 @@
 use std::{collections::HashMap, fmt::Display, io::Read, str::FromStr};
 
 use flate2::{Compression, GzBuilder};
-use http::header::{ACCEPT_ENCODING, CONTENT_ENCODING};
+use http::{
+    HeaderValue,
+    header::{ACCEPT_ENCODING, CONTENT_ENCODING},
+};
 use zlib_rs::{DeflateConfig, ReturnCode, compress_bound, compress_slice};
 
 use crate::{
@@ -82,7 +85,7 @@ impl
         let origin_value = match req
             .headers()
             .iter()
-            .find(|(name, _)| *name == http::header::ORIGIN.to_string())
+            .find(|(name, _)| *name == http::header::ORIGIN)
         {
             Some(origin_value) => origin_value.1.clone(),
             None => todo!(),
@@ -107,14 +110,16 @@ impl
         // set the ORIGIN header value in the response.
         if apply {
             if self.value.allow_origin.wildcard_return {
-                res.set_header_value(http::header::ACCESS_CONTROL_ALLOW_ORIGIN.as_str(), "*")
-                    .map_err(|e| Error::RuntimeError(e.into()))?;
+                res.headers_mut().insert(
+                    http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+                    HeaderValue::from_static("*"),
+                );
             } else {
-                res.set_header_value(
-                    http::header::ACCESS_CONTROL_ALLOW_ORIGIN.as_str(),
-                    origin_value,
-                )
-                .map_err(|e| Error::RuntimeError(e.into()))?;
+                res.headers_mut().insert(
+                    http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+                    HeaderValue::from_str(origin_value)
+                        .map_err(|e| Error::RuntimeError(e.into()))?,
+                );
             }
         }
 
@@ -202,14 +207,11 @@ fn interpret_allow_compress<'a>(
 
     let req = input.req;
 
-    let accept_encoding_value = match req
+    let accept_encoding_value = req
         .headers()
         .into_iter()
         .find(|(v, _)| **v == ACCEPT_ENCODING)
-    {
-        Some(f) => Some(f.1),
-        None => None,
-    };
+        .map(|f| f.1);
 
     // Build up the encoders that are available.
     let deflate_repr = DeflateAcceptCoding {};
@@ -260,18 +262,16 @@ fn interpret_allow_compress<'a>(
     };
 
     if let Some(repr) = chosen_encoding {
-        res.add_header(CONTENT_ENCODING.as_str(), &repr.token().to_string())
-            .map_err(|e| {
+        res.headers_mut().insert(
+            CONTENT_ENCODING,
+            HeaderValue::from_str(&repr.token().to_string()).map_err(|e| {
                 Error::RuntimeError(ImdInterpretError::MetadataProcessingError(e.into()).into())
-            })?;
+            })?,
+        );
 
-        let body = res.get_body().map_err(|e| {
-            Error::RuntimeError(ImdInterpretError::MetadataProcessingError(e.into()).into())
-        })?;
+        let body = res.body();
         let reprd = repr.code(body);
-        res.set_body(&reprd).map_err(|e| {
-            Error::RuntimeError(ImdInterpretError::MetadataProcessingError(e.into()).into())
-        })?;
+        *res.body_mut() = reprd;
     } else {
         // Log.
         todo!()
@@ -442,16 +442,17 @@ impl TryFrom<&str> for AcceptCodings {
 
 #[cfg(test)]
 mod test_allow_compress {
+    use reqwest::ResponseBuilderExt;
+
     use crate::{
         dcdn::{
             imdi::InterpretMode,
-            interpret::ProcessedRequestResponse,
             processors::{
                 SimpleProcessorsInterpreterContext,
                 cors::{AcceptCodings, ContentCodingTypes, interpret_allow_compress},
             },
         },
-        prr::Prr,
+        utils::try_to_url,
     };
 
     #[test]
@@ -485,7 +486,10 @@ mod test_allow_compress {
 
     fn build_test_request_response(
         acceptable_encodings: Option<&str>,
-    ) -> (Box<ProcessedRequestResponse>, ProcessedRequestResponse) {
+    ) -> (
+        Box<http::request::Request<Vec<u8>>>,
+        http::response::Response<Vec<u8>>,
+    ) {
         let req = http::request::Builder::new();
         let mut req = req.uri("https://www.example.com");
 
@@ -497,19 +501,19 @@ mod test_allow_compress {
         let req = req.body::<Vec<u8>>(vec![]).expect(
             "Could not build a test request with Accept-Coding of value {acceptable_encodings}",
         );
-        let req = Box::new(
-            TryInto::<ProcessedRequestResponse>::try_into(&req)
-                .expect("Could not convert the test request into a ProcessedRequestResponse"),
-        );
+        let req = Box::new(req);
 
-        let res = ProcessedRequestResponse::new_response(&req.ourl, &http::method::Method::GET);
+        let res = http::response::Response::builder()
+            .url(try_to_url(req.uri()).expect("TODO"))
+            .body(vec![])
+            .expect("TODO");
 
         (req, res)
     }
 
     fn build_test_interpreter_context<'a>(
-        req: Box<ProcessedRequestResponse>,
-        res: Option<Box<dyn Prr<Vec<u8>>>>,
+        req: Box<http::request::Request<Vec<u8>>>,
+        res: Option<Box<http::response::Response<Vec<u8>>>>,
         runtime: &'a tokio::runtime::Handle,
     ) -> SimpleProcessorsInterpreterContext<'a> {
         SimpleProcessorsInterpreterContext {
@@ -541,12 +545,15 @@ mod test_allow_compress {
 
         let header = interpreted_response
             .headers()
-            .first()
-            .expect("Missing expected header in an interpreted response")
-            .clone();
+            .iter()
+            .next()
+            .expect("Missing expected header in an interpreted response");
 
-        assert_eq!(header.0, http::header::CONTENT_ENCODING.to_string());
-        assert_eq!(header.1, ContentCodingTypes::Identity.to_string());
+        assert_eq!(header.0, http::header::CONTENT_ENCODING);
+        assert_eq!(
+            header.1.to_str().expect("TODO"),
+            ContentCodingTypes::Identity.to_string()
+        );
 
         // Should choose deflate (because of high q).
         let (req, res) = build_test_request_response(Some("identity;q=0,deflate;q=1"));
@@ -563,12 +570,15 @@ mod test_allow_compress {
 
         let header = interpreted_response
             .headers()
-            .first()
-            .expect("Missing expected header in an interpreted response")
-            .clone();
+            .iter()
+            .next()
+            .expect("Missing expected header in an interpreted response");
 
-        assert_eq!(header.0, http::header::CONTENT_ENCODING.to_string());
-        assert_eq!(header.1, ContentCodingTypes::Deflate.to_string());
+        assert_eq!(header.0, http::header::CONTENT_ENCODING);
+        assert_eq!(
+            header.1.to_str().expect("TODO"),
+            ContentCodingTypes::Deflate.to_string()
+        );
 
         // Should choose identity (because of high q).
         let (req, res) = build_test_request_response(Some("identity;q=1,deflate;q=0.5"));
@@ -585,12 +595,15 @@ mod test_allow_compress {
 
         let header = interpreted_response
             .headers()
-            .first()
-            .expect("Missing expected header in an interpreted response")
-            .clone();
+            .iter()
+            .next()
+            .expect("Missing expected header in an interpreted response");
 
-        assert_eq!(header.0, http::header::CONTENT_ENCODING.to_string());
-        assert_eq!(header.1, ContentCodingTypes::Identity.to_string());
+        assert_eq!(header.0, http::header::CONTENT_ENCODING);
+        assert_eq!(
+            header.1.to_str().expect("TODO"),
+            ContentCodingTypes::Identity.to_string()
+        );
 
         // Should choose gzip (because of high q).
         let (req, res) =
@@ -608,12 +621,15 @@ mod test_allow_compress {
 
         let header = interpreted_response
             .headers()
-            .first()
-            .expect("Missing expected header in an interpreted response")
-            .clone();
+            .iter()
+            .next()
+            .expect("Missing expected header in an interpreted response");
 
-        assert_eq!(header.0, http::header::CONTENT_ENCODING.to_string());
-        assert_eq!(header.1, ContentCodingTypes::Gzip.to_string());
+        assert_eq!(header.0, http::header::CONTENT_ENCODING);
+        assert_eq!(
+            header.1.to_str().expect("TODO"),
+            ContentCodingTypes::Gzip.to_string()
+        );
 
         // Should choose identity (because empty Accept-Encoding header value implies desire for no coding)
         let (req, res) = build_test_request_response(Some(""));
@@ -630,12 +646,15 @@ mod test_allow_compress {
 
         let header = interpreted_response
             .headers()
-            .first()
-            .expect("Missing expected header in an interpreted response")
-            .clone();
+            .iter()
+            .next()
+            .expect("Missing expected header in an interpreted response");
 
-        assert_eq!(header.0, http::header::CONTENT_ENCODING.to_string());
-        assert_eq!(header.1, ContentCodingTypes::Identity.to_string());
+        assert_eq!(header.0, http::header::CONTENT_ENCODING);
+        assert_eq!(
+            header.1.to_str().expect("TODO"),
+            ContentCodingTypes::Identity.to_string()
+        );
 
         // Should choose deflate (because missing Accept-Encoding header implies user's willingness to accept any coding)
         let (req, res) = build_test_request_response(None);
@@ -652,11 +671,14 @@ mod test_allow_compress {
 
         let header = interpreted_response
             .headers()
-            .first()
-            .expect("Missing expected header in an interpreted response")
-            .clone();
+            .iter()
+            .next()
+            .expect("Missing expected header in an interpreted response");
 
-        assert_eq!(header.0, http::header::CONTENT_ENCODING.to_string());
-        assert_eq!(header.1, ContentCodingTypes::Deflate.to_string());
+        assert_eq!(header.0, http::header::CONTENT_ENCODING);
+        assert_eq!(
+            header.1.to_str().expect("TODO"),
+            ContentCodingTypes::Deflate.to_string()
+        );
     }
 }

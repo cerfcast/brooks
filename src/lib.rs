@@ -51,9 +51,6 @@ pub mod integrations;
 pub mod environment;
 
 #[allow(dead_code)]
-pub mod prr;
-
-#[allow(dead_code)]
 pub mod macros;
 
 #[cfg(test)]

@@ -17,27 +17,24 @@
 
 //! Interpret CDNI Interconnection Metadata as a dCDN
 
-use std::str::FromStr;
-
 use chrono::Utc;
+use reqwest::ResponseBuilderExt;
 
 use crate::cdni::logging::record::LogRecord;
 use crate::dcdn::error::{ImdInterpretError, ImdInterpretResult};
-use crate::dcdn::interpret::{
-    Error, MetadataInformationResultElements, ProcessedRequestResponse, Stages,
-};
+use crate::dcdn::interpret::{Error, MetadataInformationResultElements, Stages};
 use crate::dcdn::processors::SimpleProcessorsInterpreterContext;
 use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
 use crate::processing::interpret::{InterpretationResult, Interpreter};
+use crate::utils::try_to_url;
 use crate::verifying::verify::CdniVerificationKey;
 
-use crate::prr;
 use crate::{cdni::imd::spec::HostMetadata, mel::interpreter::values::TypedValue};
 
 pub type ResultValue = Option<http::Response<Vec<u8>>>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum InterpretMode {
     Request,
     Response,
@@ -99,13 +96,12 @@ impl
 pub fn interpret_interconnection_metadata(
     hmd: &HostMetadata<CdniVerificationKey>,
     mel_scopes: Scopes<TypedValue>,
-    request: Box<dyn prr::Prr<Vec<u8>>>,
+    request: Box<http::Request<Vec<u8>>>,
     runtime: &tokio::runtime::Handle,
     mut log: LogMsgs,
 ) -> ImdInterpretResult {
     let timestamp_ns = Utc::now().timestamp();
-    let cs_uri: http::Uri =
-        http::Uri::from_str(request.url().expect("TODO").as_str()).expect("TODO");
+    let cs_uri: http::Uri = request.uri().clone();
 
     let mut request_context = SimpleProcessorsInterpreterContext {
         scopes: mel_scopes,
@@ -196,13 +192,7 @@ pub fn interpret_interconnection_metadata(
         runtime: source_context.runtime,
     };
 
-    let source_response = if let Some(res) = &response_context.res
-        && res.tpe() == prr::PrrType::Response
-    {
-        true
-    } else {
-        false
-    };
+    let source_response = response_context.res.is_some();
 
     log = debug!(
         log,
@@ -222,21 +212,11 @@ pub fn interpret_interconnection_metadata(
 
     // If there was no response, make a 404 response.
     if !source_response {
-        let response_404_url = match response_context.req.url() {
-            Ok(url) => url,
-            Err(e) => {
-                return Err((
-                    ImdInterpretError::MetadataProcessingError(e.into()).into(),
-                    log,
-                ));
-            }
-        };
-        let mut response_404 = ProcessedRequestResponse::new_response(
-            &response_404_url,
-            &response_context.req.get_method(),
-        );
-        response_404.ostatus = Some(http::StatusCode::NOT_FOUND);
-        response_context.res = Some(Box::new(response_404));
+        let response_404_url = response_context.req.uri();
+        let mut response_404 =
+            http::Response::builder().url(try_to_url(response_404_url).expect("TODO"));
+        response_404 = response_404.status(http::StatusCode::NOT_FOUND);
+        response_context.res = Some(Box::new(response_404.body(vec![]).expect("TODO")));
     }
 
     log = debug!(log, "Stop: processing source stages.");
@@ -323,28 +303,18 @@ pub fn interpret_interconnection_metadata(
 
     log = debug!(log, "Trying to convert a response into a response!");
 
-    let processed_http_response = match response_context.res {
+    let response = match response_context.res {
         Some(res) => res,
         None => todo!(),
     };
-    let interpreted_http_response: http::Response<Vec<u8>> =
-        match (&*processed_http_response as &dyn prr::Prr<Vec<u8>>).try_into() {
-            Ok(o) => o,
-            Err(e) => {
-                return Err((ImdInterpretError::TransformError(e.into()).into(), log));
-            }
-        };
 
-    log = debug!(
-        log,
-        &format!("Response code: {}", interpreted_http_response.status())
-    );
+    log = debug!(log, &format!("Response code: {}", response.status()));
 
-    let sc_status = interpreted_http_response.status();
+    let sc_status = response.status();
     let s_upstream_header_size_bytes = 0u64;
     let s_upstream_total_bytes = 0u64;
     // TODO: Add headers
-    let sc_total_bytes = interpreted_http_response.body().len();
+    let sc_total_bytes = response.body().len();
     let s_ccid = "TODO".to_string();
 
     let lr = LogRecord::new_basic(
@@ -358,10 +328,5 @@ pub fn interpret_interconnection_metadata(
         s_upstream_total_bytes,
     );
 
-    Ok((
-        interpreted_http_response.status(),
-        interpreted_http_response,
-        log,
-        Some(lr),
-    ))
+    Ok((response.status(), *response, log, Some(lr)))
 }

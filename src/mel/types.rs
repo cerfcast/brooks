@@ -28,7 +28,6 @@ use regex::Regex;
 use crate::{
     environment::scope::Scope,
     mel::{MEL_USER_SET_VARIABLE_STRUCT_NAME, interpreter::interpret::BuiltinFunction},
-    prr::Prr,
 };
 
 //BEGIN: Types
@@ -452,18 +451,6 @@ pub fn mel_empty_var_type() -> Struct {
     Struct::new(MEL_USER_SET_VARIABLE_STRUCT_NAME)
 }
 
-pub(crate) fn mel_header_type_from_processable_rr<A>(value: &dyn Prr<A>) -> Struct {
-    // Make the header type.
-    let mut ht = Struct::new("h");
-    value.headers().iter().for_each(|header| {
-        ht.insert_field(
-            &header.0.to_string().replace("-", "_").to_lowercase(),
-            Type::String,
-        );
-    });
-    ht
-}
-
 /// Create a [`Scope<Type>`] that contains the types of the MEL core variables.
 pub fn minimal_core_variable_types() -> Scope<Type> {
     let mut scope = Scope::<Type>::default();
@@ -530,12 +517,12 @@ pub fn builtin_function_types() -> Scope<Type> {
 }
 
 /// Create a scope that contains the types of only the MEL core variables present in an HTTP request.
-impl<A> From<http::Request<A>> for Scope<Type> {
-    fn from(value: http::Request<A>) -> Self {
+impl<A> From<&http::Request<A>> for Scope<Type> {
+    fn from(value: &http::Request<A>) -> Self {
         // Set up the built-in variables for type checking.
         let mut scope = Scope::<Type>::default();
 
-        let ht = mel_header_type_from_req(&value);
+        let ht = mel_header_type_from_req(value);
         let urit = mel_uri_type();
         let reqs = mel_req_type(ht, urit);
 

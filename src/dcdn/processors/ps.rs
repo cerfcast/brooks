@@ -20,6 +20,9 @@
 use std::error;
 use std::fmt::{Debug, Display};
 use std::str::FromStr;
+use std::sync::Arc;
+
+use http::{HeaderName, HeaderValue};
 
 use crate::cdni::gmd::spec::TypedGenericMetadata;
 use crate::cdni::ps::spec::{
@@ -38,6 +41,7 @@ use crate::dcdn::interpret::{
 use crate::dcdn::processors::SimpleProcessorsInterpreterContext;
 use crate::environment::scope::Scopes;
 use crate::logging::LogMsgs;
+use crate::mel;
 use crate::mel::analysis::Analyzed;
 use crate::mel::ast::Expr;
 use crate::mel::interpreter::error::{
@@ -48,12 +52,19 @@ use crate::mel::interpreter::interpret::MelInterpContext;
 use crate::mel::interpreter::values::{TypedValue, Value};
 use crate::mel::types::Type;
 use crate::processing::interpret::{self, Interpreter};
+use crate::utils::try_to_uri;
 use crate::verifying::ps::verify::PsVerificationKey;
 use crate::visitors::{PsVisitor, PsVisitorResult};
-use crate::{mel, prr};
 
-pub type PsInterpretResult =
-    Result<(PsInterpretValue, MetadataInformationResultElements), Box<PsInterpretError>>;
+pub type PsInterpretResult = Result<
+    (
+        Box<http::request::Request<Vec<u8>>>,
+        Option<Box<http::response::Response<Vec<u8>>>>,
+        PsInterpretValue,
+        MetadataInformationResultElements,
+    ),
+    Box<PsInterpretError>,
+>;
 
 #[derive(Debug, Clone)]
 pub enum PsInterpretAssertionFailures {
@@ -61,6 +72,7 @@ pub enum PsInterpretAssertionFailures {
     MissingInterpreterExpressionValue,
     InvalidInterpreterMode,
     MissingResult,
+    MissingResponse,
 }
 
 impl Display for PsInterpretAssertionFailures {
@@ -76,6 +88,7 @@ impl Display for PsInterpretAssertionFailures {
                 write!(f, "Invalid interpreter mode")
             }
             PsInterpretAssertionFailures::MissingResult => write!(f, "Missing result"),
+            PsInterpretAssertionFailures::MissingResponse => write!(f, "Missing response"),
         }
     }
 }
@@ -91,7 +104,7 @@ pub enum PsInterpretError {
     InvalidResponse(String),
     WrongType(PsInterpretValueType, PsInterpretValueType),
     WrongMatchGroupValueType(PsInterpretValueType),
-    ProcessableRequestResponseError(prr::Error),
+    HttpError(Box<dyn std::error::Error>),
 }
 
 impl error::Error for PsInterpretError {}
@@ -117,12 +130,10 @@ impl Display for PsInterpretError {
             PsInterpretError::WrongMatchGroupValueType(actual) => {
                 write!(f, "Match group value should not have {actual} type")
             }
-            PsInterpretError::ProcessableRequestResponseError(
-                processable_request_response_error,
-            ) => {
+            PsInterpretError::HttpError(http_error) => {
                 write!(
                     f,
-                    "Error occurred when modifying the request/response: {processable_request_response_error}"
+                    "Error occurred when modifying the request/response: {http_error}"
                 )
             }
         }
@@ -131,11 +142,12 @@ impl Display for PsInterpretError {
 
 // CDNI Processing Stage Interpreter
 
-pub(crate) struct PsInterpreter<'a> {
-    pub rr: &'a mut dyn prr::Prr<Vec<u8>>,
+pub(crate) struct PsInterpreter {
+    pub req: Box<http::request::Request<Vec<u8>>>,
+    pub res: Option<Box<http::response::Response<Vec<u8>>>>,
 }
 
-impl<'a> PsInterpreter<'a> {
+impl PsInterpreter {
     pub fn install_generic_visitors(&mut self) {}
 
     fn evaluate_mel_expr(
@@ -221,24 +233,10 @@ impl<'a> PsInterpreter<'a> {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PsInterpretMode {
     Request,
     Response,
-    HeaderAdd,
-    HeaderReplace,
-    HeaderCalculate,
-    #[default]
-    None,
-}
-
-impl From<imdi::InterpretMode> for PsInterpretMode {
-    fn from(value: imdi::InterpretMode) -> Self {
-        match value {
-            imdi::InterpretMode::Request => PsInterpretMode::Request,
-            imdi::InterpretMode::Response => PsInterpretMode::Response,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -266,7 +264,7 @@ pub enum PsInterpretValue {
     Terminate,
     MatchYes,
     MatchNo,
-    Header(String, String),
+    Header(HeaderName, HeaderValue),
 }
 
 impl From<PsInterpretValue> for PsInterpretValueType {
@@ -292,7 +290,7 @@ impl From<bool> for PsInterpretValue {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct PsInterpretContext {
     pub mode: PsInterpretMode,
     pub result: Option<PsInterpretValue>,
@@ -314,7 +312,7 @@ impl PsInterpretContext {
 
     fn update_metadata_elements(
         self,
-        new_element: Box<dyn MetadataInformationResultElement>,
+        new_element: Arc<dyn MetadataInformationResultElement>,
     ) -> PsInterpretContext {
         let mut nc = self;
         nc.metadata.elements.push(new_element);
@@ -330,8 +328,8 @@ impl PsInterpretContext {
     }
 }
 
-impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, PsInterpretError>
-    for PsInterpreter<'a>
+impl PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, PsInterpretError>
+    for PsInterpreter
 {
     fn visit_processing_stages(
         &mut self,
@@ -404,11 +402,6 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                     return self.visit_response_transform(res_xform, c);
                 }
             }
-            _ => {
-                return Err(PsInterpretError::AssertionFailure(
-                    PsInterpretAssertionFailures::InvalidInterpreterMode,
-                ));
-            }
         }
         Ok(c)
     }
@@ -455,9 +448,8 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
             }
             .map_err(PsInterpretError::InvalidUri)?;
 
-            self.rr
-                .set_url(&new_uri)
-                .map_err(PsInterpretError::ProcessableRequestResponseError)?
+            *self.req.uri_mut() =
+                try_to_uri(new_uri).map_err(|e| PsInterpretError::HttpError(e.into()))?;
         }
 
         Ok(c)
@@ -506,14 +498,13 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
                     "Could not convert {new_response} to unsigned 16-bit number: {e}"
                 ))
             })?;
-            self.rr.set_status(&new_response).map_err(|_| {
-                PsInterpretError::ProcessableRequestResponseError(prr::Error::BadValue(
-                    prr::Value {
-                        tpe: prr::ValueType::Status,
-                        value: Some(new_response.to_string()),
-                    },
-                ))
-            })?;
+
+            if let Some(res) = &mut self.res {
+                *res.status_mut() = http::StatusCode::from_u16(new_response)
+                    .map_err(|e| PsInterpretError::HttpError(e.into()))?;
+            } else {
+                return Err(PsInterpretError::InvalidResponse("Missing Response".into()));
+            }
         }
 
         Ok(c)
@@ -530,25 +521,54 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     fn visit_header_transform(
         &mut self,
         v: &TypedHeaderTransform<PsVerificationKey>,
-        mut c: PsInterpretContext,
+        c: PsInterpretContext,
     ) -> PsVisitorResult<PsInterpretContext, PsInterpretError> {
         if let Some(to_delete) = &v.value.delete {
-            for htr in to_delete {
-                self.rr
-                    .remove_header(htr)
-                    .map_err(PsInterpretError::ProcessableRequestResponseError)?
+            if c.mode == PsInterpretMode::Request {
+                for htr in to_delete {
+                    self.req.headers_mut().remove(htr);
+                }
+            } else {
+                if let Some(res) = &mut self.res {
+                    for htr in to_delete {
+                        res.headers_mut().remove(htr);
+                    }
+                } else {
+                    return Err(PsInterpretError::AssertionFailure(
+                        PsInterpretAssertionFailures::MissingResponse,
+                    ));
+                }
             }
         }
 
-        if let Some(to_add) = &v.value.add {
-            for htr in to_add {
-                c = self.visit_header(htr, c.update_mode(PsInterpretMode::HeaderAdd))?;
-            }
-        }
+        for htr in v.value.replace.iter().chain(&v.value.add).flatten() {
+            let result = self.visit_header(htr, c.clone())?;
 
-        if let Some(to_replace) = &v.value.replace {
-            for htr in to_replace {
-                c = self.visit_header(htr, c.update_mode(PsInterpretMode::HeaderReplace))?;
+            let (header_name, header_value) = match result.result {
+                Some(PsInterpretValue::Header(name, value)) => (name, value),
+                Some(e) => {
+                    return Err(PsInterpretError::WrongType(
+                        PsInterpretValueType::Header,
+                        e.into(),
+                    ));
+                }
+                None => {
+                    return Err(PsInterpretError::AssertionFailure(
+                        PsInterpretAssertionFailures::MissingResponse,
+                    ));
+                }
+            };
+
+            if c.mode == PsInterpretMode::Request {
+                self.req.headers_mut().insert(header_name, header_value);
+            } else {
+                if let Some(res) = self.res.as_mut() {
+                    res.headers_mut().insert(header_name, header_value);
+                } else {
+                    return Err(PsInterpretError::AssertionFailure(
+                        PsInterpretAssertionFailures::MissingResponse,
+                    ));
+                }
             }
         }
 
@@ -582,25 +602,11 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
         } else {
             v.value.value.clone()
         };
-
-        match c.mode {
-            PsInterpretMode::HeaderAdd => {
-                self.rr
-                    .add_header(&v.value.name, &value)
-                    .map_err(PsInterpretError::ProcessableRequestResponseError)?;
-                Ok(c)
-            }
-            PsInterpretMode::HeaderReplace => {
-                self.rr
-                    .set_header_value(&v.value.name, &value)
-                    .map_err(PsInterpretError::ProcessableRequestResponseError)?;
-                Ok(c)
-            }
-            PsInterpretMode::HeaderCalculate => {
-                Ok(c.update_result(Some(PsInterpretValue::Header(v.value.name.clone(), value))))
-            }
-            _ => todo!(),
-        }
+        let header_name = HeaderName::from_str(&v.value.name)
+            .map_err(|e| PsInterpretError::HttpError(e.into()))?;
+        let header_value =
+            HeaderValue::from_str(&value).map_err(|e| PsInterpretError::HttpError(e.into()))?;
+        Ok(c.update_result(Some(PsInterpretValue::Header(header_name, header_value))))
     }
 
     fn visit_synthetic_response(
@@ -612,16 +618,11 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
 
         if let Some(headers) = &v.value.headers {
             for header in headers {
-                //let result = self.visit_header(header, c.update_mode(HeaderCalculate))?;
-
-                c = self.visit_header(header, c.update_mode(PsInterpretMode::HeaderCalculate))?;
+                c = self.visit_header(header, c.clone())?;
 
                 match &c.result {
                     Some(PsInterpretValue::Header(name, value)) => {
-                        response.headers_mut().unwrap().insert(
-                            http::HeaderName::from_bytes(name.as_bytes()).expect("Todo"),
-                            http::HeaderValue::from_str(value).expect("Todo"),
-                        );
+                        response = response.header(name, value);
                     }
                     Some(r) => {
                         return Err(PsInterpretError::WrongType(
@@ -775,21 +776,24 @@ impl<'a> PsVisitor<PsVerificationKey, PsInterpretContext, PsInterpretContext, Ps
     }
 }
 
-/// TODO: Document
-pub fn interpret_stage(
+//TODO: Integrate with the [`Interpreter::interpret`] implementation for [`TypedStage`]
+// so that what is tested is what is actually used.
+fn interpret_stage(
     ts: &TypedStage<PsVerificationKey>,
     mel_scopes: &Scopes<TypedValue>,
-    reqres: &mut dyn prr::Prr<Vec<u8>>,
+    req: Box<http::request::Request<Vec<u8>>>,
+    res: Option<Box<http::response::Response<Vec<u8>>>>,
     mode: PsInterpretMode,
 ) -> PsInterpretResult {
-    let mut visitor = PsInterpreter { rr: reqres };
+    let mut visitor = PsInterpreter { req, res };
 
     visitor.install_generic_visitors();
 
     let context = PsInterpretContext {
         mel_scopes: mel_scopes.clone(),
         mode,
-        ..Default::default()
+        metadata: MetadataInformationResultElements { elements: vec![] },
+        result: None,
     };
 
     let result = match ts {
@@ -813,109 +817,7 @@ pub fn interpret_stage(
         .ok_or(Box::new(PsInterpretError::AssertionFailure(
             PsInterpretAssertionFailures::MissingResult,
         )))?;
-    Ok((result, md))
-}
-
-#[derive(Debug)]
-pub(crate) enum EffectfulRequestActions {
-    DeleteHeader(String),
-    AddHeader(String, String),
-    ClearHeaders,
-    SetUri(String),
-    SetBody,
-    SetResponse(u16),
-}
-
-#[derive(Debug)]
-pub(crate) struct EffectfulProcessableRequestResponse {
-    log: Vec<EffectfulRequestActions>,
-    tpe: prr::PrrType,
-}
-
-impl EffectfulProcessableRequestResponse {
-    fn new_request() -> Self {
-        EffectfulProcessableRequestResponse {
-            log: Default::default(),
-            tpe: prr::PrrType::Request,
-        }
-    }
-
-    fn new_response() -> Self {
-        EffectfulProcessableRequestResponse {
-            log: Default::default(),
-            tpe: prr::PrrType::Response,
-        }
-    }
-}
-
-impl prr::Prr<Vec<u8>> for EffectfulProcessableRequestResponse {
-    fn headers(&self) -> Vec<(String, http::HeaderValue)> {
-        vec![]
-    }
-
-    fn set_header_value(&mut self, _header: &str, _value: &str) -> Result<(), prr::Error> {
-        Ok(())
-    }
-
-    fn clear_headers(&mut self) -> prr::Result<()> {
-        self.log.push(EffectfulRequestActions::ClearHeaders);
-        Ok(())
-    }
-
-    fn remove_header(&mut self, header: &str) -> Result<(), prr::Error> {
-        self.log
-            .push(EffectfulRequestActions::DeleteHeader(header.to_string()));
-        Ok(())
-    }
-
-    fn url(&self) -> Result<url::Url, prr::Error> {
-        Ok(url::Url::from_str("http://www.example.com/").expect("Could not make default URL"))
-    }
-
-    fn set_url(&mut self, url: &url::Url) -> Result<(), prr::Error> {
-        self.log
-            .push(EffectfulRequestActions::SetUri(url.to_string()));
-        Ok(())
-    }
-
-    fn set_status(&mut self, response: &u16) -> Result<(), prr::Error> {
-        self.log
-            .push(EffectfulRequestActions::SetResponse(*response));
-        Ok(())
-    }
-
-    fn add_header(&mut self, header: &str, value: &str) -> Result<(), prr::Error> {
-        self.log.push(EffectfulRequestActions::AddHeader(
-            header.to_string(),
-            value.to_string(),
-        ));
-        Ok(())
-    }
-
-    fn set_body(&mut self, _: &Vec<u8>) -> prr::Result<()> {
-        self.log.push(EffectfulRequestActions::SetBody);
-        Ok(())
-    }
-
-    fn get_body(&self) -> prr::Result<&Vec<u8>> {
-        todo!()
-    }
-
-    fn get_status(&self) -> prr::Result<http::StatusCode> {
-        todo!()
-    }
-
-    fn tpe(&self) -> prr::PrrType {
-        self.tpe.clone()
-    }
-
-    fn set_method(&mut self, _method: &http::Method) -> prr::Result<()> {
-        todo!()
-    }
-
-    fn get_method(&self) -> http::Method {
-        todo!()
-    }
+    Ok((visitor.req, visitor.res, result, md))
 }
 
 impl
@@ -934,29 +836,22 @@ impl
         (imdi::ResultValue, MetadataInformationResultElements),
         Error,
     > {
-        let (mut res, mut req) = (input.res, input.req);
-        let reqres = match input.mode {
-            imdi::InterpretMode::Request => &mut req,
-            imdi::InterpretMode::Response => {
-                if let Some(res) = &mut res {
-                    res
-                } else {
-                    return Err(Error::RuntimeError(
-                        Error::AssertionFailure("Missing response".into()).into(),
-                    )
-                    .into());
-                }
-            }
+        let mut visitor = PsInterpreter {
+            req: input.req,
+            res: input.res,
         };
-
-        let mut visitor = PsInterpreter { rr: &mut **reqres };
 
         visitor.install_generic_visitors();
 
         let context = PsInterpretContext {
-            mode: input.mode.clone().into(),
+            mode: if input.mode == imdi::InterpretMode::Request {
+                PsInterpretMode::Request
+            } else {
+                PsInterpretMode::Response
+            },
             mel_scopes: input.scopes.clone(),
-            ..Default::default()
+            metadata: Default::default(),
+            result: None,
         };
 
         let result = match self {
@@ -991,8 +886,8 @@ impl
             scopes: input.scopes,
             mode: input.mode,
             runtime: input.runtime,
-            req,
-            res,
+            req: visitor.req,
+            res: visitor.res,
         };
         Ok((updated_context, (result, md)))
     }
@@ -1010,19 +905,18 @@ impl
 
 #[cfg(test)]
 mod ps_interpreter_tests {
+    use http::{HeaderValue, Uri};
+
     use crate::{
         cdni::{
-            ps::spec::{TypedGenericStage, TypedStage},
+            ps::spec::{Header, TypedGenericStage, TypedHeader, TypedStage},
             tests::test_helpers::{
-                client_request_stage, expression_match, match_group, request_transform,
-                response_transform, stage_metadata, synthetic_response, typed_header,
-                typed_stage_rule,
+                client_request_stage, expression_match, header_transform, match_group,
+                request_transform, response_transform, stage_metadata, synthetic_response,
+                typed_header, typed_stage_rule,
             },
         },
-        dcdn::processors::ps::{
-            EffectfulProcessableRequestResponse, EffectfulRequestActions, PsInterpretMode,
-            PsInterpretValue, interpret_stage,
-        },
+        dcdn::processors::ps::{PsInterpretMode, PsInterpretValue, interpret_stage},
         environment::scope::Scopes,
         mel::types::Type,
         tests::read_test_file,
@@ -1031,6 +925,14 @@ mod ps_interpreter_tests {
     };
     use std::assert_matches;
     use std::path::Path;
+
+    fn example_dot_com_request_builder() -> http::request::Builder {
+        http::request::Request::builder().uri("http://www.example.com")
+    }
+
+    fn example_dot_com_response_builder() -> http::response::Builder {
+        http::response::Response::builder()
+    }
 
     #[test]
     fn test_interpret_client_request_stage() {
@@ -1044,19 +946,31 @@ mod ps_interpreter_tests {
         let result = verify_ps_request_stage(&result, &Scopes::<Type>::default())
             .expect("Could not verify valid client request stage JSON");
 
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+        let req = example_dot_com_request_builder()
+            .header("delete-me", "value")
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
         let result = interpret_stage(
             &result,
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            None,
             PsInterpretMode::Request,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 2);
-        assert_matches!(req.log[0], EffectfulRequestActions::DeleteHeader(_));
-        assert_matches!(req.log[1], EffectfulRequestActions::AddHeader(_, _));
-        assert_matches!(result.0, PsInterpretValue::MatchYes);
+        println!("Request: {result:?}");
+
+        assert_eq!(result.0.headers().len(), 1);
+        assert_eq!(
+            result.0.headers().iter().next(),
+            Some((
+                &http::HeaderName::from_static("this-is-new"),
+                &http::HeaderValue::from_static("thisisnew")
+            ))
+        );
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
     #[test]
@@ -1070,19 +984,30 @@ mod ps_interpreter_tests {
 
         let result = verify_ps_request_stage(&result, &Scopes::<Type>::default())
             .expect("Could not verify valid client request stage JSON");
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+
+        let req = example_dot_com_request_builder()
+            .header("delete-me", "value")
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
         let result = interpret_stage(
             &result,
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            None,
             PsInterpretMode::Request,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 2);
-        assert_matches!(req.log[0], EffectfulRequestActions::DeleteHeader(_));
-        assert_matches!(req.log[1], EffectfulRequestActions::AddHeader(_, _));
-        assert_matches!(result.0, PsInterpretValue::MatchYes);
+        assert_eq!(result.0.headers().len(), 1);
+        assert_eq!(
+            result.0.headers().iter().next(),
+            Some((
+                &http::HeaderName::from_static("this-is-new"),
+                &http::HeaderValue::from_static("thisisnew")
+            ))
+        );
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
     #[test]
@@ -1092,9 +1017,10 @@ mod ps_interpreter_tests {
         let request_xform_match = expression_match("true");
         let request_xform = request_transform(
             None,
-            Some("\"http://\" . \"example.com\"".to_string()),
+            Some("\"http://\" . \"somewhere-else.com\"".to_string()),
             Some(true),
         );
+
         request_xform_stage.value.request_xform = Some(request_xform);
 
         let request_xform_mg = match_group(
@@ -1118,18 +1044,109 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+
+        let req = example_dot_com_request_builder()
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            None,
             PsInterpretMode::Request,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 1);
-        assert_matches!(&req.log[0], EffectfulRequestActions::SetUri(r) if r == "http://example.com/");
-        assert_matches!(result.0, PsInterpretValue::MatchYes);
+        assert_eq!(
+            *result.0.uri(),
+            Uri::from_static("http://somewhere-else.com/")
+        );
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
+    }
+
+    #[test]
+    fn test_interpret_client_request_stage_request_add_replace_header() {
+        let mut request_xform_stage = stage_metadata();
+
+        let header_xform = header_transform(
+            None,
+            Some(vec![
+                TypedHeader {
+                    tpe: TypedHeader::<()>::typed_cdni_metadata_name(),
+                    value: Header {
+                        name: "to-add1".to_string(),
+                        value: "to-add-value1".to_string(),
+                        value_expr: None,
+                        aug: (),
+                    },
+                },
+                TypedHeader {
+                    tpe: TypedHeader::<()>::typed_cdni_metadata_name(),
+                    value: Header {
+                        name: "to-add2".to_string(),
+                        value: "to-add-value2".to_string(),
+                        value_expr: None,
+                        aug: (),
+                    },
+                },
+            ]),
+            Some(vec![TypedHeader {
+                tpe: TypedHeader::<()>::typed_cdni_metadata_name(),
+                value: Header {
+                    name: "to-replace1".to_string(),
+                    value: "to-replace1-new-value1".to_string(),
+                    value_expr: None,
+                    aug: (),
+                },
+            }]),
+        );
+
+        let request_xform_match = expression_match("true");
+        let request_xform = request_transform(Some(header_xform), None, None);
+
+        request_xform_stage.value.request_xform = Some(request_xform);
+
+        let request_xform_mg = match_group(
+            typed_stage_rule(Some(request_xform_match), request_xform_stage),
+            None,
+        );
+
+        let crs = client_request_stage(vec![request_xform_mg]);
+
+        let (mut verifier, context) = verifier();
+
+        let result = verifier
+            .visit_client_request_stage(&crs, context)
+            .expect("Could not verify valid client request")
+            .value
+            .expect("Could not get value from verified client request");
+
+        let value = match result {
+            PsVerifierContextValue::ClientRequestStage(typed_client_request_stage) => {
+                typed_client_request_stage
+            }
+            _ => todo!(),
+        };
+
+        let req = example_dot_com_request_builder()
+            .header("to-replace1", "to-replace1-old-value1")
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
+        let result = interpret_stage(
+            &TypedStage::ClientRequest(value),
+            &Scopes { scopes: vec![] },
+            Box::new(req),
+            None,
+            PsInterpretMode::Request,
+        )
+        .expect("Could not interpret a valid client request");
+
+        assert_matches!(result.0.headers().get("to-add1"),Some(e) if e == HeaderValue::from_static("to-add-value1"));
+        assert_matches!(result.0.headers().get("to-add2"),Some(e) if e == HeaderValue::from_static("to-add-value2"));
+        assert_matches!(result.0.headers().get("to-replace1"),Some(e) if e == HeaderValue::from_static("to-replace1-new-value1"));
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
     #[test]
@@ -1140,7 +1157,7 @@ mod ps_interpreter_tests {
         let request_xform_false_match = expression_match("true");
         let request_xform_false = request_transform(
             None,
-            Some("\"http://\" . \"example.com\"".to_string()),
+            Some("\"http://\" . \"somewhere-true.com\"".to_string()),
             Some(true),
         );
         request_xform_false_stage.value.request_xform = Some(request_xform_false);
@@ -1148,7 +1165,7 @@ mod ps_interpreter_tests {
         let request_xform_true_match = expression_match("true");
         let request_xform_true = request_transform(
             None,
-            Some("\"http://\" . \"example2.com\"".to_string()),
+            Some("\"http://\" . \"somewhere-false.com\"".to_string()),
             Some(true),
         );
         request_xform_true_stage.value.request_xform = Some(request_xform_true);
@@ -1176,18 +1193,25 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+
+        let req = example_dot_com_request_builder()
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            None,
             PsInterpretMode::Request,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 1);
-        assert_matches!(&req.log[0], EffectfulRequestActions::SetUri(r) if r == "http://example.com/");
-        assert_matches!(result.0, PsInterpretValue::MatchYes);
+        assert_eq!(
+            *result.0.uri(),
+            Uri::from_static("http://somewhere-true.com/")
+        );
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
     #[test]
@@ -1247,18 +1271,22 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+
+        let req = example_dot_com_request_builder()
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            None,
             PsInterpretMode::Request,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 1);
-        assert_matches!(&req.log[0], EffectfulRequestActions::SetUri(r) if r == "http://example1.com/");
-        assert_matches!(result.0, PsInterpretValue::MatchYes);
+        assert_eq!(*result.0.uri(), Uri::from_static("http://example1.com/"));
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
     fn test_interpret_client_request_stage_request_uri_transform_else_if() {
@@ -1317,18 +1345,22 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+
+        let req = example_dot_com_request_builder()
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            None,
             PsInterpretMode::Request,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 1);
-        assert_matches!(&req.log[0], EffectfulRequestActions::SetUri(r) if r == "http://example2.com/");
-        assert_matches!(result.0, PsInterpretValue::MatchYes);
+        assert_eq!(*result.0.uri(), Uri::from_static("http://example2.com/"));
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
     #[test]
@@ -1336,7 +1368,8 @@ mod ps_interpreter_tests {
         let mut response_xform_stage = stage_metadata();
 
         let response_xform_match = expression_match("true");
-        let response_xform = response_transform(None, Some("5 + 4".to_string()), Some(true), None);
+        let response_xform =
+            response_transform(None, Some("196 + 4".to_string()), Some(true), None);
         response_xform_stage.value.response_xform = Some(response_xform);
 
         let response_xform_mg = match_group(
@@ -1360,17 +1393,31 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::new_request();
-        interpret_stage(
+
+        let req = example_dot_com_request_builder()
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
+        let res: http::response::Response<Vec<u8>> = example_dot_com_response_builder()
+            .status(http::StatusCode::NOT_FOUND)
+            .body(vec![])
+            .expect("Could not create the test response from example.com");
+
+        let result = interpret_stage(
             &TypedStage::ClientRequest(value),
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            Some(Box::new(res)),
             PsInterpretMode::Response,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 1);
-        assert_matches!(&req.log[0], EffectfulRequestActions::SetResponse(9));
+        let response = match result.1 {
+            Some(response) => response,
+            None => panic!("Missing expected response"),
+        };
+        assert_eq!(response.status(), http::StatusCode::OK);
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
     #[test]
@@ -1380,12 +1427,12 @@ mod ps_interpreter_tests {
 
         let response_xform_false_match = expression_match("true");
         let response_xform_false =
-            response_transform(None, Some("5 + 4".to_string()), Some(true), None);
+            response_transform(None, Some("196 + 4".to_string()), Some(true), None);
         response_xform_false_stage.value.response_xform = Some(response_xform_false);
 
         let response_xform_true_match = expression_match("true");
         let response_xform_true =
-            response_transform(None, Some("5 + 5".to_string()), Some(true), None);
+            response_transform(None, Some("495 + 5".to_string()), Some(true), None);
         response_xform_true_stage.value.response_xform = Some(response_xform_true);
 
         let mg = match_group(
@@ -1411,18 +1458,31 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+
+        let req = example_dot_com_request_builder()
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
+        let res: http::response::Response<Vec<u8>> = example_dot_com_response_builder()
+            .status(http::StatusCode::NOT_FOUND)
+            .body(vec![])
+            .expect("Could not create the test response from example.com");
+
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            Some(Box::new(res)),
             PsInterpretMode::Response,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 1);
-        assert_matches!(&req.log[0], EffectfulRequestActions::SetResponse(9));
-        assert_matches!(result.0, PsInterpretValue::MatchYes);
+        let response = match result.1 {
+            Some(response) => response,
+            None => panic!("Missing expected response"),
+        };
+        assert_eq!(response.status(), http::StatusCode::OK);
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
     #[test]
@@ -1433,17 +1493,17 @@ mod ps_interpreter_tests {
 
         let response_xform_false_match = expression_match("false");
         let response_xform_false =
-            response_transform(None, Some("5 + 4".to_string()), Some(true), None);
+            response_transform(None, Some("196 + 6".to_string()), Some(true), None);
         response_xform_false_stage.value.response_xform = Some(response_xform_false);
 
         let response_xform_false_false_match = expression_match("true");
         let response_xform_false_false =
-            response_transform(None, Some("5 + 5".to_string()), Some(true), None);
+            response_transform(None, Some("196 + 4".to_string()), Some(true), None);
         response_xform_false_false_stage.value.response_xform = Some(response_xform_false_false);
 
         let response_xform_true_match = expression_match("true");
         let response_xform_true =
-            response_transform(None, Some("5 + 6".to_string()), Some(true), None);
+            response_transform(None, Some("196 + 5".to_string()), Some(true), None);
 
         response_xform_true_stage.value.response_xform = Some(response_xform_true);
 
@@ -1473,20 +1533,34 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+
+        let req = example_dot_com_request_builder()
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
+        let res: http::response::Response<Vec<u8>> = example_dot_com_response_builder()
+            .status(http::StatusCode::NOT_FOUND)
+            .body(vec![])
+            .expect("Could not create the test response from example.com");
+
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            Some(Box::new(res)),
             PsInterpretMode::Response,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 1);
-        assert_matches!(&req.log[0], EffectfulRequestActions::SetResponse(10));
-        assert_matches!(result.0, PsInterpretValue::MatchYes);
+        let response = match result.1 {
+            Some(response) => response,
+            None => panic!("Missing expected response"),
+        };
+        assert_eq!(response.status(), http::StatusCode::OK);
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
+    #[test]
     fn test_interpret_client_request_stage_response_status_transform_else_if() {
         let mut response_xform_false_stage = stage_metadata();
         let mut response_xform_false_false_stage = stage_metadata();
@@ -1494,17 +1568,17 @@ mod ps_interpreter_tests {
 
         let response_xform_false_match = expression_match("false");
         let response_xform_false =
-            response_transform(None, Some("5 + 4".to_string()), Some(true), None);
+            response_transform(None, Some("196 + 6".to_string()), Some(true), None);
         response_xform_false_stage.value.response_xform = Some(response_xform_false);
 
         let response_xform_false_false_match = expression_match("false");
         let response_xform_false_false =
-            response_transform(None, Some("5 + 5".to_string()), Some(true), None);
+            response_transform(None, Some("196 + 4".to_string()), Some(true), None);
         response_xform_false_false_stage.value.response_xform = Some(response_xform_false_false);
 
         let response_xform_true_match = expression_match("true");
         let response_xform_true =
-            response_transform(None, Some("5 + 6".to_string()), Some(true), None);
+            response_transform(None, Some("196 + 5".to_string()), Some(true), None);
 
         response_xform_true_stage.value.response_xform = Some(response_xform_true);
 
@@ -1534,18 +1608,31 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+
+        let req = example_dot_com_request_builder()
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
+        let res: http::response::Response<Vec<u8>> = example_dot_com_response_builder()
+            .status(http::StatusCode::NOT_FOUND)
+            .body(vec![])
+            .expect("Could not create the test response from example.com");
+
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            Some(Box::new(res)),
             PsInterpretMode::Response,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 1);
-        assert_matches!(&req.log[0], EffectfulRequestActions::SetResponse(11));
-        assert_matches!(result.0, PsInterpretValue::MatchYes);
+        let response = match result.1 {
+            Some(response) => response,
+            None => panic!("Missing expected response"),
+        };
+        assert_eq!(response.status(), http::StatusCode::CREATED);
+        assert_matches!(result.2, PsInterpretValue::MatchYes);
     }
 
     #[test]
@@ -1590,17 +1677,26 @@ mod ps_interpreter_tests {
             }
             _ => todo!(),
         };
-        let mut req = EffectfulProcessableRequestResponse::new_request();
+
+        let req = example_dot_com_request_builder()
+            .body(vec![])
+            .expect("Could not create the test request to example.com");
+
+        let res: http::response::Response<Vec<u8>> = example_dot_com_response_builder()
+            .status(http::StatusCode::NOT_FOUND)
+            .body(vec![])
+            .expect("Could not create the test response from example.com");
+
         let result = interpret_stage(
             &TypedStage::ClientRequest(value),
             &Scopes { scopes: vec![] },
-            &mut req,
+            Box::new(req),
+            Some(Box::new(res)),
             PsInterpretMode::Response,
         )
         .expect("Could not interpret a valid client request");
 
-        assert_eq!(req.log.len(), 0);
-        assert_matches!(&result.0, PsInterpretValue::SyntheticResponse(r)
+        assert_matches!(&result.2, PsInterpretValue::SyntheticResponse(r)
             if r.status() == 404 && r.body() == &"This is a test.".to_string().into_bytes() && r.headers().len() == 2);
     }
 }
