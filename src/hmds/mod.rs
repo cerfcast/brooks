@@ -23,10 +23,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    cdni::{
-        imd::spec::HostMetadata,
-        logging::{self, record::LogRecordRaw},
-    },
+    cdni::{self, imd::spec::HostMetadata, logging::record::LogRecordRaw},
     environment::scope::Scopes,
     mel::types::Type,
     verifying::verify::CdniVerificationKey,
@@ -36,6 +33,8 @@ use crate::{
 use crate::hmds::hmds_domain_communication::{post_log_hmds_domain, query_hmds_domain};
 
 //BEGIN: HMDS Server Configuration
+
+pub mod logging;
 
 #[derive(Debug, Default, Clone)]
 pub struct HmdsServerConfiguration {
@@ -197,7 +196,7 @@ pub mod hmds_domain_support {
 }
 
 pub async fn post_log_hmds(
-    log: &logging::record::LogRecord,
+    log: &cdni::logging::record::LogRecord,
     config: &HmdsServerConfiguration,
 ) -> io::Result<()> {
     let log_raw: LogRecordRaw = log.into();
@@ -216,7 +215,10 @@ pub async fn post_log_hmds(
     }
 }
 
-async fn post_log_hmds_http(log: &logging::record::LogRecordRaw, server: &Uri) -> io::Result<()> {
+async fn post_log_hmds_http(
+    log: &cdni::logging::record::LogRecordRaw,
+    server: &Uri,
+) -> io::Result<()> {
     let post_log_uri =
         reqwest::Url::from_str(&(server.to_string() + "plog/")).map_err(io::Error::other)?;
 

@@ -15,223 +15,157 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+use http::Version;
 use serde::{Deserialize, Serialize};
-use std::{net, str::FromStr};
+use std::{
+    net::{self, IpAddr},
+    str::FromStr,
+    time::Duration,
+};
 
 use crate::cdni::logging::Error;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct LogRecordRaw {
-    // Minimal
-    /// The timestamp of the first byte read by the OCN application to a best
-    /// effort of accuracy.
-    #[serde(rename = "timestamp-ns")]
-    pub timestamp_ns: u64,
-    /// An opaque identifier for an aggregate set of clients, derived from the
-    /// client IPv4 or IPv6 address in the request received by the surrogate
-    /// and/or other network-level identifying information. See \[RFC7937\] section
-    /// 3.4.1.
+    pub date: Option<String>,
+    pub time: Option<String>,
+    #[serde(rename = "time-taken")]
+    pub time_taken: Option<usize>,
+
+    #[serde(rename = "protocol")]
+    pub protocol: Option<String>,
+
     #[serde(rename = "c-groupid")]
-    pub c_groupid: String,
-    /// Request URI prior to any transformation from MI.ProcessingStages. It is
-    /// RECOMMENDED to limit the maximum length of this field with an applied
-    /// MI.LoggingTransformTruncate, allowing at least 2048 bytes.
+    pub c_groupid: Option<String>,
+
+    #[serde(rename = "s-ip")]
+    pub s_ip: Option<String>,
+    #[serde(rename = "s-port")]
+    pub s_port: Option<usize>,
+    #[serde(rename = "s-hostname")]
+    pub s_hostname: Option<String>,
+
+    #[serde(rename = "u-uri")]
+    pub u_uri: Option<String>,
+
     #[serde(rename = "cs-uri")]
-    pub cs_uri: String,
-    /// The response status code.
-    #[serde(rename = "sc-status")]
-    pub sc_status: String,
-    /// The response size total bytes, including headers.
-    #[serde(rename = "sc-total-bytes")]
-    pub sc_total_bytes: u64,
-    /// The ccid assigned via MI.Grouping or MI.GroupingExtended configuration.
-    /// For backward compatibility, s-ccid is aliased to ccid, and either
-    /// identifier may be used to refer to this field.
-    #[serde(rename = "s-ccid")]
-    pub s_ccid: String,
-    /// Content header length from the upstream source. The value of this field
-    /// is a "best effort". If there are intermediate cache layers, it is
-    /// understood that this value may not accurately reflect the complete
-    /// upstream picture.
-    #[serde(rename = "s-upstream-header-size-bytes")]
-    pub s_upstream_header_size_bytes: u64,
-    /// Total bytes transferred from the upstream source. The value of this
-    /// field is a "best effort". If there are intermediate cache layers, it is
-    /// understood that this value may not accurately reflect the complete
-    /// upstream picture.
-    #[serde(rename = "s-upstream-total-bytes")]
-    pub s_upstream_total_bytes: u64,
-
-    // Standard
-    /// The elapsed time between reading the first byte of the request and
-    /// sending the last byte of the response to a best effort of accuracy.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-time-total-ms")]
-    pub s_time_total_ms: Option<u64>,
-    /// The Session ID assigned by the dCDN. This can be derived from Common
-    /// Media Client Data (CMCD) or another mechanism, but it is defined by the
-    /// dCDN, and uCDN allocated session identifiers are outside the scope of
-    /// this field.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-sid")]
-    pub s_sid: Option<String>,
-    /// Indicates a cache hit or cache miss. For this field, a cache hit is
-    /// defined as a request that does not result in content retrieval from the
-    /// upstream source.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-cached")]
-    pub s_cached: Option<bool>,
-    /// A short name for the dCDN intended to be used as an identifier, e.g. in
-    /// log records. Example: "CDN Example Company" might have s-shortname of
-    /// "cdn-ec".
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-shortname")]
-    pub s_shortname: Option<String>,
-
-    // Extended
-    /// The timestamp of the first byte read by the OCN application to a best
-    /// effort of accuracy. It is RECOMMENDED that timestamps use Coordinated
-    /// Universal Time (UTC).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "timestamp-iso8601")]
-    pub timestamp_iso8601: Option<String>,
-    /// The HTTP request method.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cs_uri: Option<String>,
     #[serde(rename = "cs-method")]
     pub cs_method: Option<String>,
-    /// The protocol version (e.g., HTTP/1.1).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "cs-version")]
-    pub cs_version: Option<String>,
-    /// Full request URI, including query parameters. If this field is identical
-    /// to cs-uri, the field SHOULD be truncated to an empty string.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "cs-uri-transformed")]
-    pub cs_uri_transformed: Option<String>,
-    /// The client IP address.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "c-ip")]
-    pub c_ip: Option<String>,
-    /// The server instance ID assigned by the dCDN. This value SHOULD be unique
-    /// to a particular instance.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-id")]
-    pub s_id: Option<String>,
-    /// The elapsed time from the first request byte read until the first
-    /// response byte sent.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-time-first-ms")]
-    pub s_time_first_ms: Option<u64>,
-    /// The session duration as determined by the dCDN.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-sdur-ms")]
-    pub s_sdur_ms: Option<u64>,
-    /// The time spent accessing the upstream source. The value of this field is
-    /// a "best effort". If there are intermediate cache layers, it is
-    /// understood that this value may not accurately reflect the complete
-    /// upstream picture.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-time-upstream-ms")]
-    pub s_time_upstream_ms: Option<u64>,
-    /// The response status code returned by the upstream source in the event of
-    /// a cache miss.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-upstream-status")]
-    pub s_upstream_status: Option<String>,
-    /// The IP address of the upstream source.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "s-upstream-ip")]
-    pub s_upstream_ip: Option<String>,
+
+    #[serde(rename = "sc-status")]
+    pub sc_status: Option<String>,
+    #[serde(rename = "sc-total-bytes")]
+    pub sc_total_bytes: Option<usize>,
+    #[serde(rename = "sc-entity-bytes")]
+    pub sc_entity_bytes: Option<usize>,
+    #[serde(rename = "sc-cached")]
+    pub sc_cached: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct LogRecordMetadata {
+    pub complete: chrono::DateTime<Utc>,
+    pub log: LogRecord,
 }
 
 /// See [`LogRecordRaw`].
 #[derive(Debug, Clone, Default)]
 pub struct LogRecord {
-    pub timestamp_ns: u64,
-    pub timestamp_iso8601: Option<chrono::DateTime<Utc>>,
-    pub s_time_total_ms: Option<u64>,
-    pub c_groupid: String,
+    pub datetime: Option<chrono::DateTime<Utc>>,
+    pub time_taken: Option<Duration>,
+
+    pub protocol: Option<http::Version>,
+
+    pub c_groupid: Option<String>,
+
+    pub s_ip: Option<net::IpAddr>,
+    pub s_port: Option<u16>,
+    pub s_hostname: Option<String>,
+
+    pub u_uri: Option<http::Uri>,
+
+    pub cs_uri: Option<http::Uri>,
     pub cs_method: Option<http::method::Method>,
-    pub cs_version: Option<String>,
-    pub cs_uri: http::Uri,
-    pub cs_uri_transformed: Option<http::Uri>,
-    pub sc_status: http::StatusCode,
-    pub sc_total_bytes: u64,
-    pub s_ccid: String,
-    pub s_sid: Option<String>,
-    pub s_cached: Option<bool>,
-    pub c_ip: Option<net::IpAddr>,
-    pub s_shortname: Option<String>,
-    pub s_id: Option<String>,
-    pub s_time_first_ms: Option<u64>,
-    pub s_sdur_ms: Option<u64>,
-    pub s_time_upstream_ms: Option<u64>,
-    pub s_upstream_header_size_bytes: u64,
-    pub s_upstream_total_bytes: u64,
-    pub s_upstream_status: Option<http::StatusCode>,
-    pub s_upstream_ip: Option<net::IpAddr>,
-}
 
-impl LogRecord {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_basic(
-        timestamp_ns: u64,
-        c_groupid: &str,
-        cs_uri: http::Uri,
-        sc_status: http::StatusCode,
-        sc_total_bytes: u64,
-        s_ccid: &str,
-        s_upstream_header_size_bytes: u64,
-        s_upstream_total_bytes: u64,
-    ) -> Self {
-        LogRecord {
-            timestamp_ns,
-            c_groupid: c_groupid.to_string(),
-            cs_uri,
-            sc_status,
-            sc_total_bytes,
-            s_ccid: s_ccid.to_string(),
-            s_upstream_header_size_bytes,
-            s_upstream_total_bytes,
-            ..Default::default()
-        }
-    }
-
-    pub fn is_minimal(&self) -> bool {
-        true
-    }
-
-    pub fn is_standard(&self) -> bool {
-        self.s_time_total_ms.is_some() && self.s_sid.is_some() && self.s_cached.is_some()
-    }
-
-    pub fn is_extended(&self) -> bool {
-        self.is_standard()
-            && self.cs_version.is_some()
-            && self.cs_uri_transformed.is_some()
-            && self.s_shortname.is_some()
-            && self.s_id.is_some()
-            && self.s_time_first_ms.is_some()
-            && self.s_sdur_ms.is_some()
-            && self.s_time_upstream_ms.is_some()
-            && self.s_upstream_status.is_some()
-            && self.s_upstream_ip.is_some()
-    }
+    pub sc_status: Option<http::StatusCode>,
+    pub sc_total_bytes: Option<usize>,
+    pub sc_entity_bytes: Option<usize>,
+    pub sc_cached: Option<bool>,
 }
 
 impl From<&LogRecord> for LogRecordRaw {
     fn from(value: &LogRecord) -> Self {
         LogRecordRaw {
-            timestamp_ns: value.timestamp_ns,
+            date: value.datetime.map(|f| f.date_naive().to_string()),
+            time: value.datetime.map(|f| f.time().to_string()),
+            time_taken: value.time_taken.map(|f| f.as_secs() as usize),
+            protocol: value.protocol.as_ref().map(|f| format!("{:?}", f)),
             c_groupid: value.c_groupid.clone(),
-            cs_uri: value.cs_uri.to_string(),
-            sc_status: value.sc_status.as_u16().to_string(),
+
+            s_ip: value.s_ip.map(|f| f.to_string()),
+            s_port: value.s_port.map(|f| f as usize),
+            s_hostname: value.s_hostname.as_ref().map(|f| f.to_string()),
+
+            u_uri: value.u_uri.as_ref().map(|f| f.to_string()),
+
+            cs_uri: value.cs_uri.as_ref().map(|f| f.to_string()),
+            cs_method: value.cs_method.as_ref().map(|f| f.to_string()),
+
+            sc_status: value.sc_status.map(|f| f.as_u16().to_string()),
             sc_total_bytes: value.sc_total_bytes,
-            s_ccid: value.s_ccid.clone(),
-            s_upstream_header_size_bytes: value.s_upstream_header_size_bytes,
-            s_upstream_total_bytes: value.s_upstream_total_bytes,
-            ..Default::default()
+            sc_entity_bytes: value.sc_entity_bytes,
+            sc_cached: value.sc_cached,
+        }
+    }
+}
+
+struct ParsableHttpProtocol(http::Version);
+
+impl FromStr for ParsableHttpProtocol {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let pieces = s.split("/").collect::<Vec<_>>();
+
+        if pieces.len() != 2 {
+            return Err(Error::InvalidRawValue(
+                "protocol".to_string(),
+                "Missing / delimiter".to_string(),
+            ));
+        }
+
+        let http = pieces[0].trim();
+
+        if http != "HTTP" {
+            return Err(Error::InvalidRawValue(
+                "protocol".to_string(),
+                "Missing HTTP before the / delimiter".to_string(),
+            ));
+        }
+
+        let number = pieces[1].trim();
+
+        let number = match number.parse::<f64>() {
+            Ok(number) => number,
+            Err(e) => {
+                return Err(Error::InvalidRawValue(
+                    "protocol".to_string(),
+                    format!("Could not parse {number} into a version number: {e}"),
+                ));
+            }
+        };
+
+        match number {
+            0.9 => Ok(ParsableHttpProtocol(Version::HTTP_09)),
+            1.0 => Ok(ParsableHttpProtocol(Version::HTTP_10)),
+            1.1 => Ok(ParsableHttpProtocol(Version::HTTP_11)),
+            2.0 => Ok(ParsableHttpProtocol(Version::HTTP_2)),
+            v => Err(Error::InvalidRawValue(
+                "protocol".to_string(),
+                format!("{v} is not a valid HTTP version number"),
+            )),
         }
     }
 }
@@ -241,17 +175,72 @@ impl TryFrom<LogRecordRaw> for LogRecord {
 
     fn try_from(value: LogRecordRaw) -> Result<Self, Self::Error> {
         Ok(LogRecord {
-            timestamp_ns: value.timestamp_ns,
+            datetime: match (value.date, value.time) {
+                (Some(date), Some(time)) => Some(
+                    DateTime::parse_from_rfc3339(&format!("{}T{}Z", date, time))
+                        .map_err(|e| Error::InvalidRawValue("time".to_string(), e.to_string()))?
+                        .into(),
+                ),
+                _ => None,
+            },
+            time_taken: value.time_taken.map(|f| Duration::from_secs(f as u64)),
+
+            protocol: match value.protocol {
+                Some(protocol) => Some(protocol.parse::<ParsableHttpProtocol>()?.0),
+                None => None,
+            },
             c_groupid: value.c_groupid,
-            cs_uri: http::Uri::from_str(&value.cs_uri)
-                .map_err(|_| Error::InvalidRawValue("cs_uri".to_string(), value.cs_uri))?,
-            sc_status: http::StatusCode::from_str(&value.sc_status)
-                .map_err(|_| Error::InvalidRawValue("sc_status".to_string(), value.sc_status))?,
+
+            s_hostname: value.s_hostname,
+            s_ip: match value.s_ip {
+                Some(ip) => Some(
+                    ip.parse::<IpAddr>()
+                        .map_err(|f| Error::InvalidRawValue("s_ip".to_string(), f.to_string()))?,
+                ),
+                None => None,
+            },
+            s_port: match value.s_port {
+                Some(port) => Some(
+                    TryInto::<u16>::try_into(port)
+                        .map_err(|f| Error::InvalidRawValue("s_ip".to_string(), f.to_string()))?,
+                ),
+                None => None,
+            },
+            u_uri: match value.u_uri.map(|f| http::Uri::from_str(&f)) {
+                Some(res) => Some(
+                    res.map_err(|f| Error::InvalidRawValue("u_uri".to_string(), f.to_string()))?,
+                ),
+                None => None,
+            },
+
+            cs_uri: match value.cs_uri.map(|f| http::Uri::from_str(&f)) {
+                Some(res) => Some(
+                    res.map_err(|f| Error::InvalidRawValue("cs_uri".to_string(), f.to_string()))?,
+                ),
+                None => None,
+            },
+
+            cs_method: match value.cs_method.map(|f| http::Method::from_str(&f)) {
+                Some(res) => {
+                    Some(res.map_err(|f| {
+                        Error::InvalidRawValue("cs_method".to_string(), f.to_string())
+                    })?)
+                }
+                None => None,
+            },
+
+            sc_status: match value.sc_status.map(|f| http::StatusCode::from_str(&f)) {
+                Some(res) => {
+                    Some(res.map_err(|f| {
+                        Error::InvalidRawValue("sc_status".to_string(), f.to_string())
+                    })?)
+                }
+                None => None,
+            },
             sc_total_bytes: value.sc_total_bytes,
-            s_ccid: value.s_ccid,
-            s_upstream_header_size_bytes: value.s_upstream_header_size_bytes,
-            s_upstream_total_bytes: value.s_upstream_total_bytes,
-            ..Default::default()
+            sc_entity_bytes: value.sc_entity_bytes,
+
+            sc_cached: value.sc_cached,
         })
     }
 }

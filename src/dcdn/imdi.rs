@@ -17,7 +17,9 @@
 
 //! Interpret CDNI Interconnection Metadata as a dCDN
 
-use chrono::Utc;
+use std::net::{IpAddr, Ipv4Addr};
+use std::time::Duration;
+
 use reqwest::ResponseBuilderExt;
 
 use crate::cdni::logging::record::LogRecord;
@@ -100,8 +102,8 @@ pub fn interpret_interconnection_metadata(
     runtime: &tokio::runtime::Handle,
     mut log: LogMsgs,
 ) -> ImdInterpretResult {
-    let timestamp_ns = Utc::now().timestamp();
     let cs_uri: http::Uri = request.uri().clone();
+    let cs_method: http::Method = request.method().clone();
 
     let mut request_context = SimpleProcessorsInterpreterContext {
         scopes: mel_scopes,
@@ -158,6 +160,8 @@ pub fn interpret_interconnection_metadata(
     log = debug!(log, "Stop: processing origin request stages.");
 
     log = debug!(log, "Start: processing source stages.");
+
+    let u_uri = request_context.req.uri().clone();
 
     let mut source_context = SimpleProcessorsInterpreterContext {
         scopes: request_context.scopes,
@@ -311,22 +315,25 @@ pub fn interpret_interconnection_metadata(
     log = debug!(log, &format!("Response code: {}", response.status()));
 
     let sc_status = response.status();
-    let s_upstream_header_size_bytes = 0u64;
-    let s_upstream_total_bytes = 0u64;
-    // TODO: Add headers
     let sc_total_bytes = response.body().len();
-    let s_ccid = "TODO".to_string();
+    let c_groupid = "C_GROUPID_TODO".to_string();
 
-    let lr = LogRecord::new_basic(
-        timestamp_ns as u64,
-        "",
-        cs_uri,
-        sc_status,
-        sc_total_bytes as u64,
-        &s_ccid,
-        s_upstream_header_size_bytes,
-        s_upstream_total_bytes,
-    );
+    let lr = LogRecord {
+        datetime: Some(chrono::Utc::now()),
+        time_taken: Some(Duration::from_secs(100)),
+        protocol: Some(http::Version::HTTP_11),
+        c_groupid: Some(c_groupid),
+        s_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+        s_port: Some(8080),
+        s_hostname: Some("localhost".to_string()),
+        u_uri: Some(u_uri),
+        cs_uri: Some(cs_uri),
+        cs_method: Some(cs_method),
+        sc_status: Some(sc_status),
+        sc_total_bytes: Some(sc_total_bytes),
+        sc_entity_bytes: Some(5050),
+        sc_cached: Some(false),
+    };
 
     Ok((response.status(), *response, log, Some(lr)))
 }
