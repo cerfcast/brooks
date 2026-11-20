@@ -26,6 +26,7 @@ url = "2.5.8"
 log = { version = "0.4.34" }
 zlib-rs = "0.6.8"
 flate2 = "1.1.11"
+uuid = "1.29.2"
 
 [features]
 default = ["dcdn"]
