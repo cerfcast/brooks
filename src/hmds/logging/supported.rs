@@ -41,99 +41,101 @@ pub struct LiRecord {
 
     pub c_groupid: String,
 
-    pub s_ip: net::IpAddr,
-    pub s_port: u16,
-    pub s_hostname: String,
+    pub s_ip: Option<net::IpAddr>,
+    pub s_port: Option<u16>,
+    pub s_hostname: Option<String>,
+    pub s_ccid: Option<String>,
+    pub s_sid: Option<String>,
 
     pub u_uri: http::Uri,
 
-    pub cs_uri: http::Uri,
+    pub cs_uri: Option<http::Uri>,
     pub cs_method: http::method::Method,
 
     pub sc_status: http::StatusCode,
     pub sc_total_bytes: usize,
-    pub sc_entity_bytes: usize,
-    pub sc_cached: bool,
+    pub sc_entity_bytes: Option<usize>,
+    pub sc_cached: Option<bool>,
 }
 
 impl TryFrom<&LogRecord> for LiRecord {
     type Error = Error;
 
     fn try_from(value: &LogRecord) -> Result<Self, Self::Error> {
+        // Required
         let datetime = *value
             .datetime
             .as_ref()
             .ok_or(Error::MissingLogRecordField("datetime".to_string()))?;
 
+        // Required
         let time_taken = *value
             .time_taken
             .as_ref()
             .ok_or(Error::MissingLogRecordField("time_taken".to_string()))?;
 
-        let s_ip = *value
-            .s_ip
-            .as_ref()
-            .ok_or(Error::MissingLogRecordField("s_ip".to_string()))?;
-
-        let s_port = *value
-            .s_port
-            .as_ref()
-            .ok_or(Error::MissingLogRecordField("s_port".to_string()))?;
-
-        let s_hostname = value
-            .s_hostname
-            .as_ref()
-            .ok_or(Error::MissingLogRecordField("s_hostname".to_string()))?
-            .clone();
-
+        // Required
         let c_groupid = value
             .c_groupid
             .as_ref()
             .ok_or(Error::MissingLogRecordField("c_groupid".to_string()))?
             .clone();
 
+        // Optional
+        let s_ip = value.s_ip;
+
+        // Optional
+        let s_port = value.s_port;
+
+        // Optional
+        let s_hostname = value.s_hostname.clone();
+
+        // Optional
+        let s_ccid = value.s_ccid.clone();
+
+        // Optional
+        let s_sid = value.s_sid.clone();
+
+        // Required
         let cs_method = value
             .cs_method
             .as_ref()
             .ok_or(Error::MissingLogRecordField("cs_method".to_string()))?
             .clone();
 
-        let cs_uri = value
-            .cs_uri
-            .as_ref()
-            .ok_or(Error::MissingLogRecordField("cs_uri".to_string()))?
-            .clone();
+        // Optional
+        let cs_uri = value.cs_uri.clone();
 
+        // Required
         let u_uri = value
             .u_uri
             .as_ref()
             .ok_or(Error::MissingLogRecordField("u_uri".to_string()))?
             .clone();
 
+        // Required
         let protocol = *value
             .protocol
             .as_ref()
             .ok_or(Error::MissingLogRecordField("protocol".to_string()))?;
 
+        // Required
         let sc_status = *value
             .sc_status
             .as_ref()
             .ok_or(Error::MissingLogRecordField("sc_status".to_string()))?;
 
+        // Required
         let sc_total_bytes = *value
             .sc_total_bytes
             .as_ref()
             .ok_or(Error::MissingLogRecordField("sc_total_bytes".to_string()))?;
 
-        let sc_entity_bytes = *value
-            .sc_entity_bytes
-            .as_ref()
-            .ok_or(Error::MissingLogRecordField("sc_entity_bytes".to_string()))?;
+        // Optional
+        let sc_entity_bytes = value.sc_entity_bytes;
 
-        let sc_cached = *value
-            .sc_cached
-            .as_ref()
-            .ok_or(Error::MissingLogRecordField("sc_cached".to_string()))?;
+        // Optional
+        let sc_cached = value.sc_cached;
 
         Ok(LiRecord {
             datetime,
@@ -150,6 +152,8 @@ impl TryFrom<&LogRecord> for LiRecord {
             s_hostname,
             sc_entity_bytes,
             sc_cached,
+            s_ccid,
+            s_sid,
         })
     }
 }
@@ -208,7 +212,28 @@ impl LiSession {
 
         result += "#version:\tcdni/1.0\n";
         result += "#record-type:\tcdni_http_request_v1\n";
-        result += "#fields:\tdate\ttime\t\tc-groupid\tcs-uri\t\tu-uri\tprotocol\tsc-status\tsc-total-bytes\ts-ccid\ts-upstream-header-size-bytes\ts-upstream-total-bytes\n";
+        result += "fields: ";
+        result += &[
+            "date",
+            "time",
+            "time-taken",
+            "protocol",
+            "c-groupid",
+            "s-ip",
+            "s-port",
+            "s-hostname",
+            "s-ccid",
+            "s-sid",
+            "u-uri",
+            "cs-uri",
+            "cs-method",
+            "sc-status",
+            "sc-total-bytes",
+            "sc-entity-bytes",
+            "sc-cached",
+        ]
+        .join("\t");
+        result += "\n";
 
         Ok(result)
     }
@@ -218,20 +243,87 @@ impl LiSession {
 
         for record in &span.records {
             result += &record.datetime.date_naive().to_string();
+
             result += "\t";
             result += &record.datetime.time().to_string();
+
             result += "\t";
-            result += &record.c_groupid;
-            result += "\t";
-            result += &record.cs_uri.to_string();
-            result += "\t";
-            result += &record.u_uri.to_string();
+            result += &format!("{:.4}", record.time_taken.as_secs_f64());
+
             result += "\t";
             result += &format!("{:?}", record.protocol);
+
+            result += "\t";
+            result += &record.c_groupid;
+
+            result += "\t";
+            result += &record
+                .s_ip
+                .as_ref()
+                .map(|ip| ip.to_string())
+                .unwrap_or("-".to_string());
+
+            result += "\t";
+            result += &record
+                .s_port
+                .as_ref()
+                .map(|port| port.to_string())
+                .unwrap_or("-".to_string());
+
+            result += "\t";
+            result += &record
+                .s_hostname
+                .as_ref()
+                .map(|hostname| hostname.to_string())
+                .unwrap_or("-".to_string());
+
+            result += "\t";
+            result += &record
+                .s_ccid
+                .as_ref()
+                .map(|ccid| ccid.to_string())
+                .unwrap_or("-".to_string());
+
+            result += "\t";
+            result += &record
+                .s_sid
+                .as_ref()
+                .map(|sid| sid.to_string())
+                .unwrap_or("-".to_string());
+
+            result += "\t";
+            result += &record.u_uri.to_string();
+
+            result += "\t";
+            result += &record
+                .cs_uri
+                .as_ref()
+                .map(|u| u.to_string())
+                .unwrap_or("-".to_string());
+
+            result += "\t";
+            result += record.cs_method.as_ref();
+
             result += "\t";
             result += &record.sc_status.as_u16().to_string();
+
             result += "\t";
             result += &record.sc_total_bytes.to_string();
+
+            result += "\t";
+            result += &record
+                .sc_entity_bytes
+                .as_ref()
+                .map(|entity_bytes| entity_bytes.to_string())
+                .unwrap_or("-".to_string());
+
+            result += "\t";
+            result += &record
+                .sc_cached
+                .as_ref()
+                .map(|cached| cached.to_string())
+                .unwrap_or("-".to_string());
+
             result += "\n";
         }
 

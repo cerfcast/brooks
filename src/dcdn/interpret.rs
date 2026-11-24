@@ -104,3 +104,7 @@ impl<'a> TryFrom<FromableRequest<'a>> for reqwest::Request {
         Ok(request)
     }
 }
+
+pub(crate) fn size_of_response(_response: &http::Response<Vec<u8>>) -> usize {
+    0
+}

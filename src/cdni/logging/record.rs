@@ -31,7 +31,7 @@ pub struct LogRecordRaw {
     pub date: Option<String>,
     pub time: Option<String>,
     #[serde(rename = "time-taken")]
-    pub time_taken: Option<usize>,
+    pub time_taken: Option<f64>,
 
     #[serde(rename = "protocol")]
     pub protocol: Option<String>,
@@ -45,6 +45,11 @@ pub struct LogRecordRaw {
     pub s_port: Option<usize>,
     #[serde(rename = "s-hostname")]
     pub s_hostname: Option<String>,
+
+    #[serde(rename = "s-ccid")]
+    pub s_ccid: Option<String>,
+    #[serde(rename = "s-sid")]
+    pub s_sid: Option<String>,
 
     #[serde(rename = "u-uri")]
     pub u_uri: Option<String>,
@@ -83,6 +88,8 @@ pub struct LogRecord {
     pub s_ip: Option<net::IpAddr>,
     pub s_port: Option<u16>,
     pub s_hostname: Option<String>,
+    pub s_sid: Option<String>,
+    pub s_ccid: Option<String>,
 
     pub u_uri: Option<http::Uri>,
 
@@ -100,13 +107,16 @@ impl From<&LogRecord> for LogRecordRaw {
         LogRecordRaw {
             date: value.datetime.map(|f| f.date_naive().to_string()),
             time: value.datetime.map(|f| f.time().to_string()),
-            time_taken: value.time_taken.map(|f| f.as_secs() as usize),
+            time_taken: value.time_taken.map(|f| f.as_secs_f64()),
             protocol: value.protocol.as_ref().map(|f| format!("{:?}", f)),
             c_groupid: value.c_groupid.clone(),
 
             s_ip: value.s_ip.map(|f| f.to_string()),
             s_port: value.s_port.map(|f| f as usize),
             s_hostname: value.s_hostname.as_ref().map(|f| f.to_string()),
+
+            s_sid: value.s_sid.as_ref().map(|f| f.to_string()),
+            s_ccid: value.s_ccid.as_ref().map(|f| f.to_string()),
 
             u_uri: value.u_uri.as_ref().map(|f| f.to_string()),
 
@@ -183,7 +193,7 @@ impl TryFrom<LogRecordRaw> for LogRecord {
                 ),
                 _ => None,
             },
-            time_taken: value.time_taken.map(|f| Duration::from_secs(f as u64)),
+            time_taken: value.time_taken.map(Duration::from_secs_f64),
 
             protocol: match value.protocol {
                 Some(protocol) => Some(protocol.parse::<ParsableHttpProtocol>()?.0),
@@ -206,6 +216,8 @@ impl TryFrom<LogRecordRaw> for LogRecord {
                 ),
                 None => None,
             },
+            s_ccid: value.s_ccid,
+            s_sid: value.s_sid,
             u_uri: match value.u_uri.map(|f| http::Uri::from_str(&f)) {
                 Some(res) => Some(
                     res.map_err(|f| Error::InvalidRawValue("u_uri".to_string(), f.to_string()))?,

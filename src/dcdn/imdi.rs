@@ -17,14 +17,13 @@
 
 //! Interpret CDNI Interconnection Metadata as a dCDN
 
-use std::net::{IpAddr, Ipv4Addr};
-use std::time::Duration;
+use std::time::Instant;
 
 use reqwest::ResponseBuilderExt;
 
 use crate::cdni::logging::record::LogRecord;
 use crate::dcdn::error::{ImdInterpretError, ImdInterpretResult};
-use crate::dcdn::interpret::{Error, MetadataInformationResultElements, Stages};
+use crate::dcdn::interpret::{Error, MetadataInformationResultElements, Stages, size_of_response};
 use crate::dcdn::processors::SimpleProcessorsInterpreterContext;
 use crate::environment::scope::Scopes;
 use crate::logging::{LogLevel, LogMsg, LogMsgs};
@@ -102,8 +101,13 @@ pub fn interpret_interconnection_metadata(
     runtime: &tokio::runtime::Handle,
     mut log: LogMsgs,
 ) -> ImdInterpretResult {
+    // Calculate the time that it takes to service this request.
+    let time_taken = Instant::now();
+
     let cs_uri: http::Uri = request.uri().clone();
     let cs_method: http::Method = request.method().clone();
+
+    let protocol = request.version();
 
     let mut request_context = SimpleProcessorsInterpreterContext {
         scopes: mel_scopes,
@@ -315,23 +319,26 @@ pub fn interpret_interconnection_metadata(
     log = debug!(log, &format!("Response code: {}", response.status()));
 
     let sc_status = response.status();
-    let sc_total_bytes = response.body().len();
+    let sc_total_bytes = size_of_response(&response);
+    let sc_entity_bytes = response.body().len();
     let c_groupid = "C_GROUPID_TODO".to_string();
 
     let lr = LogRecord {
         datetime: Some(chrono::Utc::now()),
-        time_taken: Some(Duration::from_secs(100)),
-        protocol: Some(http::Version::HTTP_11),
+        time_taken: Some(time_taken.elapsed()),
+        protocol: Some(protocol),
         c_groupid: Some(c_groupid),
-        s_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
-        s_port: Some(8080),
-        s_hostname: Some("localhost".to_string()),
+        s_ip: None,       // Will be completed by the ICS.
+        s_port: None,     // Will be completed by the ICS.
+        s_hostname: None, // Will be completed by the ICS.
+        s_ccid: None,
+        s_sid: None,
         u_uri: Some(u_uri),
         cs_uri: Some(cs_uri),
         cs_method: Some(cs_method),
         sc_status: Some(sc_status),
         sc_total_bytes: Some(sc_total_bytes),
-        sc_entity_bytes: Some(5050),
+        sc_entity_bytes: Some(sc_entity_bytes),
         sc_cached: Some(false),
     };
 

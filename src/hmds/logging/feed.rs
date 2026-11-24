@@ -67,11 +67,11 @@ where
         let mut result = format!(
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>
     <feed xmlns=\"http://www.w3.org/2005/Atom\">
-    <title type=\"text\">CDNI Logging Feed</title>
-    <updated>{}</updated>
-    <id>urn:uuid:{}</id>
-    <generator version=\"{}\">{}</generator>
-    <author><name>{}</name></author>",
+        <title type=\"text\">CDNI Logging Feed</title>
+        <updated>{}</updated>
+        <id>urn:uuid:{}</id>
+        <generator version=\"{}\">{}</generator>
+        <author><name>{}</name></author>",
             header.updated.to_rfc3339(),
             header.uuid,
             header.generator.version,
@@ -84,13 +84,13 @@ where
             for entry in entries {
                 result += &format!(
                     "
-    <entry>
-        <title type=\"text\">{}</title>
-        <id>urn:uuid:{}</id>
-        <updated>{}</updated>
-        <content src=\"log/{}\" type=\"application/cdni\" ptype=\"logging-file\"/>
-        <summary>{}</summary>
-    </entry>",
+        <entry>
+            <title type=\"text\">{}</title>
+            <id>urn:uuid:{}</id>
+            <updated>{}</updated>
+            <content src=\"log/{}\" type=\"application/cdni\" ptype=\"logging-file\"/>
+            <summary>{}</summary>
+        </entry>",
                     entry.title,
                     entry.id,
                     entry.updated.to_rfc3339(),
@@ -101,7 +101,8 @@ where
             result
         };
 
-        result += " </feed>";
+        result += "
+    </feed>\n";
 
         Ok(result)
     }
