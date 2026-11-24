@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+	<logging xmlns="urn:ietf:params:xml:ns:yang:ietf-cdni">
+		<field>
+			<name>date</name>
+			<description>The date on which the processing of the request completed on the Surrogate.</description>
+			<field_type>
+				<data_type>date</data_type>
+				<required>true</required>
+				<lst>false</lst>
+			</field_type>
+		</field>
+	</logging>
+</config>

@@ -1,0 +1,66 @@
+module cdni {
+    namespace "urn:ietf:params:xml:ns:yang:ietf-cdni";
+    prefix "cdni";
+
+    container logging {
+        typedef version {
+            type enumeration {
+                enum cdni_http_request_v1;
+            }
+        }
+
+        typedef field_data_type {
+            type enumeration {
+                enum date;
+                enum time;
+                enum dec;
+                enum string;
+                enum ip_address;
+                enum host;
+                enum http_method;
+                enum uri;
+                enum bool;
+            }
+        }
+
+        grouping field_type {
+            leaf data_type {
+                type field_data_type;
+            }
+            leaf description {
+                type string;
+            }
+            leaf required {
+                type boolean;
+            }
+            leaf lst {
+                type boolean;
+            }
+        }
+
+        list field {
+            key "name";
+            leaf name {
+                type string;
+            }
+            leaf description {
+                type string;
+            }
+            container field_type {
+                uses field_type;
+            }
+        }
+
+        list record {
+            key "version";
+            leaf version {
+                type version;
+            }
+            leaf-list fields {
+                type leafref {
+                    path "../../field/name";
+                }
+            }
+        }
+    }
+}
