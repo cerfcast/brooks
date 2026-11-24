@@ -43,7 +43,7 @@ Regex Literal (Invalid Syntax)
 =================================
 Regex Literal (Exotic 1)
 =================================
-/a.*?b/i 
+/a.*?b/i
 ---
 (mel
  (expr
@@ -155,31 +155,23 @@ IP v4 Literal (Invalid)
 ---
 (mel
  (ERROR
-  (string_concat)
+  (member_access)
+  (expr
+   (literal
+    (number_literal)
+   )
+  )
+  (member_access)
+  (expr
+   (literal
+    (number_literal)
+   )
+  )
+  (member_access)
  )
  (expr
-  (binary_expr
-   (expr
-    (binary_expr
-     (expr
-      (literal
-       (number_literal)
-      )
-     )
-     (string_concat)
-     (expr
-      (literal
-       (number_literal)
-      )
-     )
-    )
-   )
-   (string_concat)
-   (expr
-    (literal
-     (number_literal)
-    )
-   )
+  (literal
+   (number_literal)
   )
  )
 )
@@ -190,37 +182,17 @@ IP v4 Literal (Invalid 2)
 a.8.8.8
 ---
 (mel
+ (ERROR
+  (identifier)
+  (member_access)
+  (number_literal)
+  (member_access)
+  (number_literal)
+  (member_access)
+ )
  (expr
-  (binary_expr
-   (expr
-    (binary_expr
-     (expr
-      (binary_expr
-       (expr
-        (identifier)
-       )
-       (string_concat)
-       (expr
-        (literal
-         (number_literal)
-        )
-       )
-      )
-     )
-     (string_concat)
-     (expr
-      (literal
-       (number_literal)
-      )
-     )
-    )
-   )
-   (string_concat)
-   (expr
-    (literal
-     (number_literal)
-    )
-   )
+  (literal
+   (number_literal)
   )
  )
 )

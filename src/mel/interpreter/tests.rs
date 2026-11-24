@@ -2235,7 +2235,7 @@ mod interpreter_tests {
 
     #[test]
     fn test_interp_member_access() {
-        let code = "req^incoming";
+        let code = "req.incoming";
 
         let compile_result = compile(code);
         let ast = compile_result.expect("Compilation error");
@@ -2304,7 +2304,7 @@ mod interpreter_tests {
 
     #[test]
     fn test_interp_member_access2() {
-        let code = "req^incoming";
+        let code = "req.incoming";
 
         let compile_result = compile(code);
         let ast = compile_result.expect("Compilation error");
@@ -2437,7 +2437,7 @@ mod interpreter_logger_tests {
 
     #[test]
     fn test_trace_logging() {
-        let code = "req^incoming";
+        let code = "req.incoming";
 
         let compile_result = compile(code);
         let ast = compile_result.expect("Compilation error");

@@ -762,7 +762,7 @@ mod tests {
 
     #[test]
     fn serialize_member_access_expression() {
-        let code = "a^b^c";
+        let code = "a.b.c";
         let expected = "Member Access Expression:
 \tBase:
 \t\tMember Access Expression:
@@ -1287,7 +1287,7 @@ mod analyzed_serializer_tests {
 
     #[test]
     fn serialize_analyzed_member_access_binary_expr_nested() {
-        let code = "req^incoming^headers . \"testing\"";
+        let code = "req.incoming.headers . \"testing\"";
         let expected = "Binary Expression:
 \tLeft:
 \t\tMember Access Expression:
@@ -1346,7 +1346,7 @@ mod analyzed_serializer_tests {
 
     #[test]
     fn serialize_analyzed_member_access_binary_expr() {
-        let code = "req^incoming and true";
+        let code = "req.incoming and true";
         let expected = "Binary Expression:
 \tLeft:
 \t\tMember Access Expression:
@@ -1396,7 +1396,7 @@ mod analyzed_serializer_tests {
 
     #[test]
     fn serialize_analyzed_member_access_function_call_expr() {
-        let code = "req^callable(5)";
+        let code = "req.callable(5)";
         let expected = "Function Call:
 \tCallee:
 \t\tMember Access Expression:

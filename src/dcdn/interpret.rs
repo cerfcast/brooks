@@ -105,6 +105,16 @@ impl<'a> TryFrom<FromableRequest<'a>> for reqwest::Request {
     }
 }
 
-pub(crate) fn size_of_response(_response: &http::Response<Vec<u8>>) -> usize {
-    0
+pub(crate) fn size_of_response(response: &http::Response<Vec<u8>>) -> usize {
+    let mut length = response
+        .headers()
+        .keys()
+        .map(|k| k.as_str().len())
+        .sum::<usize>();
+    length += response.headers().values().map(|v| v.len()).sum::<usize>();
+    length += response.headers().len() * (2 /*: */ + 2/* \r\n */);
+    length += 2; /* \r\n */
+    length += response.body().len();
+
+    length
 }

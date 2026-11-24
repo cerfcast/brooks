@@ -671,7 +671,7 @@
     },
     "regex_literal": {
       "type": "PATTERN",
-      "value": "\\/[\\-0-9()*.+a-z$\\^#\\\\:|\\[\\]\\?A-Z]*\\/i?"
+      "value": "\\/[\\-0-9()*\\.+a-z$\\^#\\\\:|\\[\\]\\?A-Z]*\\/i?"
     },
     "ip_literal": {
       "type": "CHOICE",
@@ -728,11 +728,11 @@
     },
     "string_concat": {
       "type": "STRING",
-      "value": "."
+      "value": " . "
     },
     "member_access": {
       "type": "STRING",
-      "value": "^"
+      "value": "."
     },
     "eq": {
       "type": "STRING",

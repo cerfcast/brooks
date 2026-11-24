@@ -244,7 +244,7 @@ true and ! false
 =================================
 Boolean Check (Regex Equality)
 =================================
-"satisfy" ~= /testing/ 
+"satisfy" ~= /testing/
 ---
 (mel
  (expr
@@ -382,7 +382,7 @@ Ternary Expression Check (Left Grouping)
 =================================
 Simple Member Access
 =================================
-a^b^c + 5
+a.b.c + 5
 ---
 (mel
  (expr
@@ -457,7 +457,7 @@ IP Binary Expression (reversed)
 =================================
 IP Binary Expression (both sides IPv4 literals)
 =================================
-10.0.1.1 ipmatch 8.8.8.8 
+10.0.1.1 ipmatch 8.8.8.8
 ---
 (mel
  (expr

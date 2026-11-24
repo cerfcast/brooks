@@ -76,7 +76,7 @@ Function Call (Name Starts With Number)
 =================================
 Function Call (Name via Member Access)
 =================================
-a^b^c(5, 6)
+a.b.c(5, 6)
 ---
 (mel
  (expr
